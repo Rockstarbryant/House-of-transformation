@@ -1,0 +1,27 @@
+import React, { useState } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
+import AdminDashboard from '../components/admin/AdminDashboard';
+import ManageSermons from '../components/admin/ManageSermons';
+import ManageEvents from '../components/admin/ManageEvents';
+import ManageBlog from '../components/admin/ManageBlog';
+import ManageGallery from '../components/admin/ManageGallery';
+import ManageLiveStream from '../components/admin/ManageLiveStream';
+import ManageUsers from '../components/admin/ManageUsers';
+
+const AdminPage = () => {
+  return (
+    <div className="pt-20 min-h-screen bg-gray-50">
+      <Routes>
+        <Route path="/" element={<AdminDashboard />} />
+        <Route path="/sermons" element={<ManageSermons />} />
+        <Route path="/events" element={<ManageEvents />} />
+        <Route path="/blog" element={<ManageBlog />} />
+        <Route path="/gallery" element={<ManageGallery />} />
+        <Route path="/livestream" element={<ManageLiveStream />} />
+        <Route path="/users" element={<ManageUsers />} />
+      </Routes>
+    </div>
+  );
+};
+
+export default AdminPage;
