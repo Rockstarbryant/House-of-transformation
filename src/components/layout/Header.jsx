@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogIn, LogOut, Settings } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, Settings, Users } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { CHURCH_INFO } from '../../utils/constants';
 import AuthModal from '../auth/AuthModal';
@@ -36,8 +36,8 @@ const Header = () => {
     { path: '/gallery', label: 'Gallery' },
     { path: '/kids-zone', label: 'Kids Zone' },
     { path: '/volunteer', label: 'Volunteer' },
-    { path: '/contact', label: 'Contact' },
-    { path: '/userprofile', label: 'Profile' }
+    { path: '/users', label: 'Members' },
+    { path: '/contact', label: 'Contact' }
   ];
 
   const isActivePath = (path) => {

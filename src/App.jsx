@@ -21,6 +21,7 @@ import EventsPage from './pages/EventsPage';
 import DonatePage from './pages/DonatePage';
 import MinistriesPage from './pages/MinistriesPage';
 import UserProfilePage from './pages/UserProfilePage';
+import UsersPortalPage from './pages/UsersPortalPage';
 import ContactPage from './pages/ContactPage';
 import AdminLiveStreamPage from './pages/AdminLiveStreamPage';
 import AdminPage from './pages/AdminPage';
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/events" element={<EventsPage />} />
                 <Route path="/donate" element={<DonatePage />} />
                 <Route path="/ministries" element={<MinistriesPage />} />
+                <Route path="/users" element={<UsersPortalPage />} />
                 <Route path="/profile/:userId" element={<UserProfilePage />} />
                 <Route path="/contact" element={<ContactPage />} />
 

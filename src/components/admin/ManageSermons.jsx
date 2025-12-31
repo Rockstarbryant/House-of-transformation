@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Pin, X } from 'lucide-react';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
 import Button from '../common/Button';
@@ -12,6 +12,7 @@ const ManageSermons = () => {
   const [sermonType, setSermonType] = useState('text');
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [pinnedCount, setPinnedCount] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
     pastor: '',
@@ -31,6 +32,8 @@ const ManageSermons = () => {
     try {
       const data = await sermonService.getSermons({ limit: 100 });
       setSermons(data.sermons || []);
+      const pinned = (data.sermons || []).filter(s => s.pinned).length;
+      setPinnedCount(pinned);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -60,7 +63,6 @@ const ManageSermons = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate based on type
     if (sermonType === 'photo' && !formData.thumbnail) {
       alert('Please upload or add a thumbnail URL for photo sermons');
       return;
@@ -115,6 +117,22 @@ const ManageSermons = () => {
     }
   };
 
+  const handlePin = async (id) => {
+    if (pinnedCount >= 3 && !sermons.find(s => s._id === id)?.pinned) {
+      alert('You can only pin up to 3 sermons');
+      return;
+    }
+
+    try {
+      const sermon = sermons.find(s => s._id === id);
+      await sermonService.updateSermon(id, { pinned: !sermon.pinned });
+      alert(sermon.pinned ? 'Sermon unpinned' : 'Sermon pinned!');
+      fetchSermons();
+    } catch (error) {
+      alert('Error pinning sermon');
+    }
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -136,6 +154,9 @@ const ManageSermons = () => {
     }
   };
 
+  const pinnedSermons = sermons.filter(s => s.pinned);
+  const unpinnedSermons = sermons.filter(s => !s.pinned);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -151,6 +172,19 @@ const ManageSermons = () => {
           Add New Sermon
         </Button>
       </div>
+
+      {/* Pin Info Alert */}
+      <Card className="mb-6 bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <Pin className="text-blue-600 flex-shrink-0 mt-1" size={20} />
+          <div>
+            <h3 className="font-semibold text-blue-900">Pinned Sermons</h3>
+            <p className="text-sm text-blue-700">
+              You have pinned <strong>{pinnedCount}/3</strong> sermons. Pinned sermons appear on the homepage.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {showForm && (
         <Card className="mb-8">
@@ -187,7 +221,6 @@ const ManageSermons = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Basic Info */}
             <Input
               name="title"
               label="Sermon Title *"
@@ -231,19 +264,17 @@ const ManageSermons = () => {
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                rows="4"
+                rows="6"
                 placeholder="Sermon description or key points..."
               />
             </div>
 
-            {/* Conditional Fields Based on Type */}
             {(sermonType === 'photo' || sermonType === 'video') && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {sermonType === 'photo' ? 'Thumbnail Image *' : 'Thumbnail Image *'}
                 </label>
                 <div className="space-y-3">
-                  {/* File Upload Option */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">
                       Upload Image (JPG, PNG)
@@ -256,7 +287,6 @@ const ManageSermons = () => {
                     />
                   </div>
 
-                  {/* URL Option */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">
                       Or paste Image URL
@@ -293,7 +323,6 @@ const ManageSermons = () => {
               </div>
             )}
 
-            {/* Preview */}
             {imagePreview && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Preview</label>
@@ -328,58 +357,120 @@ const ManageSermons = () => {
         </Card>
       )}
 
-      {/* Sermons List */}
-      <div className="space-y-4">
-        {sermons.length === 0 ? (
-          <Card className="text-center py-12">
-            <p className="text-gray-600">No sermons yet. Click "Add New Sermon" to get started!</p>
-          </Card>
-        ) : (
-          sermons.map((sermon) => (
-            <Card key={sermon._id} hover>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{getTypeIcon(sermon.type)}</span>
-                    <div>
-                      <h3 className="text-xl font-bold text-blue-900">{sermon.title}</h3>
-                      <p className="text-gray-600">{sermon.pastor}</p>
+      {/* Pinned Sermons Section */}
+      {pinnedSermons.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+            <Pin size={24} className="text-blue-600" />
+            Pinned Sermons ({pinnedSermons.length}/3)
+          </h2>
+          <div className="space-y-4">
+            {pinnedSermons.map((sermon) => (
+              <Card key={sermon._id} hover>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{getTypeIcon(sermon.type)}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-blue-900">{sermon.title}</h3>
+                          <Pin size={16} className="text-blue-600" />
+                        </div>
+                        <p className="text-gray-600">{sermon.pastor}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 items-center mt-2">
+                      <span className="text-xs bg-blue-100 text-blue-900 px-3 py-1 rounded-full font-semibold">
+                        {sermon.category}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded-full">
+                        {new Date(sermon.date).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex gap-2 items-center mt-2">
-                    <span className="text-xs bg-blue-100 text-blue-900 px-3 py-1 rounded-full font-semibold">
-                      {sermon.category}
-                    </span>
-                    <span className="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded-full">
-                      {new Date(sermon.date).toLocaleDateString()}
-                    </span>
-                    <span className="text-xs bg-purple-100 text-purple-900 px-3 py-1 rounded-full font-semibold">
-                      {sermon.type || 'text'}
-                    </span>
+                  <div className="flex gap-2 ml-4">
+                    <button 
+                      onClick={() => handlePin(sermon._id)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="Unpin"
+                    >
+                      <Pin size={20} fill="currentColor" />
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(sermon)}
+                      className="p-2 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                    >
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(sermon._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
                   </div>
-                  {sermon.description && (
-                    <p className="text-gray-700 mt-2 text-sm line-clamp-2">{sermon.description}</p>
-                  )}
                 </div>
-                <div className="flex gap-2 ml-4">
-                  <button 
-                    onClick={() => handleEdit(sermon)}
-                    className="p-2 text-blue-900 hover:bg-blue-50 rounded transition-colors"
-                  >
-                    <Edit size={20} />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(sermon._id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Unpinned Sermons Section */}
+      {unpinnedSermons.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold text-blue-900 mb-4">All Sermons</h2>
+          <div className="space-y-4">
+            {unpinnedSermons.map((sermon) => (
+              <Card key={sermon._id} hover>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{getTypeIcon(sermon.type)}</span>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-blue-900">{sermon.title}</h3>
+                        <p className="text-gray-600">{sermon.pastor}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 items-center mt-2">
+                      <span className="text-xs bg-blue-100 text-blue-900 px-3 py-1 rounded-full font-semibold">
+                        {sermon.category}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded-full">
+                        {new Date(sermon.date).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs bg-purple-100 text-purple-900 px-3 py-1 rounded-full font-semibold">
+                        {sermon.type || 'text'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <button 
+                      onClick={() => handlePin(sermon._id)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="Pin to homepage"
+                    >
+                      <Pin size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(sermon)}
+                      className="p-2 text-blue-900 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(sermon._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

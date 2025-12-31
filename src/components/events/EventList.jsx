@@ -30,7 +30,7 @@ const EventList = ({ limit, showViewAll = false }) => {
     <div>
       <div className="space-y-6 max-w-4xl mx-auto">
         {events.map(event => (
-          <EventCard key={event.id} event={event} />
+          <EventCard key={event._id || event.id} event={event} />
         ))}
       </div>
       {showViewAll && (

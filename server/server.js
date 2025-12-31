@@ -1,5 +1,8 @@
 const express = require('express');
+//const dotenv = require('dotenv');
+const path = require('path');
 const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -44,6 +47,8 @@ app.get('/api/health', (req, res) => {
 // Add this before your routes in server.js
 app.use('/uploads', express.static('uploads'));
 
+const userRoutes = require('./routes/userRoutes');
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/sermons', require('./routes/sermonRoutes'));
@@ -51,6 +56,8 @@ app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
+//app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/users', userRoutes);
 
 // 404 handler
 app.use((req, res) => {

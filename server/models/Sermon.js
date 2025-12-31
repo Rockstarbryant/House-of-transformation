@@ -27,7 +27,7 @@ const sermonSchema = new mongoose.Schema({
   description: {
     type: String,
     trim: true,
-    maxlength: [1000, 'Description cannot be more than 1000 characters']
+    maxlength: [5000, 'Description cannot be more than 5000 characters']
   },
   // Media fields
   type: {
@@ -72,7 +72,15 @@ const sermonSchema = new mongoose.Schema({
     ref: 'User'
   }],
   
-  // Metadata
+  // Pin feature
+  pinned: {
+    type: Boolean,
+    default: false
+  },
+  pinnedOrder: {
+    type: Number,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -82,7 +90,9 @@ const sermonSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Index for better query performance

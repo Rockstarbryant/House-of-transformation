@@ -1,72 +1,374 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Award } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { User, Mail, Phone, MapPin, Calendar, Heart, MessageCircle, Edit, ArrowLeft, Share2 } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
 import Card from '../components/common/Card';
+import Button from '../components/common/Button';
 
 const UserProfilePage = () => {
   const { userId } = useParams();
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuthContext();
   const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({});
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     fetchProfile();
   }, [userId]);
 
-  const fetchProfile = async () => {
+  const getAuthToken = () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return '';
+    
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`);
-      const data = await response.json();
-      setProfile(data.user);
-    } catch (error) {
-      console.error('Error:', error);
+      const parsed = JSON.parse(token);
+      return parsed.value || token;
+    } catch (e) {
+      return token;
     }
   };
 
-  if (!profile) return <div className="text-center py-20">Loading...</div>;
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('User not found');
+      }
+      
+      const data = await response.json();
+      setProfile(data.user);
+      setEditData({
+        name: data.user.name,
+        bio: data.user.bio || '',
+        location: data.user.location || '',
+        phone: data.user.phone || ''
+      });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError('Could not load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      const token = getAuthToken();
+
+      if (!token) {
+        setError('You must be logged in to update your profile');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editData)
+      });
+      
+      if (response.status === 403) {
+        setError('You can only edit your own profile');
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+      
+      const data = await response.json();
+      setProfile(data.user);
+      setIsEditing(false);
+      setSuccess('Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setError(error.message || 'Error updating profile');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="pt-24 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="pt-24 pb-20 min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4">
+          <Card className="text-center py-12">
+            <User size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-600 text-lg mb-4">User profile not found</p>
+            <Button onClick={() => navigate('/users')} variant="primary">
+              <ArrowLeft size={16} /> Back to Members
+            </Button>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const isOwnProfile = currentUser && currentUser.id === userId;
+  const canEdit = isOwnProfile || (currentUser && currentUser.role === 'admin');
+
+  const getRoleColor = (role) => {
+    const colors = {
+      admin: 'bg-purple-100 text-purple-800 border-purple-300',
+      pastor: 'bg-red-100 text-red-800 border-red-300',
+      bishop: 'bg-blue-100 text-blue-800 border-blue-300',
+      usher: 'bg-green-100 text-green-800 border-green-300',
+      worship_team: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      volunteer: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+      member: 'bg-gray-100 text-gray-800 border-gray-300'
+    };
+    return colors[profile.role] || 'bg-gray-100 text-gray-800 border-gray-300';
+  };
 
   return (
-    <div className="pt-20 pb-20 min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <Card>
-          <div className="flex items-center gap-6 mb-8">
-            <div className="w-24 h-24 bg-blue-900 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-              {profile.name.charAt(0)}
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-blue-900">{profile.name}</h1>
-              <p className="text-gray-600 capitalize">{profile.role.replace('_', ' ')}</p>
-            </div>
-          </div>
+    <div className="pt-24 pb-20 min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/users')}
+          className="flex items-center gap-2 text-blue-900 hover:text-blue-700 font-semibold mb-6"
+        >
+          <ArrowLeft size={20} /> Back to Members
+        </button>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <div className="flex items-center gap-3">
-              <Mail className="text-blue-900" size={20} />
-              <span>{profile.email}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Phone className="text-blue-900" size={20} />
-              <span>{profile.phone || 'Not provided'}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <MapPin className="text-blue-900" size={20} />
-              <span>{profile.location || 'Busia County, Kenya'}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar className="text-blue-900" size={20} />
-              <span>Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
-            </div>
+        {/* Success Message */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded flex items-center gap-3">
+            <Heart size={20} />
+            {success}
           </div>
+        )}
 
-          <div className="border-t pt-6">
-            <h2 className="text-2xl font-bold text-blue-900 mb-4">Ministry Involvement</h2>
-            <div className="flex flex-wrap gap-2">
-              {profile.ministries?.map((ministry, index) => (
-                <span key={index} className="bg-blue-100 text-blue-900 px-4 py-2 rounded-full">
-                  {ministry}
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded flex items-center gap-3">
+            <Heart size={20} />
+            {error}
+          </div>
+        )}
+
+        {/* Profile Header Card */}
+        <Card className="mb-8">
+          <div className="flex flex-col md:flex-row gap-8 mb-8">
+            {/* Avatar */}
+            <div className="flex-shrink-0">
+              <div className="w-32 h-32 bg-gradient-to-br from-blue-900 to-blue-700 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-lg">
+                {profile.name.charAt(0).toUpperCase()}
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="flex-grow">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                <div>
+                  <h1 className="text-4xl font-bold text-blue-900 mb-2">{profile.name}</h1>
+                  <p className="text-gray-600 text-lg">@{profile.username || profile.email.split('@')[0]}</p>
+                </div>
+                {canEdit && (
+                  <Button
+                    onClick={() => setIsEditing(!isEditing)}
+                    variant={isEditing ? 'danger' : 'primary'}
+                    className="mt-4 md:mt-0"
+                  >
+                    <Edit size={16} /> {isEditing ? 'Cancel' : 'Edit Profile'}
+                  </Button>
+                )}
+              </div>
+
+              {/* Role Badge */}
+              <div className="mb-6">
+                <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold border-2 ${getRoleColor(profile.role)}`}>
+                  {profile.role.replace('_', ' ').toUpperCase()}
                 </span>
-              )) || <p className="text-gray-600">Not involved in any ministries yet</p>}
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-gray-200">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-900">{profile.blogsCreated || 0}</p>
+                  <p className="text-gray-600 text-sm">Posts</p>
+                </div>
+                <div className="text-center border-l border-r border-gray-300">
+                  <p className="text-2xl font-bold text-blue-900">{profile.testimonyCount || 0}</p>
+                  <p className="text-gray-600 text-sm">Testimonies</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-900">{profile.ministries?.length || 0}</p>
+                  <p className="text-gray-600 text-sm">Ministries</p>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Action Buttons */}
+          {!isEditing && (
+            <div className="flex gap-3">
+              <Button variant="primary" fullWidth className="flex items-center justify-center gap-2">
+                <MessageCircle size={18} /> Send Message
+              </Button>
+              <Button variant="outline" fullWidth className="flex items-center justify-center gap-2">
+                <Share2 size={18} /> Share Profile
+              </Button>
+            </div>
+          )}
         </Card>
+
+        {/* About Section */}
+        <Card className="mb-8">
+          <h2 className="text-2xl font-bold text-blue-900 mb-6">About</h2>
+
+          {isEditing ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
+                <textarea
+                  value={editData.bio}
+                  onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                  rows="4"
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
+                  placeholder="Tell us about yourself..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
+                <input
+                  type="text"
+                  value={editData.location}
+                  onChange={(e) => setEditData({ ...editData, location: e.target.value })}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
+                  placeholder="City, Country"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={editData.phone}
+                  onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
+                  placeholder="+254..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button onClick={handleSaveProfile} variant="primary" fullWidth>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {profile.bio ? (
+                <p className="text-gray-700 leading-relaxed text-lg">{profile.bio}</p>
+              ) : (
+                <p className="text-gray-500 italic">No bio added yet</p>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="flex items-start gap-4">
+                  <Mail className="text-blue-900 flex-shrink-0 mt-1" size={22} />
+                  <div>
+                    <p className="text-gray-600 text-sm">Email</p>
+                    <a href={`mailto:${profile.email}`} className="text-blue-900 font-semibold hover:underline">
+                      {profile.email}
+                    </a>
+                  </div>
+                </div>
+
+                {profile.phone && (
+                  <div className="flex items-start gap-4">
+                    <Phone className="text-blue-900 flex-shrink-0 mt-1" size={22} />
+                    <div>
+                      <p className="text-gray-600 text-sm">Phone</p>
+                      <a href={`tel:${profile.phone}`} className="text-blue-900 font-semibold hover:underline">
+                        {profile.phone}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {profile.location && (
+                  <div className="flex items-start gap-4">
+                    <MapPin className="text-blue-900 flex-shrink-0 mt-1" size={22} />
+                    <div>
+                      <p className="text-gray-600 text-sm">Location</p>
+                      <p className="text-blue-900 font-semibold">{profile.location}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-4">
+                  <Calendar className="text-blue-900 flex-shrink-0 mt-1" size={22} />
+                  <div>
+                    <p className="text-gray-600 text-sm">Member Since</p>
+                    <p className="text-blue-900 font-semibold">
+                      {new Date(profile.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Ministries Section */}
+        {(profile.ministries?.length > 0 || isEditing) && (
+          <Card>
+            <h2 className="text-2xl font-bold text-blue-900 mb-6">Ministry Involvement</h2>
+            <div className="flex flex-wrap gap-3">
+              {profile.ministries?.length > 0 ? (
+                profile.ministries.map((ministry, index) => (
+                  <span key={index} className="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-5 py-2 rounded-full font-semibold shadow">
+                    {ministry}
+                  </span>
+                ))
+              ) : (
+                <p className="text-gray-600 italic">Not involved in any ministries yet</p>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a name']
   },
+  username: {
+    type: String,
+    unique: true,
+    sparse: true,
+    lowercase: true
+  },
   email: {
     type: String,
     required: [true, 'Please add an email'],
@@ -18,19 +24,48 @@ const userSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
+  phone: {
+    type: String,
+    sparse: true
+  },
+  location: String,
+  bio: String,
+  avatar: {
+    type: String,
+    default: null
+  },
   role: {
     type: String,
-    enum: ['member', 'volunteer', 'admin'],
+    enum: ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'],
     default: 'member'
   },
-  phone: String,
+  ministries: [{
+    type: String
+  }],
+  // Engagement metrics
+  blogsCreated: {
+    type: Number,
+    default: 0
+  },
+  testimonyCount: {
+    type: Number,
+    default: 0
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
   createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Encrypt password
+// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
     next();
@@ -39,9 +74,25 @@ userSchema.pre('save', async function(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Match password
+// Generate username from email if not provided
+userSchema.pre('save', function(next) {
+  if (!this.username && this.email) {
+    this.username = this.email.split('@')[0] + Math.random().toString(36).substr(2, 9);
+  }
+  this.updatedAt = Date.now();
+  next();
+});
+
+// Match password method
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Hide sensitive fields
+userSchema.methods.toJSON = function() {
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
 };
 
 module.exports = mongoose.model('User', userSchema);
