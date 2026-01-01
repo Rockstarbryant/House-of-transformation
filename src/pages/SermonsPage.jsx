@@ -4,6 +4,10 @@ import SermonCardText from '../components/sermons/SermonCardText';
 import SermonCard from '../components/sermons/SermonCard';
 import Loader from '../components/common/Loader';
 import { sermonService } from '../services/api/sermonService';
+import { Plus } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
+import Button from '../components/common/Button';
+import PermissionAlert from '../components/common/PermissionAlert';
 
 const SermonsPage = () => {
   const [allSermons, setAllSermons] = useState([]);
@@ -82,6 +86,13 @@ const SermonsPage = () => {
     setShowAdvancedFilter(false);
   };
 
+  const { canPostSermon, user } = useAuthContext();
+
+  const handleAddSermon = () => {
+  alert('Sermon creation form coming soon');
+  // TODO: Create sermon form modal
+  };
+
   if (loading) return <Loader />;
 
   return (
@@ -89,25 +100,48 @@ const SermonsPage = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header with Settings Button */}
         <div className="px-4 py-6 border-b border-gray-200 flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Sermons</h1>
-            <p className="text-gray-600 text-sm mt-2">
-              {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              showAdvancedFilter
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-            title="Show/hide advanced filters"
-          >
-            {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
-            {showAdvancedFilter ? 'Close' : 'Filters'}
-          </button>
-        </div>
+  <div>
+    <h1 className="text-4xl font-bold text-gray-900">Sermons</h1>
+    <p className="text-gray-600 text-sm mt-2">
+      {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
+    </p>
+  </div>
+  <div className="flex flex-col gap-3">
+    {canPostSermon() && (
+      <Button
+        onClick={handleAddSermon}
+        variant="primary"
+        className="flex items-center gap-2"
+      >
+        <Plus size={20} /> Add Sermon
+      </Button>
+    )}
+    <button
+      onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+        showAdvancedFilter
+          ? 'bg-blue-100 text-blue-700'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+      title="Show/hide advanced filters"
+    >
+      {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
+      {showAdvancedFilter ? 'Close' : 'Filters'}
+    </button>
+  </div>
+    </div>
+
+    {!canPostSermon() && user && (
+  <div className="px-4 py-4">
+    <PermissionAlert
+      title="Cannot Add Sermons"
+      message="Only pastors and bishops can upload sermons."
+      requiredRole="pastor"
+      currentRole={user.role}
+      actionType="sermon upload"
+    />
+  </div>
+)}
 
         {/* Basic Search Filter - Always Visible */}
         <div className="px-4 py-3 border-b border-gray-200 bg-white">

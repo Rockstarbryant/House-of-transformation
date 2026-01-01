@@ -1,22 +1,37 @@
 const express = require('express');
 const {
-  getPosts,
-  getPost,
-  createPost,
-  updatePost,
-  deletePost
+  getBlogs,
+  getBlogsByCategory,
+  getBlog,
+  createBlog,
+  updateBlog,
+  deleteBlog,
+  approveBlog,
+  getPendingBlogs
 } = require('../controllers/blogController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
+const authorize = require('../middleware/roleAuth');
 
 const router = express.Router();
 
-router.route('/')
-  .get(getPosts)
-  .post(protect, authorize('admin'), createPost);
+// Public routes
+router.get('/', getBlogs);
+router.get('/category/:category', getBlogsByCategory);
+router.get('/:id', getBlog);
 
-router.route('/:id')
-  .get(getPost)
-  .put(protect, authorize('admin'), updatePost)
-  .delete(protect, authorize('admin'), deletePost);
+// Protected routes
+router.post(
+  '/',
+  protect,
+  authorize('member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'),
+  createBlog
+);
+
+router.put('/:id', protect, updateBlog);
+router.delete('/:id', protect, deleteBlog);
+
+// Admin routes
+router.get('/pending', protect, authorize('admin'), getPendingBlogs);
+router.put('/:id/approve', protect, authorize('admin'), approveBlog);
 
 module.exports = router;

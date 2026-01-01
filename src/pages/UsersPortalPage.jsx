@@ -222,17 +222,6 @@ const UsersPortalPage = () => {
                 >
                   View Profile
                 </Button>
-
-                {/* Message Button - if authenticated */}
-                {currentUser && currentUser.id !== user._id && (
-                  <Button
-                    onClick={() => alert(`Message feature coming soon!`)}
-                    className="mt-2 bg-blue-50 text-blue-900 hover:bg-blue-100"
-                    fullWidth
-                  >
-                    <MessageSquare size={16} /> Message
-                  </Button>
-                )}
               </Card>
             ))}
           </div>

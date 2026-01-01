@@ -1,23 +1,34 @@
 const express = require('express');
+const { protect } = require('../middleware/auth');
+const authorize = require('../middleware/roleAuth');
 const {
   getPhotos,
   uploadPhoto,
   deletePhoto,
   likePhoto
 } = require('../controllers/galleryController');
-const { protect, authorize } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+//const { protect, authorize } = require('../middleware/auth');
+const upload = require('../middleware/upload');      
 
 const router = express.Router();
 
 router.route('/')
   .get(getPhotos);
 
-// Upload with multer middleware
-router.post('/upload', protect, authorize('admin'), upload.single('photo'), uploadPhoto);
+// Protected routes - only pastor/bishop/admin can upload/delete
+router.post(
+  '/',
+  protect,
+  authorize('pastor', 'bishop', 'admin'),
+  uploadPhoto
+);
 
-router.route('/:id')
-  .delete(protect, authorize('admin'), deletePhoto);
+router.delete(
+  '/:id',
+  protect,
+  authorize('pastor', 'bishop', 'admin'),
+  deletePhoto
+);
 
 router.post('/:id/like', protect, likePhoto);
 

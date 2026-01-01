@@ -4,6 +4,10 @@ import GalleryFilter from '../components/gallery/GalleryFilter';
 import PhotoModal from '../components/gallery/PhotoModal';
 import Loader from '../components/common/Loader';
 import { galleryService } from '../services/api/galleryService';
+import { Plus } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
+import Button from '../components/common/Button';
+import PermissionAlert from '../components/common/PermissionAlert';
 
 const GalleryPage = () => {
   const [photos, setPhotos] = useState([]);
@@ -12,6 +16,14 @@ const GalleryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const { canUploadPhoto, user } = useAuthContext();
+  const [showUploadForm, setShowUploadForm] = useState(false);
+
+
+  const handlePhotoUpload = () => {
+  alert('Photo upload form coming soon');
+  // TODO: Create photo upload form modal
+  };
 
   useEffect(() => {
     fetchPhotos();
@@ -46,7 +58,18 @@ const GalleryPage = () => {
     <div className="pt-20 pb-20 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <h1 className="text-4xl font-bold text-blue-900 mb-8">Photo Gallery</h1>
-        
+        <p className="text-xl text-gray-600">Memories and moments from our community</p>
+
+         {canUploadPhoto() && (
+      <Button
+      onClick={handlePhotoUpload}
+      variant="primary"
+      className="flex items-center gap-2"
+      >
+      <Plus size={20} /> Upload Photo
+      </Button>
+      )}
+
         {error && (
           <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-8">
             {error}
@@ -63,6 +86,16 @@ const GalleryPage = () => {
           <GalleryGrid photos={filteredPhotos} onPhotoClick={setSelectedPhoto} />
         )}
       </div>
+
+      {!canUploadPhoto() && user && (
+  <PermissionAlert
+    title="Cannot Upload Photos"
+    message="Only pastors and bishops can upload photos to the gallery."
+    requiredRole="pastor"
+    currentRole={user.role}
+    actionType="photo upload"
+  />
+  )}
 
       {/* Modal displayed at page level */}
       {selectedPhoto && (

@@ -1,42 +1,177 @@
 import api from './authService';
-import { API_ENDPOINTS } from '../../utils/constants';
+
+const getAuthToken = () => {
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  try {
+    const parsed = JSON.parse(token);
+    return parsed.value || token;
+  } catch (e) {
+    return token;
+  }
+};
 
 export const blogService = {
-  async getPosts(params = {}) {
+  async getBlogs() {
     try {
-      const { page = 1, limit = 12, category } = params;
-      const queryParams = new URLSearchParams({ page, limit, ...(category && { category }) });
-      const response = await api.get(`${API_ENDPOINTS.BLOG.LIST}?${queryParams}`);
-      return response.data;
+      const response = await fetch('http://localhost:5000/api/blogs', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch blogs');
+      return data;
     } catch (error) {
       throw error;
     }
   },
 
-  async getPost(id) {
+  async getBlogsByCategory(category) {
     try {
-      const response = await api.get(API_ENDPOINTS.BLOG.GET(id));
-      return response.data;
+      const response = await fetch(`http://localhost:5000/api/blogs/category/${category}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch blogs');
+      return data;
     } catch (error) {
       throw error;
     }
   },
 
-  async createPost(postData) {
+  async getBlog(id) {
     try {
-      const response = await api.post(API_ENDPOINTS.BLOG.CREATE, postData);
-      return response.data;
+      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch blog');
+      return data;
     } catch (error) {
       throw error;
     }
+  },
+
+  async createBlog(blogData) {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('http://localhost:5000/api/blogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(blogData)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create blog');
+      }
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async updateBlog(id, blogData) {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(blogData)
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to update blog');
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async deleteBlog(id) {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to delete blog');
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async approveBlog(id) {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`http://localhost:5000/api/blogs/${id}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to approve blog');
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async getPendingBlogs() {
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('http://localhost:5000/api/blogs/pending', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch pending blogs');
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Legacy method for compatibility
+  async getPosts() {
+    return this.getBlogs();
+  },
+
+  async createBlogPost(blogData) {
+    return this.createBlog(blogData);
   },
 
   async deletePost(id) {
-  try {
-    const response = await api.delete(API_ENDPOINTS.BLOG.DELETE(id));
-    return response.data;
-  } catch (error) {
-    throw error;
+    return this.deleteBlog(id);
   }
-}
 };

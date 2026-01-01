@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
-
+const blogRoutes = require('./routes/blogRoutes');
 // Load env vars
 dotenv.config();
 
@@ -56,7 +56,7 @@ app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
-//app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/blogs', blogRoutes);
 app.use('/api/users', userRoutes);
 
 // 404 handler

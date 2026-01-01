@@ -3,7 +3,7 @@ import BlogCard from './BlogCard';
 import Loader from '../common/Loader';
 import { blogService } from '../../services/api/blogService';
 
-const BlogList = ({ limit, category }) => {
+const BlogList = ({ limit, category, onBlogDelete, onBlogEdit }) => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,14 +15,38 @@ const BlogList = ({ limit, category }) => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const data = await blogService.getPosts({ limit, category });
-      setPosts(data.posts || data);
+      let data;
+      if (category) {
+        data = await blogService.getBlogsByCategory(category);
+      } else {
+        data = await blogService.getBlogs();
+      }
+      setPosts(data.blogs || data);
       setError(null);
     } catch (err) {
       console.error('Error fetching posts:', err);
       setError('Failed to load blog posts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (blogId) => {
+    try {
+      await blogService.deleteBlog(blogId);
+      setPosts(posts.filter(p => p._id !== blogId));
+      if (onBlogDelete) {
+        onBlogDelete(blogId);
+      }
+    } catch (err) {
+      console.error('Error deleting blog:', err);
+      alert('Failed to delete blog post');
+    }
+  };
+
+  const handleEdit = (blog) => {
+    if (onBlogEdit) {
+      onBlogEdit(blog);
     }
   };
 
@@ -35,7 +59,12 @@ const BlogList = ({ limit, category }) => {
   return (
     <div className="grid md:grid-cols-3 gap-8">
       {posts.map(post => (
-        <BlogCard key={post._id} post={post} />
+        <BlogCard 
+          key={post._id} 
+          post={post}
+          onDelete={handleDelete}
+          onEdit={handleEdit}
+        />
       ))}
     </div>
   );
