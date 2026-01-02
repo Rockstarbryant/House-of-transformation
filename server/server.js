@@ -8,6 +8,7 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const blogRoutes = require('./routes/blogRoutes');
 const volunteerRoutes = require('./routes/volunteerRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 // Load env vars
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 app.use('/api/blogs', blogRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/volunteers', volunteerRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // 404 handler
 app.use((req, res) => {

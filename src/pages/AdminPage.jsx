@@ -8,6 +8,7 @@ import ManageGallery from '../components/admin/ManageGallery';
 import ManageLiveStream from '../components/admin/ManageLiveStream';
 import ManageUsers from '../components/admin/ManageUsers';
 import ManageVolunteers from '../components/admin/ManageVolunteers';
+import ManageFeedback from '../components/admin/ManageFeedback';
 
 const AdminPage = () => {
   return (
@@ -21,6 +22,7 @@ const AdminPage = () => {
         <Route path="/livestream" element={<ManageLiveStream />} />
         <Route path="/users" element={<ManageUsers />} />
         <Route path="/volunteers" element={<ManageVolunteers />} />
+        <Route path="/feedback" element={<ManageFeedback />} />
       </Routes>
     </div>
   );

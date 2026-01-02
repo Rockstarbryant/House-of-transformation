@@ -1,7 +1,7 @@
 // src/components/layout/Header.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogIn, LogOut, Settings } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, Settings, ChevronDown } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { CHURCH_INFO } from '../../utils/constants';
 import AuthModal from '../auth/AuthModal';
@@ -11,6 +11,7 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   
   const { user, isAdmin, logout } = useAuthContext();
@@ -29,19 +30,35 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   }, [location]);
 
+  useEffect(() => {
+    // Close dropdown when route changes
+    setShowDropdown(false);
+  }, [location]);
+
   const navLinks = [
     { path: '/', label: 'Home' },
-    { path: '/about', label: 'About' },
+    { path: '/about', label: 'About' }
+  ];
+
+  const dropdownLinks = [
     { path: '/sermons', label: 'Sermons' },
     { path: '/events', label: 'Events' },
-    { path: '/gallery', label: 'Gallery' },
+    { path: '/gallery', label: 'Gallery' }
+  ];
+
+  const navLinksAfterDropdown = [
     { path: '/volunteer', label: 'Volunteer' },
     { path: '/users', label: 'Members' },
-    { path: '/contact', label: 'Contact' }
+    { path: '/contact', label: 'Contact' },
+    { path: '/feedback', label: 'Feedback' }
   ];
 
   const isActivePath = (path) => {
     return location.pathname === path;
+  };
+
+  const isDropdownActive = () => {
+    return dropdownLinks.some(link => isActivePath(link.path));
   };
 
   const handleAuthClick = () => {
@@ -55,81 +72,143 @@ const Header = () => {
 
   return (
     <>
+      {/* DARK RED BACKGROUND, WHITE TEXT */}
       <nav className={`fixed w-full z-50 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white shadow-md border-b border-slate-200' 
-          : 'bg-white/80 backdrop-blur-md border-b border-slate-200/50'
+          ? 'bg-red-900 shadow-lg' 
+          : 'bg-red-900'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            
+            {/* LOGO & CHURCH NAME - FAR LEFT (EXPANDED) */}
+            <Link to="/" className="flex items-center gap-4 hover:opacity-80 transition-opacity flex-shrink-0">
               <img 
                 src="https://pbs.twimg.com/profile_images/700352011582251008/wrxEHL3q.jpg"
                 alt={CHURCH_INFO.name}
-                className="w-18 h-15 rounded-full object-cover border-2 border-blue-600"
+                className="w-20 h-20 rounded-full object-cover border-2 border-white"
               />
-              <div>
-                <h1 className={`font-bold text-lg transition-colors ${isScrolled ? 'text-slate-900' : 'text-slate-900'}`}>
+              <div className="flex flex-col">
+                <h1 className="font-bold text-lg text-white leading-tight">
                   {CHURCH_INFO.name}
                 </h1>
-                <p className="text-blue-600 text-xs font-semibold">{CHURCH_INFO.location}</p>
+                <p className="text-white/90 text-sm font-semibold">{CHURCH_INFO.location}</p>
               </div>
             </Link>
 
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-8">
-              <div className="flex gap-6">
+            {/* DESKTOP NAVIGATION - CENTER */}
+            <div className="hidden lg:flex items-center gap-8 flex-grow justify-center">
+              <div className="flex gap-6 items-center">
                 {navLinks.map((link) => (
                   <Link
                     key={link.path}
                     to={link.path}
                     className={`font-medium transition-colors duration-200 ${
                       isActivePath(link.path) 
-                        ? 'text-blue-600 font-semibold' 
-                        : 'text-slate-700 hover:text-blue-600'
+                        ? 'text-white font-bold border-b-2 border-white pb-1' 
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+
+                {/* DROPDOWN MENU */}
+                <div className="relative group">
+                  <button
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className={`font-medium transition-colors duration-200 flex items-center gap-2 pb-1 ${
+                      isDropdownActive() 
+                        ? 'text-white font-bold border-b-2 border-white' 
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    Content
+                    <ChevronDown 
+                      size={18} 
+                      className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {/* Dropdown Content */}
+                  <div className={`absolute left-0 mt-0 w-48 bg-red-900 rounded-lg shadow-lg border border-red-800 overflow-hidden transition-all duration-200 origin-top ${
+                    showDropdown 
+                      ? 'opacity-100 visible scale-y-100' 
+                      : 'opacity-0 invisible scale-y-95'
+                  }`}>
+                    <div className="py-2">
+                      {dropdownLinks.map((link) => (
+                        <Link
+                          key={link.path}
+                          to={link.path}
+                          onClick={() => setShowDropdown(false)}
+                          className={`block px-4 py-2.5 font-medium transition-all duration-200 ${
+                            isActivePath(link.path)
+                              ? 'bg-red-800 text-white border-l-4 border-white'
+                              : 'text-white/90 hover:bg-red-800 hover:text-white'
+                          }`}
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {navLinksAfterDropdown.map((link) => (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`font-medium transition-colors duration-200 ${
+                      isActivePath(link.path) 
+                        ? 'text-white font-bold border-b-2 border-white pb-1' 
+                        : 'text-white/80 hover:text-white'
                     }`}
                   >
                     {link.label}
                   </Link>
                 ))}
               </div>
+            </div>
 
-              {/* Auth Section */}
+            {/* AUTH SECTION - FAR RIGHT (EXPANDED) */}
+            <div className="hidden lg:flex items-center gap-4 flex-shrink-0">
               {user ? (
-                <div className="flex items-center gap-3 border-l border-slate-200 pl-8">
-                  <span className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">{user.name}</span>
-                  </span>
+                <div className="flex items-center gap-4 border-l border-white/30 pl-6">
+                  <div className="flex flex-col items-end">
+                    <span className="text-sm text-white font-semibold">{user.name}</span>
+                    <span className="text-xs text-white/70 capitalize">{user.role}</span>
+                  </div>
                   {isAdmin && (
                     <Link
                       to="/admin"
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors flex items-center gap-2 text-sm whitespace-nowrap"
                     >
                       <Settings size={16} /> Admin
                     </Link>
                   )}
                   <button
                     onClick={handleLogout}
-                    className="text-slate-700 hover:text-red-600 transition-colors font-medium flex items-center gap-2"
+                    className="text-white hover:text-white/80 transition-colors font-medium flex items-center gap-2 p-2 hover:bg-red-800 rounded-lg"
+                    title="Logout"
                   >
-                    <LogOut size={18} />
+                    <LogOut size={20} />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={handleAuthClick}
-                  className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="bg-blue-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-600 transition-colors flex items-center gap-2 whitespace-nowrap"
                 >
                   <LogIn size={18} /> Sign In
                 </button>
               )}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* MOBILE MENU BUTTON */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden text-slate-900 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              className="lg:hidden text-white p-2 hover:bg-red-800 rounded-lg transition-colors ml-auto"
             >
               {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
             </button>
@@ -139,13 +218,12 @@ const Header = () => {
         {/* Mobile Menu */}
         <MobileMenu
           isOpen={isMobileMenuOpen}
-          navLinks={navLinks}
           user={user}
           isAdmin={isAdmin}
           onAuthClick={handleAuthClick}
           onLogout={handleLogout}
           onClose={() => setIsMobileMenuOpen(false)}
-        />
+          />
       </nav>
 
       {/* Auth Modal */}

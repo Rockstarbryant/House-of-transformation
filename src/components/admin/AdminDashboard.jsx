@@ -18,6 +18,8 @@ import Card from '../common/Card';
 import { sermonService } from '../../services/api/sermonService';
 import { eventService } from '../../services/api/eventService';
 import { volunteerService } from '../../services/api/volunteerService';
+import { feedbackService } from '../../services/api/feedbackService';
+import { MessageSquare } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [realStats, setRealStats] = useState({
@@ -37,6 +39,7 @@ const AdminDashboard = () => {
 
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [feedbackStats, setFeedbackStats] = useState({ total: 0, positive: 0, negative: 0 });
 
   const fetchRealData = React.useCallback(async () => {
     try {
@@ -326,6 +329,20 @@ const AdminDashboard = () => {
                 </span>
               )}
             </Link>
+
+           <Link 
+
+              to="/admin/feedback" 
+              className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-pink-50 to-transparent hover:from-pink-100 transition-colors flex items-center gap-3 group"
+              >
+              <MessageSquare size={20} className="text-pink-600" />
+              <span className="flex-grow font-semibold text-gray-800">
+                Feedback & Testimonies
+                </span>  
+                 <span className="text-sm font-bold text-pink-600 bg-white px-2 py-1 rounded">
+                  {feedbackStats.total}
+              </span>  
+          </Link>
           </div>
         </Card>
       </div>

@@ -23,6 +23,8 @@ import MinistriesPage from './pages/MinistriesPage';
 import UserProfilePage from './pages/UserProfilePage';
 import UsersPortalPage from './pages/UsersPortalPage';
 import ContactPage from './pages/ContactPage';
+import FeedbackPage from './pages/FeedbackPage';
+import TestimonyDetailPage from './pages/TestimonyDetailPage';
 import AdminLiveStreamPage from './pages/AdminLiveStreamPage';
 import AdminPage from './pages/AdminPage';
 
@@ -60,6 +62,8 @@ function App() {
                 <Route path="/users" element={<UsersPortalPage />} />
                 <Route path="/profile/:userId" element={<UserProfilePage />} />
                 <Route path="/contact" element={<ContactPage />} />
+                <Route path="/feedback" element={<FeedbackPage />} />
+                <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
 
                 {/* Protected Admin Route */}
                 <Route 

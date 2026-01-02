@@ -1,45 +1,124 @@
 // src/components/layout/MobileMenu.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings } from 'lucide-react';
+import { Settings, ChevronDown, LogOut, LogIn } from 'lucide-react';
 
-const MobileMenu = ({ isOpen, navLinks, user, isAdmin, onAuthClick, onLogout, onClose }) => {
+const MobileMenu = ({ 
+  isOpen, 
+  user, 
+  isAdmin, 
+  onAuthClick, 
+  onLogout, 
+  onClose 
+}) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const navLinks = [
+    { path: '/', label: 'Home' },
+    { path: '/about', label: 'About' }
+  ];
+
+  const dropdownLinks = [
+    { path: '/sermons', label: 'Sermons' },
+    { path: '/events', label: 'Events' },
+    { path: '/gallery', label: 'Gallery' }
+  ];
+
+  const navLinksAfter = [
+    { path: '/volunteer', label: 'Volunteer' },
+    { path: '/users', label: 'Members' },
+    { path: '/contact', label: 'Contact' },
+    { path: '/feedback', label: 'Feedback' }
+  ];
+
   if (!isOpen) return null;
 
   return (
-    <div className="lg:hidden bg-blue-800 text-white px-4 pb-4">
+    <div className="lg:hidden bg-red-900 text-white px-4 pb-4 max-h-[calc(100vh-80px)] overflow-y-auto">
+      {/* Regular Nav Links */}
       {navLinks.map((link) => (
         <Link
           key={link.path}
           to={link.path}
           onClick={onClose}
-          className="block py-3 text-lg hover:text-yellow-400 transition-colors border-b border-blue-700"
+          className="block py-3 text-lg hover:bg-red-800 transition-colors px-2 rounded border-b border-red-800"
         >
           {link.label}
         </Link>
       ))}
-      
-      <div className="mt-4 pt-4 border-t border-blue-700">
+
+      {/* Dropdown Menu for Mobile */}
+      <div className="border-b border-red-800">
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="w-full flex items-center justify-between py-3 text-lg hover:bg-red-800 transition-colors px-2 rounded"
+        >
+          <span>Content</span>
+          <ChevronDown 
+            size={20}
+            className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
+          />
+        </button>
+        
+        {/* Dropdown Items */}
+        {showDropdown && (
+          <div className="bg-red-800 py-2">
+            {dropdownLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                onClick={() => {
+                  setShowDropdown(false);
+                  onClose();
+                }}
+                className="block py-2.5 px-4 text-base hover:bg-red-700 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Links After Dropdown */}
+      {navLinksAfter.map((link) => (
+        <Link
+          key={link.path}
+          to={link.path}
+          onClick={onClose}
+          className="block py-3 text-lg hover:bg-red-800 transition-colors px-2 rounded border-b border-red-800"
+        >
+          {link.label}
+        </Link>
+      ))}
+
+      {/* Auth Section */}
+      <div className="mt-4 pt-4 border-t border-red-800">
         {user ? (
           <div className="space-y-3">
-            <p className="text-sm mb-2">Hi, {user.name}</p>
+            <div className="px-2 py-2 bg-red-800 rounded">
+              <p className="text-sm font-semibold">{user.name}</p>
+              <p className="text-xs text-red-200 capitalize">{user.role}</p>
+            </div>
+            
             {isAdmin && (
               <Link
                 to="/admin"
                 onClick={onClose}
-                className="w-full bg-yellow-400 text-blue-900 py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2"
+                className="w-full bg-blue-500 text-white py-2.5 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors"
               >
-                <Settings size={16} /> Admin Dashboard
+                <Settings size={18} /> Admin Dashboard
               </Link>
             )}
+            
             <button
               onClick={() => {
                 onLogout();
                 onClose();
               }}
-              className="w-full bg-white/20 text-white py-2 rounded-lg"
+              className="w-full bg-white/20 text-white py-2.5 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-white/30 transition-colors"
             >
-              Logout
+              <LogOut size={18} /> Logout
             </button>
           </div>
         ) : (
@@ -48,9 +127,9 @@ const MobileMenu = ({ isOpen, navLinks, user, isAdmin, onAuthClick, onLogout, on
               onAuthClick();
               onClose();
             }}
-            className="w-full bg-yellow-400 text-blue-900 py-2 rounded-lg font-semibold"
+            className="w-full bg-blue-500 text-white py-2.5 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors"
           >
-            Sign In
+            <LogIn size={18} /> Sign In
           </button>
         )}
       </div>

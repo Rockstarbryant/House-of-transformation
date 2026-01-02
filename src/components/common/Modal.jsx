@@ -32,22 +32,22 @@ const Modal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className={`bg-white rounded-2xl w-full ${sizes[size]} my-8`}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className={`bg-white rounded-2xl w-full ${sizes[size]} my-8 flex flex-col max-h-[90vh]`}>
         {(title || showCloseButton) && (
-          <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
             {title && <h2 className="text-2xl font-bold text-blue-900">{title}</h2>}
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg transition-colors ml-auto"
               >
                 <X size={24} />
               </button>
             )}
           </div>
         )}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           {children}
         </div>
       </div>
