@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
 import AdminDashboard from '../components/admin/AdminDashboard';
 import ManageSermons from '../components/admin/ManageSermons';
 import ManageEvents from '../components/admin/ManageEvents';
@@ -7,6 +7,7 @@ import ManageBlog from '../components/admin/ManageBlog';
 import ManageGallery from '../components/admin/ManageGallery';
 import ManageLiveStream from '../components/admin/ManageLiveStream';
 import ManageUsers from '../components/admin/ManageUsers';
+import ManageVolunteers from '../components/admin/ManageVolunteers';
 
 const AdminPage = () => {
   return (
@@ -19,6 +20,7 @@ const AdminPage = () => {
         <Route path="/gallery" element={<ManageGallery />} />
         <Route path="/livestream" element={<ManageLiveStream />} />
         <Route path="/users" element={<ManageUsers />} />
+        <Route path="/volunteers" element={<ManageVolunteers />} />
       </Routes>
     </div>
   );

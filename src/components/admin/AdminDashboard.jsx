@@ -1,9 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart, Edit, Users, BookOpen, Calendar, Newspaper, Image, Play, TrendingUp, ArrowRight } from 'lucide-react';
+import { 
+  BarChart, 
+  Edit, 
+  Users, 
+  BookOpen, 
+  Calendar, 
+  Newspaper, 
+  Image, 
+  Play, 
+  TrendingUp, 
+  ArrowRight,
+  UserPlus,
+  Clock
+} from 'lucide-react';
 import Card from '../common/Card';
 import { sermonService } from '../../services/api/sermonService';
 import { eventService } from '../../services/api/eventService';
+import { volunteerService } from '../../services/api/volunteerService';
 
 const AdminDashboard = () => {
   const [realStats, setRealStats] = useState({
@@ -13,7 +27,12 @@ const AdminDashboard = () => {
     newMembers: 0,
     activeMembers: 0,
     inactiveMembers: 0,
-    adminCount: 0
+    adminCount: 0,
+    // Volunteer stats
+    totalVolunteerApplications: 0,
+    pendingApplications: 0,
+    approvedVolunteers: 0,
+    totalVolunteerHours: 0
   });
 
   const [recentUsers, setRecentUsers] = useState([]);
@@ -28,6 +47,28 @@ const AdminDashboard = () => {
       
       // Get real events count
       const eventsData = await eventService.getEvents();
+      
+      // Get volunteer stats
+      let volunteerStats = {
+        totalApplications: 0,
+        pendingApplications: 0,
+        approvedVolunteers: 0,
+        totalHours: 0
+      };
+      
+      try {
+        const volStats = await volunteerService.getStats();
+        if (volStats.success) {
+          volunteerStats = {
+            totalApplications: volStats.stats.totalApplications || 0,
+            pendingApplications: volStats.stats.pendingApplications || 0,
+            approvedVolunteers: volStats.stats.approvedVolunteers || 0,
+            totalHours: volStats.stats.totalHours || 0
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching volunteer stats:', error);
+      }
       
       // Get real users data
       const usersResponse = await fetch('http://localhost:5000/api/users', {
@@ -57,7 +98,12 @@ const AdminDashboard = () => {
         }).length,
         activeMembers: activeCount,
         inactiveMembers: inactiveCount,
-        adminCount: adminCount
+        adminCount: adminCount,
+        // Add volunteer stats
+        totalVolunteerApplications: volunteerStats.totalApplications,
+        pendingApplications: volunteerStats.pendingApplications,
+        approvedVolunteers: volunteerStats.approvedVolunteers,
+        totalVolunteerHours: volunteerStats.totalHours
       });
 
       setRecentUsers(recentUsersData);
@@ -81,7 +127,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="w-full mx-auto px-4 py-8 bg-blue-500 rounded-lg">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -114,18 +160,44 @@ const AdminDashboard = () => {
           </Card>
 
           <Card className="border-l-4 border-purple-600">
-            <p className="text-gray-600 text-sm mb-2">Admins</p>
-            <p className="text-3xl font-bold text-purple-600">{realStats.adminCount}</p>
-            <p className="text-xs text-gray-500 mt-2">Leadership team</p>
+            <p className="text-gray-600 text-sm mb-2">Active Volunteers</p>
+            <p className="text-3xl font-bold text-purple-600">{realStats.approvedVolunteers}</p>
+            <p className="text-xs text-gray-500 mt-2">{realStats.totalVolunteerHours} hours served</p>
           </Card>
 
           <Card className="border-l-4 border-orange-600">
-            <p className="text-gray-600 text-sm mb-2">Inactive</p>
-            <p className="text-3xl font-bold text-orange-600">{realStats.inactiveMembers}</p>
-            <p className="text-xs text-gray-500 mt-2">Need reactivation</p>
+            <p className="text-gray-600 text-sm mb-2">Pending Applications</p>
+            <p className="text-3xl font-bold text-orange-600">{realStats.pendingApplications}</p>
+            <p className="text-xs text-gray-500 mt-2">Need review</p>
           </Card>
         </div>
       </div>
+
+      {/* Volunteer Alert - Show if there are pending applications */}
+      {realStats.pendingApplications > 0 && (
+        <div className="mb-8">
+          <div className="bg-orange-50 border-l-4 border-orange-400 p-6 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Clock className="text-orange-600" size={32} />
+              <div>
+                <h3 className="text-lg font-bold text-orange-900 mb-1">
+                  {realStats.pendingApplications} Volunteer Application{realStats.pendingApplications !== 1 ? 's' : ''} Awaiting Review
+                </h3>
+                <p className="text-sm text-orange-700">
+                  Review and approve volunteer applications to grow your ministry teams
+                </p>
+              </div>
+            </div>
+            <Link 
+              to="/admin/volunteers"
+              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-2"
+            >
+              Review Now
+              <ArrowRight size={20} />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Content Stats */}
       <div className="mb-8">
@@ -238,6 +310,21 @@ const AdminDashboard = () => {
               <Play size={20} className="text-red-600 group-hover:scale-110 transition-transform" />
               <span className="flex-grow font-semibold text-gray-800">Manage Live Stream</span>
               <span className="text-sm font-bold text-red-600 bg-white px-2 py-1 rounded">Live</span>
+            </Link>
+
+            {/* NEW: Volunteer Management Link */}
+            <Link 
+              to="/admin/volunteers" 
+              className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-50 to-transparent hover:from-indigo-100 transition-colors flex items-center gap-3 group relative"
+            >
+              <UserPlus size={20} className="text-indigo-600 group-hover:scale-110 transition-transform" />
+              <span className="flex-grow font-semibold text-gray-800">Volunteer Applications</span>
+              <span className="text-sm font-bold text-indigo-600 bg-white px-2 py-1 rounded">{realStats.totalVolunteerApplications}</span>
+              {realStats.pendingApplications > 0 && (
+                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse">
+                  {realStats.pendingApplications}
+                </span>
+              )}
             </Link>
           </div>
         </Card>

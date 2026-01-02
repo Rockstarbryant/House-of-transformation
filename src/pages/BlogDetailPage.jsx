@@ -127,7 +127,7 @@ const BlogDetailPage = () => {
   const canDelete = canDeleteBlog(post.author?._id);
 
   return (
-    <div className="pt-20 pb-20 bg-gray-50 min-h-screen">
+    <div className="pt-20 pb-20 bg-teal-400 min-h-screen">
       <div className="max-w-3xl mx-auto px-4 py-12">
         {/* Back Button */}
         <button

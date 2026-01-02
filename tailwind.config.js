@@ -6,48 +6,45 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary brand colors - inspired by SquareDash
-        primary: {
-          50: '#f0f4ff',
-          100: '#e0eaff',
-          200: '#c7d7fe',
-          300: '#a4bcfc',
-          400: '#8199f8',
-          500: '#6477f0',
-          600: '#4d5de4',
-          700: '#3d47c9',
-          800: '#343ea3',
-          900: '#1e3a8a', // Main blue
-          950: '#0f1d4a',
+        // Modern slate color palette (Hope Church inspired)
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617',
         },
+        // Primary blue colors
+        blue: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c3d66',
+          950: '#051e3e',
+        },
+        // Accent colors
         accent: {
-          50: '#fffbea',
-          100: '#fff3c4',
-          200: '#ffe588',
-          300: '#ffd449',
-          400: '#ffc107', // Main yellow
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
-        },
-        // Neutral grays
-        neutral: {
-          50: '#fafafa',
-          100: '#f5f5f5',
-          200: '#e5e5e5',
-          300: '#d4d4d4',
-          400: '#a3a3a3',
-          500: '#737373',
-          600: '#525252',
-          700: '#404040',
-          800: '#262626',
-          900: '#171717',
-        },
+          orange: '#f97316',
+          pink: '#ec4899',
+          red: '#ef4444',
+          green: '#10b981',
+          purple: '#a855f7',
+        }
       },
       fontFamily: {
-        // Modern font stack similar to Satoshi
+        // Modern font stack similar to Hope Church
         sans: [
           'Inter',
           '-apple-system',
@@ -64,10 +61,10 @@ module.exports = {
         ],
       },
       fontSize: {
-        'display-xl': ['4.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
-        'display-lg': ['3.75rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
-        'display-md': ['3rem', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
-        'display-sm': ['2.25rem', { lineHeight: '1.3', letterSpacing: '-0.01em' }],
+        'display-xl': ['4.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'display-lg': ['3.75rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'display-md': ['3rem', { lineHeight: '1.2', letterSpacing: '-0.01em', fontWeight: '700' }],
+        'display-sm': ['2.25rem', { lineHeight: '1.3', letterSpacing: '-0.01em', fontWeight: '700' }],
       },
       spacing: {
         '18': '4.5rem',
@@ -79,6 +76,7 @@ module.exports = {
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 30px -5px rgba(0, 0, 0, 0.04)',
         'large': '0 20px 50px -12px rgba(0, 0, 0, 0.15)',
+        'xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
       },
       animation: {

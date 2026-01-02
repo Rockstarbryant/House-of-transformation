@@ -89,75 +89,74 @@ const SermonsPage = () => {
   const { canPostSermon, user } = useAuthContext();
 
   const handleAddSermon = () => {
-  alert('Sermon creation form coming soon');
-  // TODO: Create sermon form modal
+    alert('Sermon creation form coming soon');
   };
 
   if (loading) return <Loader />;
 
   return (
-    <div className="pt-16 pb-20 bg-white min-h-screen">
-      <div className="max-w-4xl mx-auto">
-        {/* Header with Settings Button */}
-        <div className="px-4 py-6 border-b border-gray-200 flex justify-between items-start">
-  <div>
-    <h1 className="text-4xl font-bold text-gray-900">Sermons</h1>
-    <p className="text-gray-600 text-sm mt-2">
-      {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
-    </p>
-  </div>
-  <div className="flex flex-col gap-3">
-    {canPostSermon() && (
-      <Button
-        onClick={handleAddSermon}
-        variant="primary"
-        className="flex items-center gap-2"
-      >
-        <Plus size={20} /> Add Sermon
-      </Button>
-    )}
-    <button
-      onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-        showAdvancedFilter
-          ? 'bg-blue-100 text-blue-700'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-      title="Show/hide advanced filters"
-    >
-      {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
-      {showAdvancedFilter ? 'Close' : 'Filters'}
-    </button>
-  </div>
-    </div>
+    <div className="pt-24 pb-20 bg-slate-900 min-h-screen">
+      <div className="max-w-3xl mx-auto">
+        {/* Sticky Header */}
+        <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Sermons</h1>
+            <p className="text-slate-600 text-sm mt-1">
+              {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {canPostSermon() && (
+              <Button
+                onClick={handleAddSermon}
+                variant="primary"
+                size="md"
+                icon={Plus}
+              >
+                Add
+              </Button>
+            )}
+            <button
+              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+              className={`p-2 rounded-full transition-colors ${
+                showAdvancedFilter
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Show/hide advanced filters"
+            >
+              {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
+            </button>
+          </div>
+        </div>
 
-    {!canPostSermon() && user && (
-  <div className="px-4 py-4">
-    <PermissionAlert
-      title="Cannot Add Sermons"
-      message="Only pastors and bishops can upload sermons."
-      requiredRole="pastor"
-      currentRole={user.role}
-      actionType="sermon upload"
-    />
-  </div>
-)}
+        {!canPostSermon() && user && (
+          <div className="px-4 py-4">
+            <PermissionAlert
+              title="Cannot Add Sermons"
+              message="Only pastors and bishops can upload sermons."
+              requiredRole="pastor"
+              currentRole={user.role}
+              actionType="sermon upload"
+            />
+          </div>
+        )}
 
-        {/* Basic Search Filter - Always Visible */}
-        <div className="px-4 py-3 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-3 bg-gray-100 rounded-full px-4 py-2">
-            <Search size={18} className="text-gray-500" />
+        {/* Search Bar */}
+        <div className="px-4 py-4 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-3 bg-slate-100 rounded-full px-4 py-3">
+            <Search size={18} className="text-slate-500" />
             <input
               type="text"
               placeholder="Search sermons by title, pastor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm"
+              className="flex-1 bg-transparent outline-none text-sm text-slate-900 placeholder:text-slate-500"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
+                className="text-slate-500 hover:text-slate-700 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -165,16 +164,16 @@ const SermonsPage = () => {
           </div>
         </div>
 
-        {/* Category Filter - Always Visible */}
-        <div className="px-4 py-3 flex gap-2 overflow-x-auto pb-2 border-b border-gray-200 bg-white">
+        {/* Category Filter */}
+        <div className="px-4 py-3 flex gap-2 overflow-x-auto pb-2 border-b border-slate-200 bg-white">
           {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all ${
                 selectedCategory === cat
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
+                  : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
               }`}
             >
               {cat}
@@ -182,24 +181,23 @@ const SermonsPage = () => {
           ))}
         </div>
 
-        {/* Advanced Type Filter - Only shown when toggled */}
+        {/* Advanced Type Filter */}
         {showAdvancedFilter && (
-          <div className="border-b border-gray-200 bg-gray-50">
-            {/* Type Filter Tabs */}
+          <div className="border-b border-slate-200 bg-slate-50">
             <div className="flex overflow-x-auto px-4">
               {[
-                { id: 'all', label: 'All Sermons', icon: '📺' },
-                { id: 'text', label: 'Text Only', icon: '📝' },
-                { id: 'photo', label: 'Photo + Text', icon: '📸' },
-                { id: 'video', label: 'Video + Text', icon: '🎥' }
+                { id: 'all', label: 'All', icon: '📚' },
+                { id: 'text', label: 'Text', icon: '📝' },
+                { id: 'photo', label: 'Photo', icon: '📸' },
+                { id: 'video', label: 'Video', icon: '🎥' }
               ].map(type => (
                 <button
                   key={type.id}
                   onClick={() => setSelectedType(type.id)}
-                  className={`px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors hover:text-gray-900 ${
+                  className={`px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors ${
                     selectedType === type.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-600'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <span className="mr-2">{type.icon}</span>
@@ -207,66 +205,46 @@ const SermonsPage = () => {
                 </button>
               ))}
             </div>
-            
-            {/* Reset Type Filter Button */}
-            {selectedType !== 'all' && (
-              <div className="px-4 py-3 text-center border-t border-gray-200">
-                <button
-                  onClick={() => setSelectedType('all')}
-                  className="text-blue-600 hover:text-blue-700 font-semibold text-sm"
-                >
-                  Reset type filter
-                </button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Error */}
+        {/* Error State */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg m-4 text-red-700">
+          <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 font-semibold">
             {error}
           </div>
         )}
 
-        {/* Content */}
+        {/* Empty State */}
         {filteredSermons.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="text-6xl mb-4">🔍</div>
-            <p className="text-gray-600 text-lg font-semibold">No sermons found</p>
-            <p className="text-gray-500 text-sm mt-2">
+          <div className="flex flex-col items-center justify-center py-24 px-4">
+            <div className="text-6xl mb-4">📖</div>
+            <p className="text-slate-900 text-lg font-bold">No sermons found</p>
+            <p className="text-slate-600 text-sm mt-2">
               {searchTerm || selectedCategory !== 'All' || selectedType !== 'all'
                 ? 'Try adjusting your filters or search term'
                 : 'Check back soon for new sermons'}
             </p>
           </div>
         ) : (
-          <div>
-            {/* Text Only Sermons */}
-            {filteredSermons.some(s => detectSermonType(s) === 'text') && (
-              <div className="border-b border-gray-200">
-                {filteredSermons
-                  .filter(s => detectSermonType(s) === 'text')
-                  .map(sermon => (
-                    <SermonCardText key={sermon._id} sermon={sermon} />
-                  ))}
-              </div>
-            )}
+          <div className="divide-y divide-slate-200 space-y-4">
+            {/* Text Sermons */}
+            {filteredSermons
+              .filter(s => detectSermonType(s) === 'text')
+              .map(sermon => (
+                <SermonCardText key={sermon._id} sermon={sermon} />
+              ))}
 
-            {/* Media Sermons (Photo + Video) */}
-            {filteredSermons.some(s => detectSermonType(s) !== 'text') && (
-              <div className="p-4 md:p-6 space-y-6">
-                {filteredSermons
-                  .filter(s => detectSermonType(s) !== 'text')
-                  .map(sermon => (
-                    <SermonCard
-                      key={sermon._id}
-                      sermon={sermon}
-                      type={detectSermonType(sermon)}
-                    />
-                  ))}
-              </div>
-            )}
+            {/* Media Sermons */}
+            {filteredSermons
+              .filter(s => detectSermonType(s) !== 'text')
+              .map(sermon => (
+                <SermonCard
+                  key={sermon._id}
+                  sermon={sermon}
+                  type={detectSermonType(sermon)}
+                />
+              ))}
           </div>
         )}
       </div>

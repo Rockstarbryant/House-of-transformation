@@ -67,6 +67,8 @@ const ManageGallery = () => {
       uploadData.append('description', formData.description);
       uploadData.append('category', formData.category);
 
+
+       console.log('Uploading to:', '/gallery/upload'); // Debug log
       await galleryService.uploadPhoto(uploadData);
       
       alert('Photo uploaded successfully!');
@@ -81,11 +83,20 @@ const ManageGallery = () => {
       fetchPhotos();
     } catch (error) {
       console.error('Error uploading:', error);
-      alert('Error uploading photo: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setLoading(false);
+       // Better error messages
+    if (error.response?.status === 404) {
+      alert('❌ Upload endpoint not found. Check backend configuration.');
+    } else if (error.response?.status === 413) {
+      alert('❌ File too large. Max size is 5MB.');
+    } else if (error.response?.status === 401) {
+      alert('❌ Not authorized. Please login as admin.');
+    } else {
+      alert('❌ Error: ' + (error.response?.data?.message || error.message));
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (id) => {
     if (window.confirm('Delete this photo?')) {

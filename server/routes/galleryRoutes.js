@@ -7,22 +7,24 @@ const {
   deletePhoto,
   likePhoto
 } = require('../controllers/galleryController');
-//const { protect, authorize } = require('../middleware/auth');
-const upload = require('../middleware/upload');      
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
-router.route('/')
-  .get(getPhotos);
+// GET all photos - Public
+router.get('/', getPhotos);
 
-// Protected routes - only pastor/bishop/admin can upload/delete
+// POST upload photo - Protected, only pastor/bishop/admin
+// IMPORTANT: upload.single('photo') processes the multipart form data
 router.post(
   '/',
   protect,
   authorize('pastor', 'bishop', 'admin'),
+  upload.single('photo'),  // ← THIS WAS MISSING!
   uploadPhoto
 );
 
+// DELETE photo - Protected, only pastor/bishop/admin
 router.delete(
   '/:id',
   protect,
@@ -30,6 +32,7 @@ router.delete(
   deletePhoto
 );
 
+// POST like photo - Protected
 router.post('/:id/like', protect, likePhoto);
 
 module.exports = router;

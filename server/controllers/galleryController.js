@@ -14,31 +14,63 @@ exports.getPhotos = async (req, res) => {
 
     res.json({ success: true, photos });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching photos:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // @desc    Upload photo
-// @route   POST /api/gallery/upload
+// @route   POST /api/gallery
 // @access  Private/Admin
 exports.uploadPhoto = async (req, res) => {
   try {
+    // Check if file was uploaded by multer
     if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No file uploaded. Please select a photo.' 
+      });
     }
 
+    // Validate required fields
+    if (!req.body.title || req.body.title.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title is required' 
+      });
+    }
+
+    // Create photo data
     const photoData = {
-      title: req.body.title || 'Untitled',
-      description: req.body.description || '',
+      title: req.body.title.trim(),
+      description: req.body.description?.trim() || '',
       category: req.body.category || 'General',
-      imageUrl: `/uploads/gallery/${req.file.filename}`, // Store relative path
-      uploadedBy: req.user.id
+      imageUrl: `/uploads/gallery/${req.file.filename}`, // Path where file is stored
+      uploadedBy: req.user._id || req.user.id,
+      likes: 0,
+      likedBy: [],
+      comments: 0
     };
 
+    // Create and save photo to database
     const photo = await Gallery.create(photoData);
-    res.status(201).json({ success: true, photo });
+
+    // Populate user info
+    await photo.populate('uploadedBy', 'name email');
+
+    console.log('✅ Photo uploaded successfully:', photo._id);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Photo uploaded successfully',
+      photo 
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Upload error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error uploading photo' 
+    });
   }
 };
 
@@ -48,20 +80,34 @@ exports.uploadPhoto = async (req, res) => {
 exports.deletePhoto = async (req, res) => {
   try {
     const photo = await Gallery.findByIdAndDelete(req.params.id);
-    if (!photo) {
-      return res.status(404).json({ message: 'Photo not found' });
-    }
     
-    // Optionally delete the file from disk
+    if (!photo) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Photo not found' 
+      });
+    }
+
+    // Optional: Delete file from disk
     // const fs = require('fs');
+    // const path = require('path');
     // const filePath = path.join(__dirname, '../' + photo.imageUrl);
     // if (fs.existsSync(filePath)) {
     //   fs.unlinkSync(filePath);
     // }
 
-    res.json({ success: true, message: 'Photo deleted' });
+    console.log('✅ Photo deleted:', photo._id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Photo deleted successfully' 
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Delete error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 };
 
@@ -71,25 +117,41 @@ exports.deletePhoto = async (req, res) => {
 exports.likePhoto = async (req, res) => {
   try {
     const photo = await Gallery.findById(req.params.id);
+    
     if (!photo) {
-      return res.status(404).json({ message: 'Photo not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Photo not found' 
+      });
     }
 
-    const alreadyLiked = photo.likedBy.includes(req.user.id);
+    const userId = req.user._id || req.user.id;
+    const alreadyLiked = photo.likedBy.some(id => id.toString() === userId.toString());
 
     if (alreadyLiked) {
-      // Unlike
-      photo.likedBy = photo.likedBy.filter(id => id.toString() !== req.user.id);
-      photo.likes -= 1;
+      // Unlike - remove user from likedBy array
+      photo.likedBy = photo.likedBy.filter(id => id.toString() !== userId.toString());
+      photo.likes = Math.max(0, photo.likes - 1);
     } else {
-      // Like
-      photo.likedBy.push(req.user.id);
+      // Like - add user to likedBy array
+      photo.likedBy.push(userId);
       photo.likes += 1;
     }
 
     await photo.save();
-    res.json({ success: true, likes: photo.likes });
+
+    console.log(`✅ Photo ${alreadyLiked ? 'unliked' : 'liked'}:`, photo._id);
+    
+    res.json({ 
+      success: true, 
+      likes: photo.likes,
+      liked: !alreadyLiked 
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Like error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 };

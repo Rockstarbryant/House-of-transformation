@@ -7,6 +7,7 @@ const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const blogRoutes = require('./routes/blogRoutes');
+const volunteerRoutes = require('./routes/volunteerRoutes');
 // Load env vars
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 app.use('/api/blogs', blogRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/volunteers', volunteerRoutes);
 
 // 404 handler
 app.use((req, res) => {
