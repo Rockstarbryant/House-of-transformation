@@ -56,7 +56,7 @@ const LoginForm = ({ onSuccess, onSwitchToSignup }) => {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-blue-900 mb-6">Welcome Back</h2>
+      <h2 className="text-2xl font-bold text-blue-900 mb-6">Welcome Back Please Signin</h2>
 
       {error && (
         <div className={`${isRateLimited ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'} p-3 rounded-lg mb-4 flex items-center gap-2`}>

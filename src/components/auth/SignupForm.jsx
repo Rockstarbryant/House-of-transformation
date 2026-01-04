@@ -202,7 +202,7 @@ const SignupForm = ({ onSuccess, onSwitchToLogin }) => {
           {/* Password Requirements */}
           {formData.password && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs font-semibold text-gray-700 mb-2">Password must include:</p>
+              <p className="text-xs font-semibold text-gray-700 mb-2">Password should include:</p>
               <div className="space-y-1">
                 {passwordRequirements.map((req, idx) => (
                   <div key={idx} className="flex items-center gap-2">
