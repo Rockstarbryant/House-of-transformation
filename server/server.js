@@ -28,7 +28,7 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
     ]
   : [
       process.env.FRONTEND_URL,
-      'https://yourdomain.com',
+      'https://comfy-gumdrop-df8b26.netlify.app',
       'https://house-of-transformation.vercel.app',
       'https://www.yourdomain.com'
     ];
