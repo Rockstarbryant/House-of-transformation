@@ -5,6 +5,8 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 
+//const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const ManageGallery = () => {
   const [photos, setPhotos] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -208,7 +210,7 @@ const ManageGallery = () => {
         {photos.map((photo) => (
           <Card key={photo._id} padding="none" hover>
             <img 
-              src={`http://localhost:5000${photo.imageUrl}`}
+              src={`${process.env.REACT_APP_API_URL}${photo.imageUrl}`}
               alt={photo.title}
               className="w-full h-64 object-cover rounded-t-xl"
               onError={(e) => {

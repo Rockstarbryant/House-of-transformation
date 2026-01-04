@@ -1,23 +1,10 @@
 import api from './authService';
 
-const getAuthToken = () => {
-  const token = localStorage.getItem('authToken');
-  if (!token) return null;
-  try {
-    const parsed = JSON.parse(token);
-    return parsed.value || token;
-  } catch (e) {
-    return token;
-  }
-};
-
 export const blogService = {
   async getBlogs() {
     try {
-      const response = await fetch('http://localhost:5000/api/blogs', {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
+      const response = await api.get('/blogs', {
+       
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to fetch blogs');
@@ -29,10 +16,8 @@ export const blogService = {
 
   async getBlogsByCategory(category) {
     try {
-      const response = await fetch(`http://localhost:5000/api/blogs/category/${category}`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
+      const response = await fetch(`https://house-of-transformation.onrender.com/api/blogs/category/${category}`, {
+       
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to fetch blogs');
@@ -44,10 +29,8 @@ export const blogService = {
 
   async getBlog(id) {
     try {
-      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
+      const response = await api.get(`/blogs/${id}`, {
+        
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to fetch blog');
@@ -59,15 +42,9 @@ export const blogService = {
 
   async createBlog(blogData) {
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch('http://localhost:5000/api/blogs', {
+      const response = await api.post('/blogs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+       
         body: JSON.stringify(blogData)
       });
 
@@ -83,15 +60,9 @@ export const blogService = {
 
   async updateBlog(id, blogData) {
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
+     const response = await api.put(`/blogs/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        
         body: JSON.stringify(blogData)
       });
 
@@ -105,14 +76,9 @@ export const blogService = {
 
   async deleteBlog(id) {
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch(`http://localhost:5000/api/blogs/${id}`, {
+       const response = await api.delete(`/blogs/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        
       });
 
       const data = await response.json();
@@ -125,14 +91,9 @@ export const blogService = {
 
   async approveBlog(id) {
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch(`http://localhost:5000/api/blogs/${id}/approve`, {
+      const response = await api.get(`/blogs/${id}/approve`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        
       });
 
       const data = await response.json();
@@ -145,13 +106,8 @@ export const blogService = {
 
   async getPendingBlogs() {
     try {
-      const token = getAuthToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch('http://localhost:5000/api/blogs/pending', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+       const response = await api.get('/blogs/pending', {
+        
       });
 
       const data = await response.json();

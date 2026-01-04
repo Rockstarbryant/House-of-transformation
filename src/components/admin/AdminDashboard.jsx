@@ -19,6 +19,7 @@ import { sermonService } from '../../services/api/sermonService';
 import { eventService } from '../../services/api/eventService';
 import { volunteerService } from '../../services/api/volunteerService';
 import { feedbackService } from '../../services/api/feedbackService';
+import api from '../../services/api/authService';
 import { MessageSquare } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -74,11 +75,7 @@ const AdminDashboard = () => {
       }
       
       // Get real users data
-      const usersResponse = await fetch('http://localhost:5000/api/users', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
+      const usersResponse = await api.get('/users');
       const usersData = await usersResponse.json();
       const users = usersData.users || [];
 
