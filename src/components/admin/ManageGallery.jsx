@@ -6,6 +6,7 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 
 //const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://house-of-transformation.onrender.com';
 
 const ManageGallery = () => {
   const [photos, setPhotos] = useState([]);
@@ -210,7 +211,7 @@ const ManageGallery = () => {
         {photos.map((photo) => (
           <Card key={photo._id} padding="none" hover>
             <img 
-              src={`${process.env.REACT_APP_API_URL}${photo.imageUrl}`}
+              src={`${API_BASE}${photo.imageUrl}`}
               alt={photo.title}
               className="w-full h-64 object-cover rounded-t-xl"
               onError={(e) => {

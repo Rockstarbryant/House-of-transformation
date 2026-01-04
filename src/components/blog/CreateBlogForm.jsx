@@ -4,6 +4,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import PermissionAlert from '../common/PermissionAlert';
+import { blogService } from '../../services/api/blogService';
 
 const CreateBlogForm = ({ onBlogCreated, onCancel }) => {
   const { user, canPostBlog, getAllowedBlogCategories } = useAuthContext();
@@ -41,15 +42,7 @@ const CreateBlogForm = ({ onBlogCreated, onCancel }) => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/blogs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('authToken')).value}`
-        },
-        body: JSON.stringify(formData)
-      });
-
+      const response = await blogService.createBlog(formData);
       const data = await response.json();
 
       if (!response.ok) {

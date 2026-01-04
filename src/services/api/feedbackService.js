@@ -11,18 +11,12 @@ const api = axios.create({
 });
 
 // Add optional auth token if available
+// Add optional auth token if available
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = sessionStorage.getItem('_auth_token');
     if (token) {
-      try {
-        const tokenData = typeof token === 'string' && token.startsWith('{') 
-          ? JSON.parse(token) 
-          : { value: token };
-        config.headers.Authorization = `Bearer ${tokenData.value || tokenData}`;
-      } catch (error) {
-        console.error('Token parse error:', error);
-      }
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -34,36 +28,14 @@ api.interceptors.request.use(
 export const feedbackService = {
   // Submit feedback (NO AUTH REQUIRED - works for anonymous and authenticated users)
   async submitFeedback(feedbackData) {
-    try {
-      // Create a clean config without auth if anonymous
-      const config = {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      };
-
-      // Only add auth token if NOT anonymous and token exists
-      if (!feedbackData.isAnonymous) {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          try {
-            const tokenData = typeof token === 'string' && token.startsWith('{') 
-              ? JSON.parse(token) 
-              : { value: token };
-            config.headers.Authorization = `Bearer ${tokenData.value || tokenData}`;
-          } catch (error) {
-            console.error('Token parse error:', error);
-          }
-        }
-      }
-
-      const response = await axios.post(`${API_URL}/feedback`, feedbackData, config);
-      return response.data;
-    } catch (error) {
-      console.error('Submit feedback error:', error);
-      throw error;
-    }
-  },
+  try {
+    const response = await api.post('/feedback', feedbackData);
+    return response.data;
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    throw error;
+  }
+},
 
   // Get public testimonies (NO AUTH REQUIRED)
   async getPublicTestimonies() {
