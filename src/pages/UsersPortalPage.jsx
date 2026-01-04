@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, MapPin, Phone, Calendar, MessageSquare, Users, Award, Loader, Mail } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import api from '../services/api/authService'; // Import axios instance
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
@@ -11,7 +12,7 @@ const UsersPortalPage = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [error, setError] = useState('');
   const { user: currentUser } = useAuthContext();
 
   const roles = [
@@ -31,16 +32,16 @@ const UsersPortalPage = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/users', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      const data = await response.json();
-      setUsers(data.users || []);
-      setFilteredUsers(data.users || []);
+      setError('');
+      
+      // Use axios instance with auth token
+      const response = await api.get('/users');
+      setUsers(response.data.users || []);
+      setFilteredUsers(response.data.users || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setError('Failed to load members. Please try again.');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -97,6 +98,13 @@ const UsersPortalPage = () => {
           <h1 className="text-5xl font-bold text-blue-900 mb-3">Church Members Portal</h1>
           <p className="text-lg text-gray-600">Connect with {users.length} members in our community</p>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Search and Filter */}
         <div className="grid md:grid-cols-3 gap-4 mb-8">

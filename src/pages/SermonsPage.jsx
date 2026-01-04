@@ -95,7 +95,7 @@ const SermonsPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <div className="pt-24 pb-20 bg-slate-200 min-h-screen">
+    <div className="pt-24 pb-20 bg-amber-200 min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Sticky Header */}
         <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-4 flex justify-between items-center">

@@ -31,6 +31,8 @@ router.post('/login', limiter, (req, res) => {
       phone: '254712345678'
     };
 
+    
+
     const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
 
     res.json({

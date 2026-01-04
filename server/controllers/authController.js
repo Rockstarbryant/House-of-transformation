@@ -92,3 +92,8 @@ exports.verifyToken = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.logout = (req, res) => {
+  // TODO: Add token to blacklist/Redis
+  res.json({ success: true, message: 'Logged out successfully' });
+};

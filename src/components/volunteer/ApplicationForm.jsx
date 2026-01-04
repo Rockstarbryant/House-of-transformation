@@ -123,7 +123,7 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5 bg-brown-100">
       {/* Required Fields Section */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">

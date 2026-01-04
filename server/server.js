@@ -1,16 +1,13 @@
 const express = require('express');
-//const dotenv = require('dotenv');
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const cors = require('cors');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
-const blogRoutes = require('./routes/blogRoutes');
-const volunteerRoutes = require('./routes/volunteerRoutes');
-const feedbackRoutes = require('./routes/feedbackRoutes');
+const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
+
 // Load env vars
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Connect to database
 connectDB();
@@ -21,10 +18,36 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable CORS
-app.use(cors());
+// CORS Configuration
+const allowedOrigins = process.env.NODE_ENV === 'development' 
+  ? [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5001',
+      'http://127.0.0.1:3000'   
+    ]
+  : [
+      process.env.FRONTEND_URL,
+      'https://yourdomain.com',
+      'https://house-of-transformation.vercel.app',
+      'https://www.yourdomain.com'
+    ];
 
-// Root route
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+}));
+
+// Static files
+app.use('/uploads', express.static('uploads'));
+
+// ============================================
+// HEALTH & INFO ROUTES (NO AUTH NEEDED)
+// ============================================
+
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to House of Transformation API',
@@ -41,29 +64,41 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check route
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Server is running' });
 });
 
-// Add this before your routes in server.js
-app.use('/uploads', express.static('uploads'));
+// ============================================
+// API ROUTES (MOUNT THESE BEFORE ERROR HANDLER)
+// ============================================
 
-const userRoutes = require('./routes/userRoutes');
+// Apply general API rate limiter to all /api routes
+app.use('/api/', apiLimiter);
 
-// Routes
+// Auth routes (MUST be first)
+app.use('/api/auth/login', authLimiter); // Strict limit for login
+app.use('/api/auth/signup', signupLimiter); // Strict limit for signup
 app.use('/api/auth', require('./routes/authRoutes'));
+
+// Content routes
 app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
-app.use('/api/volunteers', require('./routes/volunteerRoutes'));
-app.use('/api/blogs', blogRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/volunteers', volunteerRoutes);
-app.use('/api/feedback', feedbackRoutes);
 
-// 404 handler
+// User routes
+app.use('/api/users', require('./routes/userRoutes'));
+
+// Volunteer routes (only mount once!)
+app.use('/api/volunteers', require('./routes/volunteerRoutes'));
+
+// Feedback routes
+app.use('/api/feedback', require('./routes/feedbackRoutes'));
+
+// ============================================
+// 404 HANDLER (BEFORE ERROR HANDLER)
+// ============================================
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -73,7 +108,10 @@ app.use((req, res) => {
   });
 });
 
-// Error handler (must be last)
+// ============================================
+// ERROR HANDLER (MUST BE LAST)
+// ============================================
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
@@ -81,6 +119,11 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✓ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`✓ API Documentation: http://localhost:${PORT}/`);
+  console.log(`✓ CORS enabled for: ${allowedOrigins.join(', ')}`);
+  console.log(`✓ Rate limiting enabled:`);
+  console.log(`  - General API: 100 requests per 15 minutes`);
+  console.log(`  - Login: 5 attempts per 15 minutes`);
+  console.log(`  - Signup: 3 attempts per 15 minutes`);
 });
 
 module.exports = app;

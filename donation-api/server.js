@@ -31,6 +31,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Handle preflight requests
 
+
+
 // ============================================
 // SECURITY & MIDDLEWARE
 // ============================================
@@ -62,6 +64,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 // ============================================
 // MOUNT ROUTES
 // ============================================
+
 app.use('/api/auth', authRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/pledges', pledgeRoutes);

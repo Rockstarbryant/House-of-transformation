@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, BookOpen, Church, Heart, Lightbulb, HandHeart, MessageCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { MessageSquare } from 'lucide-react'; // Only keeping the main header icon
 import AnonymousToggle from '../components/feedback/AnonymousToggle';
 import SermonFeedbackForm from '../components/feedback/SermonFeedbackForm';
 import ServiceFeedbackForm from '../components/feedback/ServiceFeedbackForm';
@@ -22,7 +22,6 @@ const FeedbackPage = () => {
       id: 'sermon',
       title: 'Sermon Feedback',
       description: 'Share your thoughts on recent sermons',
-      icon: BookOpen,
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600'
     },
@@ -30,7 +29,6 @@ const FeedbackPage = () => {
       id: 'service',
       title: 'Service Experience',
       description: 'Rate your worship experience',
-      icon: Church,
       color: 'purple',
       gradient: 'from-purple-500 to-purple-600'
     },
@@ -38,7 +36,6 @@ const FeedbackPage = () => {
       id: 'testimony',
       title: 'Share Testimony',
       description: 'Tell us how God has moved in your life',
-      icon: Heart,
       color: 'red',
       gradient: 'from-red-500 to-pink-600'
     },
@@ -46,7 +43,6 @@ const FeedbackPage = () => {
       id: 'suggestion',
       title: 'Suggestions & Ideas',
       description: 'Help us improve and grow',
-      icon: Lightbulb,
       color: 'yellow',
       gradient: 'from-yellow-500 to-orange-600'
     },
@@ -54,7 +50,6 @@ const FeedbackPage = () => {
       id: 'prayer',
       title: 'Prayer Request',
       description: 'Submit your prayer needs',
-      icon: HandHeart,
       color: 'green',
       gradient: 'from-green-500 to-teal-600'
     },
@@ -62,7 +57,6 @@ const FeedbackPage = () => {
       id: 'general',
       title: 'General Feedback',
       description: 'Questions, comments, or concerns',
-      icon: MessageCircle,
       color: 'gray',
       gradient: 'from-gray-500 to-gray-600'
     }
@@ -80,7 +74,6 @@ const FeedbackPage = () => {
     setSelectedCategory(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Auto-hide success message after 10 seconds
     setTimeout(() => {
       setShowSuccessMessage(false);
     }, 10000);
@@ -171,7 +164,7 @@ const FeedbackPage = () => {
           </div>
         )}
 
-        {/* Anonymous Toggle (shown when form is active) */}
+        {/* Anonymous Toggle */}
         {selectedCategory && (
           <div className="mb-8">
             <AnonymousToggle 
@@ -190,39 +183,34 @@ const FeedbackPage = () => {
                 Choose Feedback Type
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {categories.map((category) => {
-                  const Icon = category.icon;
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategorySelect(category.id)}
-                      className="group relative bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-200"
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity`} />
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategorySelect(category.id)}
+                    className="group relative bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-200"
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity`} />
+                    
+                    <div className="relative">
+                      {/* Removed icon container completely */}
                       
-                      <div className="relative">
-                        <div className={`w-16 h-16 bg-gradient-to-br ${category.gradient} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                          <Icon className="text-white" size={32} />
-                        </div>
-                        
-                        <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-900 transition-colors">
-                          {category.title}
-                        </h3>
-                        
-                        <p className="text-gray-600 text-sm">
-                          {category.description}
-                        </p>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-900 transition-colors mt-4">
+                        {category.title}
+                      </h3>
+                      
+                      <p className="text-gray-600 text-sm mb-6">
+                        {category.description}
+                      </p>
 
-                        <div className="mt-4 flex items-center text-blue-600 font-semibold text-sm group-hover:gap-2 transition-all">
-                          <span>Get Started</span>
-                          <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </div>
+                      <div className="flex items-center text-blue-600 font-semibold text-sm group-hover:gap-2 transition-all">
+                        <span>Get Started</span>
+                        <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </div>
-                    </button>
-                  );
-                })}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -252,7 +240,6 @@ const FeedbackPage = () => {
             <TestimoniesWall />
           </>
         ) : (
-          /* Render Selected Form */
           <div className="max-w-3xl mx-auto">
             {renderForm()}
           </div>

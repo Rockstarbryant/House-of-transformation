@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Calendar, Heart, MessageCircle, Edit, ArrowLeft, Share2 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import api from '../services/api/authService'; // Use axios instance
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 
@@ -15,47 +16,31 @@ const UserProfilePage = () => {
   const [editData, setEditData] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchProfile();
   }, [userId]);
 
-  const getAuthToken = () => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return '';
-    
-    try {
-      const parsed = JSON.parse(token);
-      return parsed.value || token;
-    } catch (e) {
-      return token;
-    }
-  };
-
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
-      });
+      setError('');
       
-      if (!response.ok) {
-        throw new Error('User not found');
-      }
+      // Use axios instance
+      const response = await api.get(`/users/${userId}`);
+      const userData = response.data.user;
       
-      const data = await response.json();
-      setProfile(data.user);
+      setProfile(userData);
       setEditData({
-        name: data.user.name,
-        bio: data.user.bio || '',
-        location: data.user.location || '',
-        phone: data.user.phone || ''
+        name: userData.name,
+        bio: userData.bio || '',
+        location: userData.location || '',
+        phone: userData.phone || ''
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setError('Could not load profile');
+      setError('Could not load profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -65,40 +50,29 @@ const UserProfilePage = () => {
     try {
       setError('');
       setSuccess('');
-      const token = getAuthToken();
+      setIsSaving(true);
 
-      if (!token) {
-        setError('You must be logged in to update your profile');
-        return;
-      }
-
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(editData)
-      });
+      // Use axios instance - it automatically includes auth token
+      const response = await api.put(`/users/${userId}`, editData);
       
-      if (response.status === 403) {
-        setError('You can only edit your own profile');
-        return;
+      if (response.status === 200 || response.status === 201) {
+        setProfile(response.data.user);
+        setIsEditing(false);
+        setSuccess('Profile updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
       }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update profile');
-      }
-      
-      const data = await response.json();
-      setProfile(data.user);
-      setIsEditing(false);
-      setSuccess('Profile updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
       console.error('Error updating profile:', error);
-      setError(error.message || 'Error updating profile');
+      
+      if (error.response?.status === 403) {
+        setError('You can only edit your own profile');
+      } else if (error.response?.status === 401) {
+        setError('Your session has expired. Please login again.');
+      } else {
+        setError(error.response?.data?.message || 'Error updating profile');
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -129,7 +103,8 @@ const UserProfilePage = () => {
     );
   }
 
-  const isOwnProfile = currentUser && currentUser.id === userId;
+  // Check if user is logged in AND owns the profile or is admin
+  const isOwnProfile = currentUser && (currentUser.id === userId || currentUser._id === userId);
   const canEdit = isOwnProfile || (currentUser && currentUser.role === 'admin');
 
   const getRoleColor = (role) => {
@@ -172,6 +147,14 @@ const UserProfilePage = () => {
           </div>
         )}
 
+        {/* Not Logged In Warning */}
+        {!currentUser && (
+          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 rounded flex items-center gap-3">
+            <Heart size={20} />
+            You must be logged in to edit your profile
+          </div>
+        )}
+
         {/* Profile Header Card */}
         <Card className="mb-8">
           <div className="flex flex-col md:flex-row gap-8 mb-8">
@@ -194,6 +177,7 @@ const UserProfilePage = () => {
                     onClick={() => setIsEditing(!isEditing)}
                     variant={isEditing ? 'danger' : 'primary'}
                     className="mt-4 md:mt-0"
+                    disabled={isSaving}
                   >
                     <Edit size={16} /> {isEditing ? 'Cancel' : 'Edit Profile'}
                   </Button>
@@ -251,6 +235,7 @@ const UserProfilePage = () => {
                   value={editData.name}
                   onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
+                  disabled={isSaving}
                 />
               </div>
 
@@ -262,6 +247,7 @@ const UserProfilePage = () => {
                   rows="4"
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
                   placeholder="Tell us about yourself..."
+                  disabled={isSaving}
                 />
               </div>
 
@@ -273,6 +259,7 @@ const UserProfilePage = () => {
                   onChange={(e) => setEditData({ ...editData, location: e.target.value })}
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
                   placeholder="City, Country"
+                  disabled={isSaving}
                 />
               </div>
 
@@ -284,12 +271,18 @@ const UserProfilePage = () => {
                   onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                   className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-900 focus:outline-none"
                   placeholder="+254..."
+                  disabled={isSaving}
                 />
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button onClick={handleSaveProfile} variant="primary" fullWidth>
-                  Save Changes
+                <Button 
+                  onClick={handleSaveProfile} 
+                  variant="primary" 
+                  fullWidth
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </div>

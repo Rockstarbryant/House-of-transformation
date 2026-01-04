@@ -1,5 +1,6 @@
 // src/services/api/authService.js
 import axios from 'axios';
+import { tokenService } from './../tokenService'
 import { API_ENDPOINTS } from '../../utils/constants';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -9,7 +10,8 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+   withCredentials: true // IMPORTANT: Send cookies with requests
 });
 
 // Add auth token to requests
@@ -25,61 +27,72 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Handle token expiration
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
+    // Handle rate limiting
+    if (error.response?.status === 429) {
+      console.warn('Rate limited - too many requests');
+      // Don't auto-redirect, let component handle it
+      return Promise.reject(error);
+    }
+
+    // Handle unauthorized
     if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
+      tokenService.removeToken();
       window.location.href = '/login';
     }
+
     return Promise.reject(error);
   }
 );
 
 export const authService = {
-  /**
-   * Login user
-   */
   async login(email, password) {
     try {
       const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, {
         email,
         password
       });
+      
+      if (response.data.token) {
+        tokenService.setToken(response.data.token);
+      }
+      
       return response.data;
     } catch (error) {
       throw error;
     }
   },
+  
+  // Signup new user
 
-  /**
-   * Signup new user
-   */
   async signup(userData) {
     try {
       const response = await api.post(API_ENDPOINTS.AUTH.SIGNUP, userData);
+      
+      if (response.data.token) {
+        tokenService.setToken(response.data.token);
+      }
+      
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  /**
-   * Logout user
-   */
-  async logout() {
+  // Logout user
+  
+   async logout() {
     try {
       await api.post(API_ENDPOINTS.AUTH.LOGOUT);
-      return { success: true };
-    } catch (error) {
-      throw error;
+    } finally {
+      tokenService.removeToken();
     }
   },
-
-  /**
-   * Verify token
-   */
+  
+  // Verify token
+  
   async verifyToken(token) {
     try {
       const response = await api.get(API_ENDPOINTS.AUTH.VERIFY, {

@@ -1,7 +1,10 @@
+// src/components/sermons/SermonCardText.jsx
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Heart, MessageCircle, Share2, Eye, Calendar, ArrowRight } from 'lucide-react';
 import { formatDate } from '../../utils/helpers';
 import { sermonService } from '../../services/api/sermonService';
+import Card from '../common/Card';
 
 const SermonCardText = ({ sermon }) => {
   const [liked, setLiked] = useState(false);
@@ -18,110 +21,114 @@ const SermonCardText = ({ sermon }) => {
     }
   };
 
-  const MAX_DISPLAY_LENGTH = 280;
-  const isLongText = sermon.description && sermon.description.length > MAX_DISPLAY_LENGTH;
-  const displayText = expanded || !isLongText ? sermon.description : sermon.description?.substring(0, MAX_DISPLAY_LENGTH);
+  const truncateText = (text, maxLength = 180) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+  };
+
+  const displayText = expanded ? sermon.description : truncateText(sermon.description);
 
   return (
-    <div className="bg-white border-b border-slate-200 p-6 hover:bg-blue-300 transition-colors cursor-pointer">
-      <div className="flex gap-3">
-        {/* Avatar */}
-        <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-          {sermon.pastor?.charAt(0).toUpperCase() || 'P'}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            <span className="font-bold text-slate-900">{sermon.pastor || 'Pastor'}</span>
-            <span className="text-slate-600">@church</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-slate-600">{formatDate(sermon.date, 'short')}</span>
-          </div>
-
-          {/* Title */}
-          <h3 className="text-base font-bold text-slate-900 mt-2 break-words leading-snug">
-            {sermon.title}
-          </h3>
-          
-          {/* Description */}
-          {sermon.description && (
-            <div className="mt-3">
-              <p className="text-slate-900 text-base leading-normal break-words whitespace-pre-wrap">
-                {displayText}
-                {isLongText && !expanded && '...'}
-              </p>
-              {isLongText && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpanded(!expanded);
-                  }}
-                  className="text-blue-600 font-semibold hover:text-blue-700 mt-2 text-sm transition-colors"
-                >
-                  {expanded ? 'Show Less' : 'Read More'}
-                </button>
-              )}
-            </div>
-          )}
-
+    <Card className="flex flex-col hover:shadow-lg transition-shadow h-full bg-slate-300">
+      {/* Header */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-3">
           {/* Category Badge */}
           {sermon.category && (
-            <div className="mt-3">
-              <span className="inline-block bg-blue-100 text-blue-900 text-xs px-3 py-1 rounded-full font-semibold">
-                {sermon.category}
-              </span>
-            </div>
+            <span className="inline-block px-3 py-1 bg-red-300 text-blue-800 text-xs font-semibold rounded-full">
+              {sermon.category}
+            </span>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-between mt-3 max-w-md text-slate-600 text-sm">
-            <button 
-              onClick={(e) => e.stopPropagation()}
-              className="group flex items-center gap-2 hover:text-blue-600 transition-colors"
-            >
-              <div className="group-hover:bg-blue-600/10 rounded-full p-2 transition-colors">
-                <MessageCircle size={16} />
-              </div>
-              <span className="text-xs group-hover:text-blue-600">{sermon.comments || 0}</span>
-            </button>
+          {/* Date */}
+          <span className="flex items-center gap-1 text-xs text-gray-500">
+            <Calendar size={12} />
+            {formatDate(sermon.date, 'short')}
+          </span>
+        </div>
 
-            <button 
-              onClick={(e) => e.stopPropagation()}
-              className="group flex items-center gap-2 hover:text-green-600 transition-colors"
-            >
-              <div className="group-hover:bg-green-600/10 rounded-full p-2 transition-colors">
-                <Share2 size={16} />
-              </div>
-            </button>
+        {/* Sermon Title */}
+        <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline">
+          {sermon.title}
+        </h3>
+      </div>
 
-            <button 
-              onClick={(e) => e.stopPropagation()}
-              className="group flex items-center gap-2 hover:text-orange-600 transition-colors"
-            >
-              <div className="group-hover:bg-orange-600/10 rounded-full p-2 transition-colors">
-                <Eye size={16} />
-              </div>
-              <span className="text-xs group-hover:text-orange-600">{sermon.views || 0}</span>
-            </button>
-
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLike();
-              }}
-              className="group flex items-center gap-2 hover:text-red-600 transition-colors"
-            >
-              <div className="group-hover:bg-red-600/10 rounded-full p-2 transition-colors">
-                <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
-              </div>
-              <span className="text-xs group-hover:text-red-600">{likes}</span>
-            </button>
-          </div>
+      {/* Pastor Info */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-sm">
+          {sermon.pastor?.charAt(0).toUpperCase() || 'P'}
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900 text-sm">
+            {sermon.pastor || 'Pastor'}
+          </p>
+          <p className="text-xs text-gray-500">@church</p>
         </div>
       </div>
-    </div>
+
+      {/* Sermon Description Preview */}
+      <div className="flex-grow mb-4">
+        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+          {displayText}
+        </p>
+        {sermon.description && sermon.description.length > 180 && !expanded && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(true);
+            }}
+            className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
+          >
+            Read More
+          </button>
+        )}
+        {expanded && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(false);
+            }}
+            className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
+          >
+            Show Less
+          </button>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="pt-4 border-t border-gray-200 space-y-4">
+        {/* Stats Row */}
+        <div className="flex justify-between text-sm text-gray-600">
+          <div className="flex items-center gap-1">
+            <MessageCircle size={16} />
+            <span>{sermon.comments || 0}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Eye size={16} />
+            <span>{sermon.views || 0}</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLike();
+            }}
+            className="flex items-center gap-1 text-red-500 hover:text-red-600 transition"
+          >
+            <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+            <span>{likes}</span>
+          </button>
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 text-gray-600 hover:text-green-600 transition"
+          >
+            <Share2 size={16} />
+          </button>
+        </div>
+
+        {/* Read Full Sermon Button */}
+        
+      </div>
+    </Card>
   );
 };
 
