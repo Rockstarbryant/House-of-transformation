@@ -2,16 +2,17 @@
 import React, { useState } from 'react';
 import { Play, X } from 'lucide-react';
 import Button from '../common/Button';
+import '../../index.css';
 
 const HeroSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const youtubeEmbedUrl = "https://www.youtube.com/embed/peKWWYI70wI?si=4_lY8fmBlagW4x4";
+  const youtubeEmbedUrl =
+    "https://www.youtube.com/embed/peKWWYI70wI?si=4_lY8fmBlagW4x4";
 
-  // Church images - you can edit these URLs later
   const churchImages = [
     {
-      url: 'https://pbs.twimg.com/profile_images/700352011582251008/wrxEHL3q.jpg',
+      url: 'https://res.cloudinary.com/dcu8uuzrs/image/upload/v1767444965/WhatsApp_Image_2026-01-03_at_15.54.45_mpogon.jpg',
       alt: 'Church worship'
     },
     {
@@ -19,63 +20,125 @@ const HeroSection = () => {
       alt: 'Church community'
     },
     {
-      url: 'https://pbs.twimg.com/profile_images/700352011582251008/wrxEHL3q.jpg',
+      url: 'https://res.cloudinary.com/dcu8uuzrs/image/upload/v1767445662/copy_of_ot_ibz2xp_6e0397.jpg',
       alt: 'Church fellowship'
     }
   ];
 
   return (
-    <section className="bg-purple-100 pt-32 pb-0">
-      {/* Hero Text Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6 text-center mb-16 md:mb-20">
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-slate-900 mb-6 leading-tight">
-          There is <span className="text-blue-600">HOPE</span> for you,
-          <br />
-          His name is <span className="text-blue-600">JESUS</span>
-        </h1>
-        
-        <p className="text-lg md:text-xl text-slate-700 mb-8">
-          Sunday Services at 9:00AM, 11:00AM & 1:00PM
-        </p>
+    <section 
+      className="relative bg-cover bg-center bg-no-repeat pt-32 pb-24 overflow-hidden"
+      style={{
+        backgroundImage: `url('https://res.cloudinary.com/dcu8uuzrs/image/upload/v1767444965/WhatsApp_Image_2026-01-03_at_15.54.45_mpogon.jpg')`
+      }}
+    >
+      {/* Dark overlay for better text readability across the full background */}
+      <div className="absolute inset-0 bg-black/50"></div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button 
-            variant="secondary" 
-            size="lg" 
-            icon={Play}
-            onClick={() => setIsModalOpen(true)}
-          >
-            Watch Sunday service
-          </Button>
-          <Button 
-            variant="outline" 
-            size="lg"
-            className="border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
-          >
-            New? Start here
-          </Button>
-        </div>
-      </div>
+      {/* ================= MAIN GRID ================= */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
-      {/* Hero Images Grid */}
-      <div className="max-w-7xl mx-auto px-4 bg-purple-100">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-          {churchImages.map((image, index) => (
-            <div 
-              key={index} 
-              className="relative h-64 md:h-72 lg:h-80 overflow-hidden"
+        {/* ========== LEFT: TEXT CONTENT ========== */}
+        <div className="text-white">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
+            H.O.T
+            <br />
+            <span className="block mt-2">
+              More than a church.
+            </span>
+          </h1>
+
+          <p className="max-w-xl text-lg md:text-xl text-white/90 mb-4">
+            A place where the transformative Gospel of the Kingdom is preached —
+            and lives are truly changed.
+          </p>
+
+          <p className="text-base md:text-lg text-white/80 mb-10">
+            Sunday Services · 9:00AM · 11:00AM · 1:00PM
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              variant="secondary"
+              size="lg"
+              icon={Play}
+              onClick={() => setIsModalOpen(true)}
+              className="shadow-lg hover:shadow-xl transition"
             >
-              <img 
-                src={image.url} 
-                alt={image.alt}
-                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-              />
-            </div>
-          ))}
+              Watch Sunday Service
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="
+                border-2 border-white
+                text-white
+                hover:bg-white
+                hover:text-slate-900
+                transition
+              "
+            >
+              New Here? Start Here
+            </Button>
+          </div>
+        </div>
+
+        {/* ========== RIGHT: IMAGE COLLAGE (kept exactly as before) ========== */}
+        <div className="relative">
+          {/* Floating Top Image */}
+          <img
+            src={churchImages[1].url}
+            alt={churchImages[1].alt}
+            className="
+              hidden md:block
+              absolute
+              -top-12
+              right-0
+              w-64
+              h-40
+              object-cover
+              rounded-2xl
+              shadow-2xl
+              z-20
+            "
+          />
+
+          {/* Main Image */}
+          <img
+            src={churchImages[0].url}
+            alt={churchImages[0].alt}
+            className="
+              w-full
+              h-[420px]
+              md:h-[520px]
+              object-cover
+              rounded-3xl
+              shadow-xl
+            "
+          />
+
+          {/* Bottom Accent Image */}
+          <img
+            src={churchImages[2].url}
+            alt={churchImages[2].alt}
+            className="
+              hidden lg:block
+              absolute
+              -bottom-12
+              left-0
+              w-72
+              h-48
+              object-cover
+              rounded-2xl
+              shadow-2xl
+              z-10
+            "
+          />
         </div>
       </div>
 
-      {/* Modal for YouTube Live */}
+      {/* ================= MODAL (unchanged) ================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
           <div className="relative w-full max-w-5xl">
@@ -95,7 +158,7 @@ const HeroSection = () => {
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-              ></iframe>
+              />
             </div>
           </div>
         </div>

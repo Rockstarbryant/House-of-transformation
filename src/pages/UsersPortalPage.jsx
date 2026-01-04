@@ -94,7 +94,7 @@ const UsersPortalPage = () => {
       <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="mb-12">
-          <h1 className="text-5xl font-bold text-blue-900 mb-3">Church Members Directory</h1>
+          <h1 className="text-5xl font-bold text-blue-900 mb-3">Church Members Portal</h1>
           <p className="text-lg text-gray-600">Connect with {users.length} members in our community</p>
         </div>
 

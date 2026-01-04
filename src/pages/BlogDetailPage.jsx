@@ -90,10 +90,10 @@ const BlogDetailPage = () => {
 
   const getCategoryColor = (category) => {
     const colors = {
-      testimonies: 'from-purple-500 to-purple-600',
-      events: 'from-blue-500 to-blue-600',
-      teaching: 'from-green-500 to-green-600',
-      news: 'from-yellow-500 to-orange-600'
+      testimonies: 'from-purple-600 to-purple-600',
+      events: 'from-blue-600 to-blue-600',
+      teaching: 'from-green-600 to-green-600',
+      news: 'from-yellow-900 to-yellow-900'
     };
     return colors[category] || 'from-gray-500 to-gray-600';
   };

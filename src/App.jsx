@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ChatbotProvider } from './context/ChatbotContext';
+import { DonationProvider } from './context/DonationContext'; // ADD THIS IMPORT
 
 // Layout Components
 import Header from './components/layout/Header';
@@ -28,6 +29,12 @@ import TestimonyDetailPage from './pages/TestimonyDetailPage';
 import AdminLiveStreamPage from './pages/AdminLiveStreamPage';
 import AdminPage from './pages/AdminPage';
 
+// Donation Pages
+import DonationPage from './pages/donation/DonationPage';
+import PledgePage from './pages/donation/PledgePage';
+import DonationDashboard from './pages/donation/DonationDashboard';
+import PaymentPage from './pages/donation/PaymentPage';
+
 // Components
 import Chatbot from './components/chatbot/Chatbot';
 import ScrollToTop from './components/common/ScrollToTop';
@@ -41,58 +48,65 @@ function App() {
     <Router>
       <AuthProvider>
         <ChatbotProvider>
-          <div className="App min-h-screen flex flex-col">
-            <Header />
-            
-            <main className="flex-grow">
-              <ScrollToTop />
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/sermons" element={<SermonsPage />} />
-                <Route path="/blog" element={<BlogPage />} />
-                <Route path="/blog/:id" element={<BlogDetailPage />} />
-                <Route path="/gallery" element={<GalleryPage />} />
-                <Route path="/kids-zone" element={<KidsZonePage />} />
-                <Route path="/volunteer" element={<VolunteerPage />} />
-                <Route path="/events" element={<EventsPage />} />
-                <Route path="/donate" element={<DonatePage />} />
-                <Route path="/ministries" element={<MinistriesPage />} />
-                <Route path="/users" element={<UsersPortalPage />} />
-                <Route path="/profile/:userId" element={<UserProfilePage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/feedback" element={<FeedbackPage />} />
-                <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
+          <DonationProvider> {/* ADD THIS WRAPPER */}
+            <div className="App min-h-screen flex flex-col">
+              <Header />
+              
+              <main className="flex-grow">
+                <ScrollToTop />
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/sermons" element={<SermonsPage />} />
+                  <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/blog/:id" element={<BlogDetailPage />} />
+                  <Route path="/gallery" element={<GalleryPage />} />
+                  <Route path="/kids-zone" element={<KidsZonePage />} />
+                  <Route path="/volunteer" element={<VolunteerPage />} />
+                  <Route path="/events" element={<EventsPage />} />
+                  <Route path="/donate" element={<DonatePage />} />
+                  <Route path="/ministries" element={<MinistriesPage />} />
+                  <Route path="/users" element={<UsersPortalPage />} />
+                  <Route path="/profile/:userId" element={<UserProfilePage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
+                  
+                  {/* Donation Routes */}
+                  <Route path="/donations" element={<DonationPage />} />
+                  <Route path="/donations/pledge/:campaignId" element={<PledgePage />} />
+                  <Route path="/donations/dashboard" element={<DonationDashboard />} />
+                  <Route path="/donations/pay/:pledgeId" element={<PaymentPage />} />
 
-                {/* Protected Admin Route */}
-                <Route 
-                  path="/admin/*" 
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <AdminPage />
-                    </ProtectedRoute>
-                  } 
-                />
+                  {/* Protected Admin Routes */}
+                  <Route 
+                    path="/admin/*" 
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminPage />
+                      </ProtectedRoute>
+                    } 
+                  />
 
-                {/* Protected Admin Route */}
-                <Route 
-                  path="/admin/live-stream/*" 
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <AdminLiveStreamPage />
-                    </ProtectedRoute>
-                  } 
-                />
+                  <Route 
+                    path="/admin/live-stream/*" 
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminLiveStreamPage />
+                      </ProtectedRoute>
+                    } 
+                  />
 
-                {/* 404 Redirect */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
+                  {/* 404 Redirect */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </main>
 
-            <Footer />
-            <Chatbot />
-          </div>
+              <Footer />
+              <Chatbot />
+            </div>
+          </DonationProvider> {/* CLOSE THIS WRAPPER */}
         </ChatbotProvider>
       </AuthProvider>
     </Router>

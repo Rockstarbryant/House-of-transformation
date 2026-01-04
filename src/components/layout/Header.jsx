@@ -43,7 +43,8 @@ const Header = () => {
   const dropdownLinks = [
     { path: '/sermons', label: 'Sermons' },
     { path: '/events', label: 'Events' },
-    { path: '/gallery', label: 'Gallery' }
+    { path: '/gallery', label: 'Gallery' },
+    { path: '/blog', label: 'blogs' }
   ];
 
   const navLinksAfterDropdown = [
