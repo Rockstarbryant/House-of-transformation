@@ -47,10 +47,16 @@ const AdminDashboard = () => {
       setLoading(true);
 
       // Get real sermon count
-      const sermonsData = await sermonService.getSermons();
+      const sermonsData = await sermonService.getSermons().catch(err => {
+        console.error('Error fetching sermons:', err);
+        return { sermons: [] };
+      });
       
       // Get real events count
-      const eventsData = await eventService.getEvents();
+      const eventsData = await eventService.getEvents().catch(err => {
+        console.error('Error fetching events:', err);
+        return { events: [] };
+      });
       
       // Get volunteer stats
       let volunteerStats = {
@@ -62,7 +68,7 @@ const AdminDashboard = () => {
       
       try {
         const volStats = await volunteerService.getStats();
-        if (volStats.success) {
+        if (volStats.success && volStats.stats) {
           volunteerStats = {
             totalApplications: volStats.stats.totalApplications || 0,
             pendingApplications: volStats.stats.pendingApplications || 0,
@@ -74,10 +80,16 @@ const AdminDashboard = () => {
         console.error('Error fetching volunteer stats:', error);
       }
       
-      // Get real users data
-      const usersResponse = await api.get('/users');
-      const usersData = await usersResponse.json();
-      const users = usersData.users || [];
+      // Get real users data - FIXED: axios already parses JSON
+      let users = [];
+      try {
+        const usersResponse = await api.get('/users');
+        // axios automatically parses JSON, access data directly
+        users = usersResponse.data?.users || [];
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        users = [];
+      }
 
       const activeCount = users.filter(u => u.isActive).length;
       const inactiveCount = users.filter(u => !u.isActive).length;
@@ -107,8 +119,22 @@ const AdminDashboard = () => {
       });
 
       setRecentUsers(recentUsersData);
+
+      // Fetch feedback stats if available
+      try {
+        const feedbackData = await feedbackService.getFeedback?.().catch(() => ({ feedback: [] }));
+        if (feedbackData?.feedback) {
+          setFeedbackStats({
+            total: feedbackData.feedback.length,
+            positive: feedbackData.feedback.filter(f => f.rating >= 4).length || 0,
+            negative: feedbackData.feedback.filter(f => f.rating <= 2).length || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching feedback:', error);
+      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -127,7 +153,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="w-full mx-auto px-4 py-8 bg-blue-500 rounded-lg">
+    <div className="w-full mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -190,7 +216,7 @@ const AdminDashboard = () => {
             </div>
             <Link 
               to="/admin/volunteers"
-              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-2"
+              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-2 whitespace-nowrap"
             >
               Review Now
               <ArrowRight size={20} />
@@ -312,7 +338,7 @@ const AdminDashboard = () => {
               <span className="text-sm font-bold text-red-600 bg-white px-2 py-1 rounded">Live</span>
             </Link>
 
-            {/* NEW: Volunteer Management Link */}
+            {/* Volunteer Management Link */}
             <Link 
               to="/admin/volunteers" 
               className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-50 to-transparent hover:from-indigo-100 transition-colors flex items-center gap-3 group relative"
@@ -327,19 +353,16 @@ const AdminDashboard = () => {
               )}
             </Link>
 
-           <Link 
-
+            <Link 
               to="/admin/feedback" 
               className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-pink-50 to-transparent hover:from-pink-100 transition-colors flex items-center gap-3 group"
-              >
+            >
               <MessageSquare size={20} className="text-pink-600" />
-              <span className="flex-grow font-semibold text-gray-800">
-                Feedback & Testimonies
-                </span>  
-                 <span className="text-sm font-bold text-pink-600 bg-white px-2 py-1 rounded">
-                  {feedbackStats.total}
+              <span className="flex-grow font-semibold text-gray-800">Feedback & Testimonies</span>
+              <span className="text-sm font-bold text-pink-600 bg-white px-2 py-1 rounded">
+                {feedbackStats.total}
               </span>  
-          </Link>
+            </Link>
           </div>
         </Card>
       </div>
@@ -361,7 +384,7 @@ const AdminDashboard = () => {
               <div key={user._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center gap-4 flex-grow">
                   <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold">
-                    {user.name.charAt(0)}
+                    {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">{user.name}</p>
