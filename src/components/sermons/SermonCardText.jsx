@@ -45,12 +45,7 @@ const SermonCardText = ({ sermon }) => {
             <Calendar size={12} />
             {formatDate(sermon.date, 'short')}
           </span>
-        </div>
-
-        {/* Sermon Title */}
-        <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline">
-          {sermon.title}
-        </h3>
+        </div>   
       </div>
 
       {/* Pastor Info */}
@@ -68,6 +63,11 @@ const SermonCardText = ({ sermon }) => {
 
       {/* Sermon Description Preview */}
       <div className="flex-grow mb-4">
+
+        {/* Sermon Title */}
+        <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline text-center">
+          {sermon.title}
+        </h3>
         <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
           {displayText}
         </p>

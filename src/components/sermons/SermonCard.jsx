@@ -78,10 +78,7 @@ const SermonCard = ({ sermon }) => {
             </span>
           </div>
 
-          {/* Title */}
-          <h3 className="text-lg font-bold text-red-900 line-clamp-2 mb-3 leading-snug underline">
-            {sermon.title}
-          </h3>
+          
 
           {/* Pastor Info */}
           <div className="flex items-center gap-3 mb-4">
@@ -95,6 +92,11 @@ const SermonCard = ({ sermon }) => {
               <p className="text-xs text-gray-500">@Busia_HOT</p>
             </div>
           </div>
+
+          {/* Title */}
+          <h3 className="text-lg font-bold text-red-900 line-clamp-2 mb-3 leading-snug underline text-center">
+            {sermon.title}
+          </h3>
 
           {/* Description Preview */}
           {sermon.description && (
