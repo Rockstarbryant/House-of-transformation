@@ -29,7 +29,7 @@ const SermonCardText = ({ sermon }) => {
   const displayText = expanded ? sermon.description : truncateText(sermon.description);
 
   return (
-    <Card className="flex flex-col hover:shadow-lg transition-shadow h-full bg-slate-300">
+    <Card className="flex flex-col hover:shadow-lg transition-shadow h-full bg-slate-300 text-left">
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">

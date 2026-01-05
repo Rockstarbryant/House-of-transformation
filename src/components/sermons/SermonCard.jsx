@@ -64,7 +64,7 @@ const SermonCard = ({ sermon }) => {
         )}
 
         {/* Card Body */}
-        <div className="p-5 flex flex-col flex-grow">
+        <div className="p-5 flex flex-col flex-grow text-left">
           {/* Header: Category + Date */}
           <div className="flex items-center justify-between mb-3">
             {sermon.category && (
