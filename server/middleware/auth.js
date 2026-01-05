@@ -1,29 +1,63 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+/**
+ * PROTECTED ROUTE - Requires valid JWT token
+ * Attaches req.user to request object
+ */
 exports.protect = async (req, res, next) => {
   let token;
 
+  // Extract token from Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
 
+  // No token provided
   if (!token) {
-    return res.status(401).json({ message: 'Not authorized to access this route' });
+    return res.status(401).json({ 
+      success: false,
+      message: 'Not authorized to access this route' 
+    });
   }
 
   try {
+    // Verify token signature and expiry
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id);
+    
+    // Get user from database (exclude password)
+    req.user = await User.findById(decoded.id).select('-password');
+    
+    // User was deleted after token was issued
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+    
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Not authorized to access this route' });
+    // Handle token expiry separately
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token expired' 
+      });
+    }
+    
+    // Invalid token (malformed, wrong secret, etc)
+    return res.status(401).json({ 
+      success: false,
+      message: 'Invalid token' 
+    });
   }
 };
 
-// Add this function to your existing server/middleware/auth.js file
-
-// Optional authentication - attaches user if token exists, but doesn't require it
+/**
+ * OPTIONAL AUTH - Attaches user if token exists, but doesn't require it
+ * Used for public endpoints that show different content for logged-in users
+ */
 exports.optionalAuth = async (req, res, next) => {
   try {
     let token;
@@ -32,22 +66,18 @@ exports.optionalAuth = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // If no token, just continue without user
+    // If no token, continue as guest
     if (!token) {
       req.user = null;
       return next();
     }
 
     try {
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from token
       req.user = await User.findById(decoded.id).select('-password');
-      
       next();
     } catch (error) {
-      // If token is invalid, just continue without user (don't throw error)
+      // Invalid token - just continue as guest
       req.user = null;
       next();
     }
@@ -57,58 +87,46 @@ exports.optionalAuth = async (req, res, next) => {
   }
 };
 
-// Your existing protect and authorize functions remain unchanged
-
+/**
+ * ROLE-BASED AUTHORIZATION
+ * Check if user has required role
+ * MUST be used AFTER protect middleware
+ */
 exports.authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'User role not authorized' });
+    // protect middleware should have set req.user
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not authenticated' 
+      });
     }
+
+    // Check if user's role is in allowed roles
+    if (!req.user.role || !roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false,
+        message: `This action requires one of these roles: ${roles.join(', ')}`,
+        requiredRoles: roles,
+        userRole: req.user.role || 'none'
+      });
+    }
+
     next();
   };
 };
 
-// Token blacklist for logout (use Redis in production)
+/**
+ * LOGOUT - Clear token blacklist entry on production use Redis
+ * For development, using in-memory Set is fine
+ */
 const tokenBlacklist = new Set();
 
-exports.protect = async (req, res, next) => {
-  let token;
-
-  if (req.headers.authorization?.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized' });
-  }
-
-  // Check if token is blacklisted (logged out)
-  if (tokenBlacklist.has(token)) {
-    return res.status(401).json({ message: 'Token revoked' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password');
-    
-    if (!req.user) {
-      return res.status(401).json({ message: 'User not found' });
-    }
-    
-    next();
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token expired' });
-    }
-    return res.status(401).json({ message: 'Invalid token' });
-  }
-};
-
-// Add logout functionality
 exports.logout = (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (token) {
     tokenBlacklist.add(token);
+    // In production, store in Redis with TTL = token expiry time
   }
-  res.json({ success: true, message: 'Logged out' });
+  res.json({ success: true, message: 'Logged out successfully' });
 };

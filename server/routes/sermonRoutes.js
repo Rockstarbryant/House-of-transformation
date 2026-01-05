@@ -1,6 +1,5 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
-const authorize = require('../middleware/roleAuth');
+const { protect, authorize } = require('../middleware/auth');
 const {
   getSermons,
   getSermon,
@@ -9,15 +8,15 @@ const {
   deleteSermon,
   toggleLike
 } = require('../controllers/sermonController');
-//const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes
+// ===== PUBLIC ROUTES (NO AUTH) =====
 router.get('/', getSermons);
 router.get('/:id', getSermon);
 
-// Protected routes - only pastor/bishop/admin can create/update/delete
+// ===== PROTECTED & AUTHORIZED ROUTES (Admin/Pastor/Bishop only) =====
+// Create sermon
 router.post(
   '/',
   protect,
@@ -25,6 +24,7 @@ router.post(
   createSermon
 );
 
+// Update sermon
 router.put(
   '/:id',
   protect,
@@ -32,6 +32,7 @@ router.put(
   updateSermon
 );
 
+// Delete sermon
 router.delete(
   '/:id',
   protect,
@@ -39,7 +40,7 @@ router.delete(
   deleteSermon
 );
 
-// Like route (authenticated users)
+// ===== LIKE ROUTE (Authenticated users only) =====
 router.post('/:id/like', protect, toggleLike);
 
 module.exports = router;

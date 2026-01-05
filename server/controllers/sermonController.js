@@ -107,6 +107,14 @@ exports.createSermon = async (req, res) => {
       views: 0,
       comments: 0
     });
+    // In sermonController.js createSermon, add this:
+console.log('=== SERMON CREATE DEBUG ===');
+console.log('Token:', req.headers.authorization?.substring(0, 20));
+console.log('User ID:', req.user?._id);
+console.log('User Name:', req.user?.name);
+console.log('User Role:', req.user?.role);
+console.log('User Object:', JSON.stringify(req.user, null, 2));
+console.log('========================');
 
     res.status(201).json({ success: true, sermon });
   } catch (error) {
