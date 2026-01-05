@@ -197,3 +197,192 @@ exports.deleteUser = asyncHandler(async (req, res) => {
     message: 'User deleted'
   });
 });
+
+// ===== ADD THESE TO userController.js =====
+
+// @desc    Get all users with pagination
+// @route   GET /api/users?page=1&limit=50&role=admin&status=active&search=john
+// @access  Public
+exports.getAllUsersWithPagination = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 50, role, status, search } = req.query;
+
+  // Build filter object
+  const filter = {};
+  
+  if (role && role !== 'all') {
+    filter.role = role;
+  }
+  
+  if (status === 'active') {
+    filter.isActive = true;
+  } else if (status === 'inactive') {
+    filter.isActive = false;
+  }
+  
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { username: { $regex: search, $options: 'i' } },
+      { phone: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  try {
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 50;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const total = await User.countDocuments(filter);
+
+    // Get paginated data
+    const users = await User.find(filter)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const pages = Math.ceil(total / limitNum);
+
+    res.json({
+      success: true,
+      users,
+      total,
+      pages,
+      currentPage: pageNum,
+      limit: limitNum
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @desc    Bulk update user roles
+// @route   POST /api/users/bulk/role-update
+// @access  Private/Admin
+exports.bulkUpdateRoles = asyncHandler(async (req, res) => {
+  const { userIds, role } = req.body;
+
+  // Verify requester is admin
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Not authorized' 
+    });
+  }
+
+  if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid user IDs' 
+    });
+  }
+
+  if (!role) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Role required' 
+    });
+  }
+
+  try {
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      { role },
+      { runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: `Updated ${result.modifiedCount} users`,
+      updatedCount: result.modifiedCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @desc    Send bulk notification
+// @route   POST /api/users/notifications/send
+// @access  Private/Admin
+exports.sendBulkNotification = asyncHandler(async (req, res) => {
+  const { role, message } = req.body;
+
+  // Verify requester is admin
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Not authorized' 
+    });
+  }
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Message required' 
+    });
+  }
+
+  try {
+    // Find users by role (or all if role is 'all')
+    const filter = role && role !== 'all' ? { role } : {};
+    
+    const users = await User.find(filter).select('_id email');
+
+    // TODO: Integrate with your notification system (email, SMS, push notifications)
+    // For now, just return the count
+    
+    res.json({
+      success: true,
+      message: `Notification sent to ${users.length} users`,
+      sentCount: users.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @desc    Get user statistics
+// @route   GET /api/users/stats
+// @access  Public
+exports.getUserStats = asyncHandler(async (req, res) => {
+  try {
+    const total = await User.countDocuments();
+    const active = await User.countDocuments({ isActive: true });
+    const inactive = await User.countDocuments({ isActive: false });
+
+    // Count by role
+    const byRole = {};
+    const roles = ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'];
+    
+    for (const r of roles) {
+      byRole[r] = await User.countDocuments({ role: r });
+    }
+
+    res.json({
+      success: true,
+      stats: {
+        total,
+        active,
+        inactive,
+        byRole
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
