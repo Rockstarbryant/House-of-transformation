@@ -20,14 +20,28 @@ export const AuthProvider = ({ children }) => {
     try {
       const token = tokenService.getToken();
       if (token) {
+        // Verify token is still valid
         const response = await authService.verifyToken(token);
         if (response.user) {
           setUser(response.user);
+        } else {
+          tokenService.removeToken();
         }
       }
     } catch (err) {
       console.error('Auth check failed:', err);
-      tokenService.removeToken();
+      // Token might be expired - try to refresh it
+      try {
+        const refreshResponse = await authService.refreshToken();
+        if (refreshResponse.user) {
+          setUser(refreshResponse.user);
+        } else {
+          tokenService.removeToken();
+        }
+      } catch (refreshErr) {
+        console.error('Token refresh failed:', refreshErr);
+        tokenService.removeToken();
+      }
     } finally {
       setIsLoading(false);
     }

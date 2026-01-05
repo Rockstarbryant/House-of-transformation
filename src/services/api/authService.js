@@ -14,6 +14,23 @@ const api = axios.create({
   withCredentials: true
 });
 
+// Track if we're already refreshing to prevent multiple refresh calls
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  
+  isRefreshing = false;
+  failedQueue = [];
+};
+
 // Add auth token to requests
 api.interceptors.request.use(
   (config) => {
@@ -27,16 +44,58 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Handle response errors and token refresh
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const originalRequest = error.config;
+
     // Handle rate limiting
     if (error.response?.status === 429) {
       console.warn('Rate limited - too many requests');
       return Promise.reject(error);
     }
 
-    // Handle unauthorized (401)
+    // Handle token expiry with automatic refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      // Try to refresh token
+      return api
+        .post('/auth/refresh')
+        .then((res) => {
+          if (res.data.token) {
+            tokenService.setToken(res.data.token);
+            originalRequest.headers.Authorization = `Bearer ${res.data.token}`;
+            processQueue(null, res.data.token);
+            return api(originalRequest);
+          } else {
+            throw new Error('No token in refresh response');
+          }
+        })
+        .catch((err) => {
+          processQueue(err, null);
+          // Token refresh failed - clear auth and redirect to login
+          tokenService.removeToken();
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+          return Promise.reject(err);
+        });
+    }
+
+    // Handle other 401 errors (invalid token, etc)
     if (error.response?.status === 401) {
       console.warn('Unauthorized - clearing token and redirecting to login');
       tokenService.removeToken();
