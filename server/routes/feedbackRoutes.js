@@ -14,17 +14,35 @@ const { protect, authorize, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes (NO authentication required)
-router.post('/', optionalAuth, submitFeedback); // optionalAuth attaches user if logged in
+// ===== PUBLIC ROUTES (NO authentication required) =====
+// POST submit feedback - supports anonymous
+router.post('/', optionalAuth, submitFeedback);
+
+// GET public testimonies - anyone can view
 router.get('/testimonies/public', getPublicTestimonies);
 
-// Admin routes
-router.get('/', protect, authorize('admin', 'pastor', 'bishop'), getAllFeedback);
+// ===== ADMIN ROUTES (MUST come BEFORE generic /api/feedback routes) =====
+// IMPORTANT: Put specific routes BEFORE generic ones!
+// GET /api/feedback/stats - MUST be before GET /api/feedback/:id
 router.get('/stats', protect, authorize('admin', 'pastor', 'bishop'), getStats);
+
+// ===== ADMIN ROUTES (Generic - catches all other feedback endpoints) =====
+// GET all feedback - with filters
+router.get('/', protect, authorize('admin', 'pastor', 'bishop'), getAllFeedback);
+
+// GET single feedback by ID
 router.get('/:id', protect, authorize('admin', 'pastor', 'bishop'), getFeedback);
+
+// PUT update feedback status
 router.put('/:id/status', protect, authorize('admin', 'pastor', 'bishop'), updateStatus);
+
+// POST respond to feedback
 router.post('/:id/respond', protect, authorize('admin', 'pastor', 'bishop'), respondToFeedback);
+
+// PUT publish testimony
 router.put('/:id/publish', protect, authorize('admin', 'pastor', 'bishop'), publishTestimony);
+
+// DELETE feedback
 router.delete('/:id', protect, authorize('admin'), deleteFeedback);
 
 module.exports = router;
