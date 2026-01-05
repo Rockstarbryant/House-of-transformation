@@ -32,15 +32,33 @@ exports.uploadPhoto = asyncHandler(async (req, res) => {
     });
   }
 
-  // ✅ CHECK 2: Cloudinary returned URL
-  if (!req.file.secure_url) {
-    console.error('❌ Cloudinary did not return secure_url');
+  console.log('✅ req.file object:', {
+    fieldname: req.file.fieldname,
+    originalname: req.file.originalname,
+    encoding: req.file.encoding,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+    // Cloudinary returns these properties:
+    filename: req.file.filename,
+    path: req.file.path,
+    secure_url: req.file.secure_url,
+    public_id: req.file.public_id
+  });
+
+  // ✅ CHECK 2: Get image URL from Cloudinary
+  // Multer-storage-cloudinary returns 'path' not 'secure_url'
+  const imageUrl = req.file.secure_url || req.file.path;
+
+  if (!imageUrl) {
+    console.error('❌ Cloudinary did not return URL');
     console.error('❌ req.file:', req.file);
     return res.status(400).json({
       success: false,
       message: 'Image upload to Cloudinary failed. Check your Cloudinary credentials.'
     });
   }
+
+  console.log('✅ Image URL from Cloudinary:', imageUrl);
 
   // ✅ CHECK 3: Title required
   if (!req.body.title || req.body.title.trim() === '') {
@@ -57,7 +75,7 @@ exports.uploadPhoto = asyncHandler(async (req, res) => {
       title: req.body.title.trim(),
       description: req.body.description?.trim() || '',
       category: req.body.category || 'General',
-      imageUrl: req.file.secure_url, // ✅ Cloudinary URL
+      imageUrl: imageUrl, // ✅ Either secure_url or path
       imagePublicId: req.file.public_id, // ✅ For deletion
       uploadedBy: req.user._id || req.user.id,
       likes: 0,
@@ -67,14 +85,16 @@ exports.uploadPhoto = asyncHandler(async (req, res) => {
 
     console.log('✅ Creating photo with data:', {
       title: photoData.title,
-      imageUrl: photoData.imageUrl ? 'URL present' : 'URL MISSING',
-      category: photoData.category
+      imageUrl: photoData.imageUrl,
+      category: photoData.category,
+      imagePublicId: photoData.imagePublicId
     });
 
     const photo = await Gallery.create(photoData);
     await photo.populate('uploadedBy', 'name email');
 
     console.log('✅ Photo uploaded successfully:', photo._id);
+    console.log('✅ Image URL saved in DB:', photo.imageUrl);
 
     res.status(201).json({
       success: true,
@@ -89,6 +109,7 @@ exports.uploadPhoto = asyncHandler(async (req, res) => {
     });
   }
 });
+
 
 exports.deletePhoto = asyncHandler(async (req, res) => {
   const photo = await Gallery.findById(req.params.id);
