@@ -1,6 +1,6 @@
 // src/services/api/authService.js
 import axios from 'axios';
-import { tokenService } from './../tokenService'
+import { tokenService } from './../tokenService';
 import { API_ENDPOINTS } from '../../utils/constants';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -11,16 +11,16 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-   withCredentials: true // IMPORTANT: Send cookies with requests
+  withCredentials: true
 });
 
 // Add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = tokenService.getToken();
     if (token) {
-      const tokenData = JSON.parse(token);
-      config.headers.Authorization = `Bearer ${tokenData.value}`;
+      // Token is already a raw string from tokenService
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -33,14 +33,17 @@ api.interceptors.response.use(
     // Handle rate limiting
     if (error.response?.status === 429) {
       console.warn('Rate limited - too many requests');
-      // Don't auto-redirect, let component handle it
       return Promise.reject(error);
     }
 
-    // Handle unauthorized
+    // Handle unauthorized (401)
     if (error.response?.status === 401) {
+      console.warn('Unauthorized - clearing token and redirecting to login');
       tokenService.removeToken();
-      window.location.href = '/login';
+      // Only redirect if not already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
 
     return Promise.reject(error);
@@ -54,45 +57,41 @@ export const authService = {
         email,
         password
       });
-      
+
       if (response.data.token) {
+        // Store raw token string
         tokenService.setToken(response.data.token);
       }
-      
+
       return response.data;
     } catch (error) {
       throw error;
     }
   },
-  
-  // Signup new user
 
   async signup(userData) {
     try {
       const response = await api.post(API_ENDPOINTS.AUTH.SIGNUP, userData);
-      
+
       if (response.data.token) {
+        // Store raw token string
         tokenService.setToken(response.data.token);
       }
-      
+
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Logout user
-  
-   async logout() {
+  async logout() {
     try {
       await api.post(API_ENDPOINTS.AUTH.LOGOUT);
     } finally {
       tokenService.removeToken();
     }
   },
-  
-  // Verify token
-  
+
   async verifyToken(token) {
     try {
       const response = await api.get(API_ENDPOINTS.AUTH.VERIFY, {
@@ -104,21 +103,18 @@ export const authService = {
     }
   },
 
-  /**
-   * Refresh access token
-   */
   async refreshToken() {
     try {
       const response = await api.post(API_ENDPOINTS.AUTH.REFRESH);
+      if (response.data.token) {
+        tokenService.setToken(response.data.token);
+      }
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  /**
-   * Update user profile
-   */
   async updateProfile(updates) {
     try {
       const response = await api.put('/auth/profile', updates);
@@ -128,9 +124,6 @@ export const authService = {
     }
   },
 
-  /**
-   * Change password
-   */
   async changePassword(currentPassword, newPassword) {
     try {
       const response = await api.put('/auth/password', {
@@ -143,9 +136,6 @@ export const authService = {
     }
   },
 
-  /**
-   * Request password reset
-   */
   async requestPasswordReset(email) {
     try {
       const response = await api.post('/auth/forgot-password', { email });
@@ -155,9 +145,6 @@ export const authService = {
     }
   },
 
-  /**
-   * Reset password with token
-   */
   async resetPassword(token, newPassword) {
     try {
       const response = await api.post('/auth/reset-password', {

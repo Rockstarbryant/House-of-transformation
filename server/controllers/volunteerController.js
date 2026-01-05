@@ -350,16 +350,29 @@ exports.getStats = async (req, res) => {
     const totalApplications = await Volunteer.countDocuments();
     const pendingApplications = await Volunteer.countDocuments({ status: 'pending' });
     const approvedVolunteers = await Volunteer.countDocuments({ status: 'approved' });
-    const totalHours = await Volunteer.aggregate([
+    
+    // Get total hours - handle empty result
+    const totalHoursResult = await Volunteer.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: null, total: { $sum: '$hours' } } }
     ]);
+    const totalHours = totalHoursResult.length > 0 ? totalHoursResult[0].total : 0;
 
+    // Get ministry breakdown
     const ministryBreakdown = await Volunteer.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: '$ministry', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
+
+    // Log for debugging
+    console.log('Volunteer Stats:', {
+      totalApplications,
+      pendingApplications,
+      approvedVolunteers,
+      totalHours,
+      ministryBreakdown
+    });
 
     res.json({
       success: true,
@@ -367,11 +380,12 @@ exports.getStats = async (req, res) => {
         totalApplications,
         pendingApplications,
         approvedVolunteers,
-        totalHours: totalHours[0]?.total || 0,
+        totalHours,
         ministryBreakdown
       }
     });
   } catch (error) {
+    console.error('Error fetching stats:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch statistics',

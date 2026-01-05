@@ -5,12 +5,13 @@
 
 export const tokenService = {
   /**
-   * Store token in sessionStorage (memory-based, cleared on browser close)
+   * Store raw token string in sessionStorage (memory-based, cleared on browser close)
    */
   setToken(token) {
     if (!token) return false;
     try {
-      sessionStorage.setItem('_auth_token', token);
+      // Store as raw string (not JSON)
+      sessionStorage.setItem('authToken', token);
       return true;
     } catch (error) {
       console.error('Error storing token:', error);
@@ -19,11 +20,12 @@ export const tokenService = {
   },
 
   /**
-   * Get token from sessionStorage
+   * Get raw token string from sessionStorage
    */
   getToken() {
     try {
-      return sessionStorage.getItem('_auth_token');
+      const token = sessionStorage.getItem('authToken');
+      return token; // Return raw string, not parsed
     } catch (error) {
       console.error('Error retrieving token:', error);
       return null;
@@ -35,7 +37,7 @@ export const tokenService = {
    */
   removeToken() {
     try {
-      sessionStorage.removeItem('_auth_token');
+      sessionStorage.removeItem('authToken');
       return true;
     } catch (error) {
       console.error('Error removing token:', error);
@@ -58,7 +60,11 @@ export const tokenService = {
     if (!token) return true;
 
     try {
-      const decoded = JSON.parse(atob(token.split('.')[1]));
+      // JWT format: header.payload.signature
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+
+      const decoded = JSON.parse(atob(parts[1]));
       const expiryTime = decoded.exp * 1000; // Convert to milliseconds
       return expiryTime < Date.now();
     } catch (error) {

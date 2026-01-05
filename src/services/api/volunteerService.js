@@ -35,25 +35,28 @@ export const volunteerService = {
     }
   },
 
-  // Get current user's applications
+  // Get current user's applications (PROTECTED - only their own)
   async getMyApplications() {
     try {
-      const response = await api.get('/volunteers/my-applications');
+      const response = await api.get(API_ENDPOINTS.VOLUNTEERS.MY_APPLICATIONS);
       return response.data;
     } catch (error) {
-      console.error('Error fetching applications:', error);
+      console.error('Error fetching my applications:', error);
       throw error;
     }
   },
 
-  // Admin: Get all volunteer applications
+  // Admin: Get all volunteer applications (with filters)
   async getAllApplications(filters = {}) {
     try {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.ministry) params.append('ministry', filters.ministry);
-      
-      const response = await api.get(`/volunteers/applications?${params.toString()}`);
+
+      const response = await api.get(
+        API_ENDPOINTS.VOLUNTEERS.ALL_APPLICATIONS,
+        { params }
+      );
       return response.data;
     } catch (error) {
       console.error('Error fetching all applications:', error);
@@ -64,7 +67,10 @@ export const volunteerService = {
   // Admin: Update application status
   async updateStatus(applicationId, statusData) {
     try {
-      const response = await api.put(`/volunteers/${applicationId}`, statusData);
+      const response = await api.put(
+        API_ENDPOINTS.VOLUNTEERS.UPDATE_STATUS(applicationId),
+        statusData
+      );
       return response.data;
     } catch (error) {
       console.error('Error updating status:', error);
@@ -75,7 +81,10 @@ export const volunteerService = {
   // Admin: Update volunteer hours
   async updateHours(applicationId, hours) {
     try {
-      const response = await api.put(`/volunteers/${applicationId}/hours`, { hours });
+      const response = await api.put(
+        API_ENDPOINTS.VOLUNTEERS.UPDATE_HOURS(applicationId),
+        { hours }
+      );
       return response.data;
     } catch (error) {
       console.error('Error updating hours:', error);
@@ -86,7 +95,9 @@ export const volunteerService = {
   // Admin: Delete application
   async deleteApplication(applicationId) {
     try {
-      const response = await api.delete(`/volunteers/${applicationId}`);
+      const response = await api.delete(
+        API_ENDPOINTS.VOLUNTEERS.DELETE(applicationId)
+      );
       return response.data;
     } catch (error) {
       console.error('Error deleting application:', error);
@@ -97,7 +108,7 @@ export const volunteerService = {
   // Admin: Get volunteer statistics
   async getStats() {
     try {
-      const response = await api.get('/volunteers/stats');
+      const response = await api.get(API_ENDPOINTS.VOLUNTEERS.STATS);
       return response.data;
     } catch (error) {
       console.error('Error fetching stats:', error);
