@@ -122,7 +122,7 @@ const AdminDashboard = () => {
 
       // Fetch feedback stats if available
       try {
-        const feedbackData = await feedbackService.getFeedback?.().catch(() => ({ feedback: [] }));
+        const feedbackData = await feedbackService.getAllFeedback().catch(() => ({ feedback: [] }));
         if (feedbackData?.feedback) {
           setFeedbackStats({
             total: feedbackData.feedback.length,

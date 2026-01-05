@@ -1,46 +1,26 @@
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
-// Create axios instance with base configuration
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add optional auth token if available
-// Add optional auth token if available
-api.interceptors.request.use(
-  (config) => {
-    const token = sessionStorage.getItem('_auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import api from './authService';
+import { API_ENDPOINTS } from '../../utils/constants';
 
 export const feedbackService = {
-  // Submit feedback (NO AUTH REQUIRED - works for anonymous and authenticated users)
+  /**
+   * Submit feedback (NO AUTH REQUIRED - works for anonymous and authenticated users)
+   */
   async submitFeedback(feedbackData) {
-  try {
-    const response = await api.post('/feedback', feedbackData);
-    return response.data;
-  } catch (error) {
-    console.error('Submit feedback error:', error);
-    throw error;
-  }
-},
+    try {
+      const response = await api.post('/feedback', feedbackData);
+      return response.data;
+    } catch (error) {
+      console.error('Submit feedback error:', error);
+      throw error;
+    }
+  },
 
-  // Get public testimonies (NO AUTH REQUIRED)
+  /**
+   * Get public testimonies (NO AUTH REQUIRED)
+   */
   async getPublicTestimonies() {
     try {
-      const response = await axios.get(`${API_URL}/feedback/testimonies/public`);
+      const response = await api.get('/feedback/testimonies/public');
       return response.data;
     } catch (error) {
       console.error('Get testimonies error:', error);
@@ -48,7 +28,9 @@ export const feedbackService = {
     }
   },
 
-  // Admin: Get all feedback
+  /**
+   * Admin: Get all feedback with filters
+   */
   async getAllFeedback(filters = {}) {
     try {
       const params = new URLSearchParams();
@@ -58,16 +40,20 @@ export const feedbackService = {
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
 
-      const response = await api.get(`/feedback?${params.toString()}`);
+      const response = await api.get(
+        `/feedback${params.toString() ? '?' + params.toString() : ''}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Get feedback error:', error);
+      console.error('Get all feedback error:', error);
       throw error;
     }
   },
 
-  // Admin: Get single feedback
-  async getFeedback(id) {
+  /**
+   * Admin: Get single feedback by ID
+   */
+  async getFeedbackById(id) {
     try {
       const response = await api.get(`/feedback/${id}`);
       return response.data;
@@ -77,7 +63,9 @@ export const feedbackService = {
     }
   },
 
-  // Admin: Update feedback status
+  /**
+   * Admin: Update feedback status
+   */
   async updateStatus(id, statusData) {
     try {
       const response = await api.put(`/feedback/${id}/status`, statusData);
@@ -88,18 +76,24 @@ export const feedbackService = {
     }
   },
 
-  // Admin: Respond to feedback
-  async respondToFeedback(id, response) {
+  /**
+   * Admin: Respond to feedback
+   */
+  async respondToFeedback(id, responseText) {
     try {
-      const result = await api.post(`/feedback/${id}/respond`, { response });
-      return result.data;
+      const response = await api.post(`/feedback/${id}/respond`, { 
+        response: responseText 
+      });
+      return response.data;
     } catch (error) {
       console.error('Respond error:', error);
       throw error;
     }
   },
 
-  // Admin: Publish testimony
+  /**
+   * Admin: Publish testimony
+   */
   async publishTestimony(id) {
     try {
       const response = await api.put(`/feedback/${id}/publish`);
@@ -110,7 +104,9 @@ export const feedbackService = {
     }
   },
 
-  // Admin: Delete feedback
+  /**
+   * Admin: Delete feedback
+   */
   async deleteFeedback(id) {
     try {
       const response = await api.delete(`/feedback/${id}`);
@@ -121,13 +117,15 @@ export const feedbackService = {
     }
   },
 
-  // Admin: Get statistics
+  /**
+   * Admin: Get feedback statistics
+   */
   async getStats() {
     try {
       const response = await api.get('/feedback/stats');
       return response.data;
     } catch (error) {
-      console.error('Get stats error:', error);
+      console.error('Get feedback stats error:', error);
       throw error;
     }
   }
