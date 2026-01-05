@@ -1,6 +1,5 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
-const authorize = require('../middleware/roleAuth');
+const { protect, authorize } = require('../middleware/auth');
 const {
   getPhotos,
   uploadPhoto,
@@ -11,20 +10,21 @@ const upload = require('../middleware/upload');
 
 const router = express.Router();
 
+// ===== PUBLIC ROUTES =====
 // GET all photos - Public
 router.get('/', getPhotos);
 
-// POST upload photo - Protected, only pastor/bishop/admin
-// IMPORTANT: upload.single('photo') processes the multipart form data
+// ===== PROTECTED & AUTHORIZED ROUTES =====
+// POST upload photo - Only pastor/bishop/admin can upload
 router.post(
   '/',
   protect,
   authorize('pastor', 'bishop', 'admin'),
-  upload.single('photo'),  // ← THIS WAS MISSING!
+  upload.single('photo'),
   uploadPhoto
 );
 
-// DELETE photo - Protected, only pastor/bishop/admin
+// DELETE photo - Only pastor/bishop/admin can delete
 router.delete(
   '/:id',
   protect,
@@ -32,7 +32,8 @@ router.delete(
   deletePhoto
 );
 
-// POST like photo - Protected
+// ===== PROTECTED ROUTES (All authenticated users) =====
+// POST like photo - Any authenticated user can like
 router.post('/:id/like', protect, likePhoto);
 
 module.exports = router;

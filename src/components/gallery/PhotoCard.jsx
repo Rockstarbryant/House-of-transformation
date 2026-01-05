@@ -4,9 +4,13 @@ import Card from '../common/Card';
 import { formatDate } from '../../utils/helpers';
 
 const PhotoCard = ({ photo, onViewFullSize }) => {
+  // Get API base URL from environment or use default
+  const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://house-of-transformation.onrender.com';
+  
+  // Build image URL - handle both full URLs and relative paths
   const imageUrl = photo.imageUrl.startsWith('http') 
     ? photo.imageUrl 
-    : `http://localhost:5000${photo.imageUrl}`;
+    : `${API_BASE}${photo.imageUrl}`;
 
   return (
     <Card hover padding="none" className="group relative overflow-hidden cursor-pointer">
@@ -16,6 +20,7 @@ const PhotoCard = ({ photo, onViewFullSize }) => {
           alt={photo.title}
           className="w-full h-full object-cover"
           onError={(e) => {
+            // Fallback if image fails to load
             e.target.style.display = 'none';
           }}
         />

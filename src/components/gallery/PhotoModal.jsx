@@ -7,6 +7,9 @@ const PhotoModal = ({ photo, onClose }) => {
   const [likes, setLikes] = useState(photo.likes || 0);
   const [liked, setLiked] = useState(false);
 
+  // Get API base URL from environment or use default
+  const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://house-of-transformation.onrender.com';
+
   const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -19,9 +22,10 @@ const PhotoModal = ({ photo, onClose }) => {
     }
   };
 
+  // Build image URL - handle both full URLs and relative paths
   const imageUrl = photo.imageUrl.startsWith('http') 
     ? photo.imageUrl 
-    : `http://localhost:5000${photo.imageUrl}`;
+    : `${API_BASE}${photo.imageUrl}`;
 
   return (
     <div 
@@ -52,7 +56,7 @@ const PhotoModal = ({ photo, onClose }) => {
           alt={photo.title}
           className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
           onError={(e) => {
-            console.error('Image failed to load');
+            console.error('Image failed to load:', imageUrl);
           }}
         />
         <div className="mt-4 bg-white p-4 rounded-lg">

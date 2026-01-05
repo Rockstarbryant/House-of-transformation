@@ -68,7 +68,8 @@ export const API_ENDPOINTS = {
   GALLERY: {
     LIST: '/gallery',
     UPLOAD: '/gallery',
-    DELETE: (id) => `/gallery/${id}`
+    DELETE: (id) => `/gallery/${id}`,
+    LIKE: (id) => `/gallery/${id}/like`
   },
   VOLUNTEERS: {
     OPPORTUNITIES: '/volunteers/opportunities',
