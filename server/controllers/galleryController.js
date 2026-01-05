@@ -19,42 +19,75 @@ exports.getPhotos = asyncHandler(async (req, res) => {
 });
 
 exports.uploadPhoto = asyncHandler(async (req, res) => {
+  console.log('📁 Upload request received');
+  console.log('📄 req.file:', req.file ? 'EXISTS' : 'MISSING');
+  console.log('📝 req.body:', req.body);
+
+  // ✅ CHECK 1: File exists
   if (!req.file) {
+    console.error('❌ No file uploaded');
     return res.status(400).json({
       success: false,
       message: 'No file uploaded. Please select a photo.'
     });
   }
 
+  // ✅ CHECK 2: Cloudinary returned URL
+  if (!req.file.secure_url) {
+    console.error('❌ Cloudinary did not return secure_url');
+    console.error('❌ req.file:', req.file);
+    return res.status(400).json({
+      success: false,
+      message: 'Image upload to Cloudinary failed. Check your Cloudinary credentials.'
+    });
+  }
+
+  // ✅ CHECK 3: Title required
   if (!req.body.title || req.body.title.trim() === '') {
+    console.error('❌ Title is required');
     return res.status(400).json({
       success: false,
       message: 'Title is required'
     });
   }
 
-  const photoData = {
-    title: req.body.title.trim(),
-    description: req.body.description?.trim() || '',
-    category: req.body.category || 'General',
-    imageUrl: req.file.secure_url,
-    imagePublicId: req.file.public_id,
-    uploadedBy: req.user._id || req.user.id,
-    likes: 0,
-    likedBy: [],
-    comments: 0
-  };
+  try {
+    // ✅ All validations passed, create photo
+    const photoData = {
+      title: req.body.title.trim(),
+      description: req.body.description?.trim() || '',
+      category: req.body.category || 'General',
+      imageUrl: req.file.secure_url, // ✅ Cloudinary URL
+      imagePublicId: req.file.public_id, // ✅ For deletion
+      uploadedBy: req.user._id || req.user.id,
+      likes: 0,
+      likedBy: [],
+      comments: 0
+    };
 
-  const photo = await Gallery.create(photoData);
-  await photo.populate('uploadedBy', 'name email');
+    console.log('✅ Creating photo with data:', {
+      title: photoData.title,
+      imageUrl: photoData.imageUrl ? 'URL present' : 'URL MISSING',
+      category: photoData.category
+    });
 
-  console.log('✅ Photo uploaded successfully:', photo._id);
+    const photo = await Gallery.create(photoData);
+    await photo.populate('uploadedBy', 'name email');
 
-  res.status(201).json({
-    success: true,
-    message: 'Photo uploaded successfully',
-    photo
-  });
+    console.log('✅ Photo uploaded successfully:', photo._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Photo uploaded successfully',
+      photo
+    });
+  } catch (error) {
+    console.error('❌ Database save error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error saving photo: ' + error.message
+    });
+  }
 });
 
 exports.deletePhoto = asyncHandler(async (req, res) => {

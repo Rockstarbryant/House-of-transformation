@@ -1,9 +1,3 @@
-
-// ============================================
-// FILE 1: backend/config/cloudinaryConfig.js
-// PATH: Create NEW file at: backend/config/cloudinaryConfig.js
-// ============================================
-
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
@@ -13,6 +7,11 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+console.log('🔧 Cloudinary config:');
+console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌ MISSING');
+console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? '✅' : '❌ MISSING');
+console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅' : '❌ MISSING');
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -34,7 +33,8 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type'), false);
+      console.error('❌ Invalid file type:', file.mimetype);
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP allowed'), false);
     }
   }
 });
