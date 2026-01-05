@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ChatbotProvider } from './context/ChatbotContext';
-import { DonationProvider } from './context/DonationContext'; // ADD THIS IMPORT
+import { DonationProvider } from './context/DonationContext';
 
 // Layout Components
 import Header from './components/layout/Header';
@@ -35,6 +35,11 @@ import PledgePage from './pages/donation/PledgePage';
 import DonationDashboard from './pages/donation/DonationDashboard';
 import PaymentPage from './pages/donation/PaymentPage';
 
+// ===== NEW: AUTH PAGES =====
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';
+import VerifyEmailForm from './components/auth/VerifyEmailForm';
+
 // Components
 import Chatbot from './components/chatbot/Chatbot';
 import ScrollToTop from './components/common/ScrollToTop';
@@ -48,14 +53,14 @@ function App() {
     <Router>
       <AuthProvider>
         <ChatbotProvider>
-          <DonationProvider> {/* ADD THIS WRAPPER */}
+          <DonationProvider>
             <div className="App min-h-screen flex flex-col">
               <Header />
               
               <main className="flex-grow">
                 <ScrollToTop />
                 <Routes>
-                  {/* Public Routes */}
+                  {/* ===== PUBLIC ROUTES ===== */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/sermons" element={<SermonsPage />} />
@@ -73,13 +78,18 @@ function App() {
                   <Route path="/feedback" element={<FeedbackPage />} />
                   <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
                   
-                  {/* Donation Routes */}
+                  {/* ===== NEW: EMAIL AUTHENTICATION ROUTES ===== */}
+                  <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+                  <Route path="/reset-password/:token" element={<ResetPasswordForm />} />
+                  <Route path="/verify-email/:token" element={<VerifyEmailForm />} />
+                  
+                  {/* ===== DONATION ROUTES ===== */}
                   <Route path="/donations" element={<DonationPage />} />
                   <Route path="/donations/pledge/:campaignId" element={<PledgePage />} />
                   <Route path="/donations/dashboard" element={<DonationDashboard />} />
                   <Route path="/donations/pay/:pledgeId" element={<PaymentPage />} />
 
-                  {/* Protected Admin Routes */}
+                  {/* ===== PROTECTED ADMIN ROUTES ===== */}
                   <Route 
                     path="/admin/*" 
                     element={
@@ -98,7 +108,7 @@ function App() {
                     } 
                   />
 
-                  {/* 404 Redirect */}
+                  {/* ===== 404 REDIRECT ===== */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>
@@ -106,7 +116,7 @@ function App() {
               <Footer />
               <Chatbot />
             </div>
-          </DonationProvider> {/* CLOSE THIS WRAPPER */}
+          </DonationProvider>
         </ChatbotProvider>
       </AuthProvider>
     </Router>

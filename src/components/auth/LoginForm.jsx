@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import { useAuthContext } from '../../context/AuthContext';
@@ -86,6 +87,17 @@ const LoginForm = ({ onSuccess, onSwitchToSignup }) => {
           required
           disabled={isRateLimited || isSubmitting}
         />
+
+        {/* Forgot Password Link - Professional placement */}
+        <div className="flex justify-end">
+          <Link
+            to="/forgot-password"
+            className="text-sm text-blue-900 hover:text-blue-700 font-semibold hover:underline transition-colors"
+          >
+            Forgot Password?
+          </Link>
+        </div>
+
         <Button
           type="submit"
           variant="primary"
