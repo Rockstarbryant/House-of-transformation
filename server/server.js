@@ -14,11 +14,15 @@ connectDB();
 
 const app = express();
 
-// Body parser
+// ===== TRUST PROXY (CRITICAL FOR RENDER) =====
+// Must be set BEFORE rate limiter and other middleware
+app.set('trust proxy', 1);
+
+// ===== BODY PARSER =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS Configuration
+// ===== CORS CONFIGURATION =====
 const allowedOrigins = process.env.NODE_ENV === 'development' 
   ? [
       'http://localhost:3000',
@@ -41,7 +45,7 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Static files
+// ===== STATIC FILES =====
 app.use('/uploads', express.static('uploads'));
 
 // ============================================
@@ -59,6 +63,7 @@ app.get('/', (req, res) => {
       events: '/api/events',
       gallery: '/api/gallery',
       volunteers: '/api/volunteers',
+      feedback: '/api/feedback',
       health: '/api/health'
     }
   });
@@ -89,7 +94,7 @@ app.use('/api/gallery', require('./routes/galleryRoutes'));
 // User routes
 app.use('/api/users', require('./routes/userRoutes'));
 
-// Volunteer routes (only mount once!)
+// Volunteer routes
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 
 // Feedback routes
@@ -119,6 +124,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✓ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`✓ API Documentation: http://localhost:${PORT}/`);
+  console.log(`✓ Trust Proxy: Enabled for ${process.env.NODE_ENV === 'production' ? 'Render/Production' : 'Development'}`);
   console.log(`✓ CORS enabled for: ${allowedOrigins.join(', ')}`);
   console.log(`✓ Rate limiting enabled:`);
   console.log(`  - General API: 100 requests per 15 minutes`);

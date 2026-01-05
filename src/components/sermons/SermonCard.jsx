@@ -92,7 +92,7 @@ const SermonCard = ({ sermon }) => {
               <p className="font-semibold text-gray-900 text-sm">
                 {sermon.pastor || 'Pastor'}
               </p>
-              <p className="text-xs text-gray-500">@church</p>
+              <p className="text-xs text-gray-500">@Busia_HOT</p>
             </div>
           </div>
 
