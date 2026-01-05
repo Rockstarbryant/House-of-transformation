@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "migrate:verify": "node server/scripts/migrateUsersVerified.js",
     "lint": "eslint .",
     "test": "jest"
   },

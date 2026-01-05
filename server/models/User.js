@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -42,6 +43,31 @@ const userSchema = new mongoose.Schema({
   ministries: [{
     type: String
   }],
+  
+  // ===== EMAIL VERIFICATION FIELDS =====
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    default: null
+  },
+  emailVerificationExpiry: {
+    type: Date,
+    default: null
+  },
+  
+  // ===== PASSWORD RESET FIELDS =====
+  passwordResetToken: {
+    type: String,
+    default: null
+  },
+  passwordResetExpiry: {
+    type: Date,
+    default: null
+  },
+  
   // Engagement metrics
   blogsCreated: {
     type: Number,
@@ -88,17 +114,55 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Generate email verification token
+userSchema.methods.generateEmailVerificationToken = function() {
+  // Generate token
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  // Hash and save token
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+  
+  // Set expiry to 24 hours
+  this.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000;
+  
+  return token;
+};
+
+// Generate password reset token
+userSchema.methods.generatePasswordResetToken = function() {
+  // Generate token
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  // Hash and save token
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+  
+  // Set expiry to 30 minutes
+  this.passwordResetExpiry = Date.now() + 30 * 60 * 1000;
+  
+  return token;
+};
+
 // Hide sensitive fields
 userSchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.emailVerificationToken;
+  delete obj.passwordResetToken;
   return obj;
 };
 
-// server/models/User.js - Add to schema
+// Indexes for better query performance
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ isActive: 1 });
+userSchema.index({ emailVerificationToken: 1 });
+userSchema.index({ passwordResetToken: 1 });
 
 module.exports = mongoose.model('User', userSchema);
