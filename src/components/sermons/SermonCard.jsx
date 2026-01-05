@@ -101,7 +101,7 @@ const SermonCard = ({ sermon }) => {
           {/* Description Preview */}
           {sermon.description && (
             <div className="flex-grow mb-4">
-              <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap text-center font-semibold italic">
                 {displayText}
               </p>
               {sermon.description.length > 180 && (

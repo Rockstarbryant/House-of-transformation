@@ -68,7 +68,7 @@ const SermonCardText = ({ sermon }) => {
         <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline text-center">
           {sermon.title}
         </h3>
-        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+        <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap text-center font-semibold italic">
           {displayText}
         </p>
         {sermon.description && sermon.description.length > 180 && !expanded && (
