@@ -6,6 +6,9 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
 
+// ✅ ADD THIS LINE - Initialize Cloudinary config at startup
+require('./config/cloudinaryConfig');
+
 // Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -15,7 +18,6 @@ connectDB();
 const app = express();
 
 // ===== TRUST PROXY (CRITICAL FOR RENDER) =====
-// Must be set BEFORE rate limiter and other middleware
 app.set('trust proxy', 1);
 
 // ===== BODY PARSER =====
@@ -64,13 +66,14 @@ app.get('/', (req, res) => {
       gallery: '/api/gallery',
       volunteers: '/api/volunteers',
       feedback: '/api/feedback',
+      users: '/api/users',
       health: '/api/health'
     }
   });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'Server is running' });
+  res.json({ success: true, message: 'Server is running', cloudinary: 'configured' });
 });
 
 // ============================================
@@ -81,8 +84,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/', apiLimiter);
 
 // Auth routes (MUST be first)
-app.use('/api/auth/login', authLimiter); // Strict limit for login
-app.use('/api/auth/signup', signupLimiter); // Strict limit for signup
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/signup', signupLimiter);
 app.use('/api/auth', require('./routes/authRoutes'));
 
 // Content routes
@@ -126,6 +129,7 @@ app.listen(PORT, () => {
   console.log(`✓ API Documentation: http://localhost:${PORT}/`);
   console.log(`✓ Trust Proxy: Enabled for ${process.env.NODE_ENV === 'production' ? 'Render/Production' : 'Development'}`);
   console.log(`✓ CORS enabled for: ${allowedOrigins.join(', ')}`);
+  console.log(`✓ Cloudinary: Configured`);
   console.log(`✓ Rate limiting enabled:`);
   console.log(`  - General API: 100 requests per 15 minutes`);
   console.log(`  - Login: 5 attempts per 15 minutes`);

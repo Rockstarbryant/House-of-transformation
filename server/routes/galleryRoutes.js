@@ -1,3 +1,9 @@
+// ============================================
+// FILE 3: backend/routes/galleryRoutes.js
+// PATH: REPLACE entire file: backend/routes/galleryRoutes.js
+// DELETE the old one and paste this completely
+// ============================================
+
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const {
@@ -6,16 +12,12 @@ const {
   deletePhoto,
   likePhoto
 } = require('../controllers/galleryController');
-const upload = require('../middleware/upload');
+const { upload } = require('../config/cloudinaryConfig');
 
 const router = express.Router();
 
-// ===== PUBLIC ROUTES =====
-// GET all photos - Public
 router.get('/', getPhotos);
 
-// ===== PROTECTED & AUTHORIZED ROUTES =====
-// POST upload photo - Only pastor/bishop/admin can upload
 router.post(
   '/',
   protect,
@@ -24,7 +26,6 @@ router.post(
   uploadPhoto
 );
 
-// DELETE photo - Only pastor/bishop/admin can delete
 router.delete(
   '/:id',
   protect,
@@ -32,8 +33,6 @@ router.delete(
   deletePhoto
 );
 
-// ===== PROTECTED ROUTES (All authenticated users) =====
-// POST like photo - Any authenticated user can like
 router.post('/:id/like', protect, likePhoto);
 
 module.exports = router;

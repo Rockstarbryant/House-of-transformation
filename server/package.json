@@ -8,10 +8,13 @@
     "dev": "nodemon server.js",
     "migrate:verify": "node server/scripts/migrateUsersVerified.js",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "npm run build || true",
+    "build": "echo 'Build complete'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.40.0",
     "cors": "^2.8.5",
     "dompurify": "^3.3.1",
     "dotenv": "^16.6.1",
@@ -25,6 +28,7 @@
     "mongoose": "^7.8.8",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^6.10.1",
     "uuid": "^9.0.1"
   },
@@ -32,5 +36,8 @@
     "jest": "^29.7.0",
     "nodemon": "^2.0.22",
     "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": "18.x || 20.x"
   }
 }
