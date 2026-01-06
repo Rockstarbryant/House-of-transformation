@@ -103,6 +103,8 @@ app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 // Feedback routes
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 
+app.use('/api/livestreams', require('./routes/livestreamRoutes'));
+
 // ============================================
 // 404 HANDLER (BEFORE ERROR HANDLER)
 // ============================================

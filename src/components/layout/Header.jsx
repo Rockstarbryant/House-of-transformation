@@ -87,7 +87,7 @@ const Header = () => {
               <img 
                 src="https://pbs.twimg.com/profile_images/700352011582251008/wrxEHL3q.jpg"
                 alt={CHURCH_INFO.name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-white"
+                className="w-18 h-18 rounded-full object-cover border-2 border-white"
               />
               <div className="flex flex-col">
                 <h1 className="font-bold text-lg text-white leading-tight">

@@ -27,6 +27,7 @@ import ContactPage from './pages/ContactPage';
 import FeedbackPage from './pages/FeedbackPage';
 import TestimonyDetailPage from './pages/TestimonyDetailPage';
 import AdminLiveStreamPage from './pages/AdminLiveStreamPage';
+import LiveStreamPage from './pages/LiveStreamPage';
 import AdminPage from './pages/AdminPage';
 
 // Donation Pages
@@ -77,6 +78,7 @@ function App() {
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
                   <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
+                  <Route path="/livestream" element={<LiveStreamPage />} />
                   
                   {/* ===== NEW: EMAIL AUTHENTICATION ROUTES ===== */}
                   <Route path="/forgot-password" element={<ForgotPasswordForm />} />

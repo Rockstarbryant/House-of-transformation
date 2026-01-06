@@ -73,7 +73,7 @@ const SermonCardText = ({ sermon }) => {
       </div>
 
       {/* Sermon Description */}
-      <div className="flex-grow mb-4">
+      <div className="flex-grow mb-4 text-justify">
         {/* Sermon Title */}
         <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline text-center">
           {sermon.title}

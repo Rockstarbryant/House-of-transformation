@@ -133,7 +133,7 @@ const SermonCard = ({ sermon }) => {
 
         {/* ✅ FIX #2: ALWAYS SHOW VIDEO PREVIEW FOR VIDEO SERMONS */}
         {isVideo && !showVideoModal && (
-          <div className="px-5 mb-4">
+          <div className="px-5 mb-4 text-justify">
             <button
               onClick={() => setShowVideoModal(true)}
               className="relative w-full aspect-video rounded-lg overflow-hidden bg-black group"
