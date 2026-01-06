@@ -29,13 +29,29 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .js,.jsx"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "no-restricted-globals": [
+        "error",
+        {
+          "name": "confirm",
+          "message": "Use window.confirm instead"
+        }
+      ],
+      "no-unused-vars": [
+        "warn",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    }
   },
   "browserslist": {
     "production": [
@@ -51,6 +67,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.23",
+    "eslint": "^8.56.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19"
   }
