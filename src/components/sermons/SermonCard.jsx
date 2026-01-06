@@ -132,7 +132,7 @@ const SermonCard = ({ sermon }) => {
         </h3>
 
         {/* ✅ FIX #2: ALWAYS SHOW VIDEO PREVIEW FOR VIDEO SERMONS */}
-        {isVideo && (
+        {isVideo && !showVideoModal && (
           <div className="px-5 mb-4">
             <button
               onClick={() => setShowVideoModal(true)}
@@ -167,6 +167,30 @@ const SermonCard = ({ sermon }) => {
                 </div>
               )}
             </button>
+          </div>
+        )}
+
+        {/* ✅ INLINE VIDEO PLAYER (replaces thumbnail when playing) */}
+        {isVideo && showVideoModal && (
+          <div className="px-5 mb-4">
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
+              <button
+                onClick={() => setShowVideoModal(false)}
+                className="absolute top-3 right-3 z-10 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition"
+                title="Close video"
+              >
+                <X size={20} />
+              </button>
+              
+              <iframe
+                className="w-full h-full"
+                src={videoEmbedUrl}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={sermon.title}
+              />
+            </div>
           </div>
         )}
 
@@ -255,41 +279,7 @@ const SermonCard = ({ sermon }) => {
         </div>
       </Card>
 
-      {/* ✅ FIX #3: VIDEO MODAL (condition simplified) */}
-      {showVideoModal && sermon.videoUrl && videoEmbedUrl && (
-        <div
-          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowVideoModal(false)}
-        >
-          <div
-            className="relative max-w-5xl w-full bg-black rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowVideoModal(false)}
-              className="absolute top-4 right-4 z-10 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition"
-            >
-              <X size={24} />
-            </button>
-            
-            <div className="relative" style={{ paddingBottom: sermon.videoUrl?.includes('tiktok.com') ? '177.78%' : '56.25%' }}>
-              <iframe
-                className="absolute inset-0 w-full h-full"
-                src={videoEmbedUrl}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title={sermon.title}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Facebook video fallback - open in new tab */}
-      {showVideoModal && isFacebookVideo && (
-        <script>{`window.open('${sermon.videoUrl}', '_blank'); window.location.reload();`}</script>
-      )}
     </>
   );
 };
