@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Eye, Calendar, ArrowRight } from 'lucide-react';
-import DOMPurify from 'dompurify';
 import { formatDate } from '../../utils/helpers';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
@@ -33,22 +32,8 @@ const SermonCardText = ({ sermon }) => {
 
   const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
 
-  // ✅ FIX #1: Proper DOMPurify config to allow Cloudinary images
-  const sanitizedHtml = DOMPurify.sanitize(
-    sermon.descriptionHtml || sermon.description,
-    {
-      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'img', 'a'],
-      ALLOWED_ATTR: ['src', 'alt', 'class', 'style', 'href', 'title'],
-      ALLOW_DATA_ATTR: false,
-      ALLOW_UNKNOWN_PROTOCOLS: true
-    }
-  );
-
-  // Debug: Check if images are in HTML
-  if ((sermon.descriptionHtml || sermon.description || '').includes('<img')) {
-    console.log(`✅ Images detected in ${sermon.title}`);
-    console.log(`📸 Sanitized HTML includes img:`, sanitizedHtml.includes('<img'));
-  }
+  // ✅ Use HTML directly from TipTap (safe and trusted source)
+  const sanitizedHtml = sermon.descriptionHtml || sermon.description || '';
 
   // Check if content has substantial text (more than preview length)
   const hasMoreContent = (sermon.descriptionHtml || sermon.description).length > 180;
