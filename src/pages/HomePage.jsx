@@ -67,7 +67,7 @@ const HomePage = () => {
   };
 
   return (
-    <div className="home-page">
+    <div className="home-page bg-white-200">
       {/* Hero Section */}
       <HeroSection />
       
@@ -75,8 +75,8 @@ const HomePage = () => {
       <QuickInfoBar />
 
       {/* About Section */}
-      <section className="py-16 md:py-24 bg-slate-200">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-2 md:py-3">
+        <div className="max-w-full mx-auto px-4 md:px-6">
           <AboutSection preview />
         </div>
       </section>

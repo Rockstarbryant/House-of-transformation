@@ -49,8 +49,7 @@ const HeroSection = () => {
           </h1>
 
           <p className="max-w-xl text-lg md:text-xl text-white/90 mb-4">
-            A place where the transformative Gospel of the Kingdom is preached —
-            and lives are truly changed.
+          Touching & transforming lives through the anointed gospel 
           </p>
 
           <p className="text-base md:text-lg text-white/80 mb-10">

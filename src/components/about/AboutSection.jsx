@@ -23,22 +23,22 @@ const AboutSection = ({ preview = false }) => {
   if (preview) {
     // This is the version shown on the Homepage (short preview with Read More button)
     return (
-      <section className="py-20 bg-slate-50">
+      <section className="py-20 bg-white-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl bg-red-900 font-bold text-slate-900 mb-4">About Us</h2>
+            <h2 className="text-4xl md:text-5xl bg-red-900 font-bold text-slate-900 mb-4">About H.O.T</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              More than a church – a place where lives are truly transformed by the Gospel of the Kingdom
+              Touching & transforming lives through the anointed gospel.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1 space-y-6">
               <h3 className="text-3xl font-bold text-red-900">Welcome to House of Transformation (H.O.T)</h3>
-              <p className="text-lg text-gray-700 leading-relaxed">
-                House of Transformation Ministries (H.O.T.) is a vibrant community in Busia County, Kenya, where the transformative Gospel of the Kingdom of God is preached with power, and lives are genuinely changed spiritually, physically, and communally.
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+                House of Transformation Ministries (H.O.T) is a vibrant community in Busia County, Kenya, where the transformative Gospel of the Kingdom of God is preached with power, and lives are genuinely changed spiritually, physically, and communally.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed">
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
                 As a ministry extending from our roots in Nairobi, we are committed to creating a welcoming space for worship, fellowship, healing, and growth for people from all walks of life.
               </p>
 
@@ -76,7 +76,7 @@ const AboutSection = ({ preview = false }) => {
             <span className="text-orange-600">H.O.T</span>
           </h1>
           <p className="text-2xl text-gray-700 max-w-4xl mx-auto">
-            More than a church – a place where the transformative Gospel of the Kingdom is preached, and lives are truly changed.
+            Touching & transforming lives through the anointed gospel.
           </p>
         </div>
 
@@ -84,10 +84,10 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Welcome to H.O.T</h2>
-            <p className="text-lg text-gray-700 leading-relaxed">
-              House of Transformation Ministries (H.O.T.) is a dynamic community located in Busia County, Kenya. We are a ministry outreach with deep roots in Nairobi, dedicated to preaching the powerful Gospel of the Kingdom of God and seeing real transformation in people's lives.
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              House of Transformation Ministries (H.O.T) is a dynamic community located in Busia County, Kenya. We are a ministry outreach with deep roots in Nairobi, dedicated to preaching the powerful Gospel of the Kingdom of God and seeing real transformation in people's lives.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               Founded on faith, hope, and love, we create a welcoming environment where everyone – whether a longtime believer or someone new to faith – can encounter God, experience healing, and grow spiritually. Our Busia Main Campus is a beacon of hope, fostering vibrant worship, deep fellowship, and active service.
             </p>
           </div>
@@ -111,10 +111,10 @@ const AboutSection = ({ preview = false }) => {
           </div>
           <div className="space-y-6 order-1 md:order-2">
             <h2 className="text-4xl font-bold text-slate-900">Our Mission</h2>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               To preach the transformative Gospel of the Kingdom of God, changing lives spiritually and physically.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               We believe in a Gospel that actively restores relationships, heals wounds, and empowers people to live with purpose. Through teaching, outreach, and community initiatives in Busia and beyond, we address every aspect of life – helping people overcome challenges and overcome their God-given destiny.
             </p>
           </div>
@@ -124,10 +124,10 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Our Vision</h2>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               A global movement of transformation, starting from Busia and Nairobi, reaching all of Kenya, Africa, and the world.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               We envision societies built on justice, compassion, and faith, where every person experiences the life-changing power of Jesus Christ. From our local hub in Busia, we aim to plant ministries worldwide, uniting people in worship, learning, and service.
             </p>
           </div>
@@ -188,10 +188,10 @@ const AboutSection = ({ preview = false }) => {
             </div>
             <div className="space-y-6 order-1 md:order-2">
               <h3 className="text-3xl font-bold text-slate-900">The Birth of H.O.T in Nairobi</h3>
-              <p className="text-lg text-gray-700 leading-relaxed">
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
                 Founded around 1989 as Nairobi Gospel Assembly Church, House of Transformation Ministries began as a place of vibrant worship and community outreach in Nairobi, Kenya. Over the years, it grew into a powerful ministry focused on spiritual renewal and holistic change.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed">
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
                 Under visionary leadership, the church rebranded to House of Transformation (H.O.T.) to emphasize its mission of preaching the Kingdom Gospel and transforming lives across all spheres. Celebrating over 36 years of ministry, we've witnessed countless stories of faith, healing, and growth.
               </p>
             </div>
@@ -201,10 +201,10 @@ const AboutSection = ({ preview = false }) => {
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-6">
               <h3 className="text-3xl font-bold text-slate-900">Expansion to Busia: A Beacon in the West</h3>
-              <p className="text-lg text-gray-700 leading-relaxed">
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
                 As the ministry expanded beyond Nairobi, the Busia Main Campus was established as a key outreach in western Kenya. This branch addresses the unique needs of Busia County's diverse communities, including the Luhya and Iteso people, amid challenges like cross-border trade and local development.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed">
+              <p className="text-lg text-gray-700 leading-relaxed text-justify">
                 Though exact founding details are rooted in the church's growth phase post-rebranding, Busia has become a thriving hub for powerful services, youth empowerment, and community transformation. It's a testament to our commitment to spreading the Gospel nationwide.
               </p>
             </div>
@@ -264,10 +264,10 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Community Impact & Outreach</h2>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-gray-700 leading-relaxed text-justify">
               At H.O.T., transformation extends beyond our walls. We're committed to serving Busia, Nairobi, and beyond through practical actions that address real needs.
             </p>
-            <ul className="space-y-6 text-lg text-gray-700">
+            <ul className="space-y-6 text-lg text-gray-700 text-justify">
               <li className="flex items-start">
                 <span className="text-orange-600 font-bold mr-4 text-2xl">✓</span>
                 <div>

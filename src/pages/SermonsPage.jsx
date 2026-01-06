@@ -123,7 +123,7 @@ const SermonsPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <div className="pt-20 pb-20 bg-amber-200 min-h-screen">
+    <div className="pt-20 pb-20 bg-white-200 min-h-[150vh]">
       {/* ✅ DYNAMIC COLLAPSIBLE HEADER */}
       <div
         className={`fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300 ${
@@ -131,19 +131,19 @@ const SermonsPage = () => {
         }`}
       >
         {/* Header Title & Controls */}
-        <div className="px-4 py-4 max-w-3xl mx-auto flex justify-between items-center">
+        <div className="px-2 py-2 max-w-3xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Sermons</h1>
-            <p className="text-slate-600 text-sm mt-1">
+            <h1 className="text-lg font-bold text-slate-900 text-center">Sermons</h1>
+            <p className="text-slate-600 text-xs mt-0">
               {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             {canPostSermon() && (
               <Button
                 onClick={handleAddSermon}
                 variant="primary"
-                size="md"
+                size="sm"
                 icon={Plus}
               >
                 Add
