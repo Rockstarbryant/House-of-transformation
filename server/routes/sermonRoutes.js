@@ -8,6 +8,7 @@ const {
   deleteSermon,
   toggleLike
 } = require('../controllers/sermonController');
+const { upload } = require('../config/cloudinaryConfig');
 
 const router = express.Router();
 
@@ -16,19 +17,21 @@ router.get('/', getSermons);
 router.get('/:id', getSermon);
 
 // ===== PROTECTED & AUTHORIZED ROUTES (Admin/Pastor/Bishop only) =====
-// Create sermon
+// Create sermon (with optional file upload)
 router.post(
   '/',
   protect,
   authorize('pastor', 'bishop', 'admin'),
+  upload.single('thumbnail'),
   createSermon
 );
 
-// Update sermon
+// Update sermon (with optional file upload)
 router.put(
   '/:id',
   protect,
   authorize('pastor', 'bishop', 'admin'),
+  upload.single('thumbnail'),
   updateSermon
 );
 

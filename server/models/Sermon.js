@@ -42,6 +42,10 @@ const sermonSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  thumbnailPublicId: {
+    type: String,
+    default: null
+  },
   videoUrl: {
     type: String,
     default: null

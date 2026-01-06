@@ -61,49 +61,60 @@ const ManageSermons = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  if (sermonType === 'photo' && !formData.thumbnail) {
+    alert('Please upload or add a thumbnail URL for photo sermons');
+    return;
+  }
+  if (sermonType === 'video' && !formData.videoUrl) {
+    alert('Please add a YouTube video URL for video sermons');
+    return;
+  }
+
+  try {
+    setLoading(true);
     
-    if (sermonType === 'photo' && !formData.thumbnail) {
-      alert('Please upload or add a thumbnail URL for photo sermons');
-      return;
-    }
-    if (sermonType === 'video' && !formData.videoUrl) {
-      alert('Please add a YouTube video URL for video sermons');
-      return;
+    const dataToSubmit = {
+      ...formData,
+      type: sermonType
+    };
+
+    if (editingId) {
+      await sermonService.updateSermon(editingId, dataToSubmit);
+      alert('Sermon updated successfully!');
+    } else {
+      await sermonService.createSermon(dataToSubmit);
+      alert('Sermon added successfully!');
     }
 
-    try {
-      setLoading(true);
-      
-      const dataToSubmit = {
-        ...formData,
-        type: sermonType
-      };
-
-      if (editingId) {
-        await sermonService.updateSermon(editingId, dataToSubmit);
-        alert('Sermon updated successfully!');
-      } else {
-        await sermonService.createSermon(dataToSubmit);
-        alert('Sermon added successfully!');
-      }
-
-      setShowForm(false);
-      resetForm();
-      fetchSermons();
-    } catch (error) {
-      alert('Error saving sermon: ' + error.message);
-    } finally {
-      setLoading(false);
+    setShowForm(false);
+    resetForm();
+    fetchSermons();
+  } catch (error) {
+    console.error('Error saving sermon:', error);
+    if (error.response?.status === 413) {
+      alert('❌ File too large. Max size is 5MB.');
+    } else if (error.response?.status === 401) {
+      alert('❌ Not authorized. Please login as admin.');
+    } else {
+      alert('Error saving sermon: ' + (error.response?.data?.message || error.message));
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleEdit = (sermon) => {
-    setFormData(sermon);
-    setSermonType(sermon.type || 'text');
-    setEditingId(sermon._id);
-    setShowForm(true);
-  };
+  setFormData({
+    ...sermon,
+    thumbnail: sermon.thumbnail || '' // Set URL string, not File object
+  });
+  setSermonType(sermon.type || 'text');
+  setEditingId(sermon._id);
+  setImagePreview(sermon.thumbnail); // Show existing image
+  setShowForm(true);
+};
 
   const handleDelete = async (id) => {
     if (window.confirm('Delete this sermon?')) {
@@ -134,15 +145,18 @@ const ManageSermons = () => {
   };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-        setFormData({ ...formData, thumbnail: reader.result });
-      };
-      reader.readAsDataURL(file);
-    }
+  const file = e.target.files[0];
+  if (file) {
+    // Store the File object, not base64
+    setFormData({ ...formData, thumbnail: file });
+    
+    // Create preview for display only
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
   };
 
   const getTypeIcon = (type) => {
