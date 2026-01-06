@@ -48,40 +48,25 @@ export const sermonService = {
    * Create new sermon (admin only)
    */
   async createSermon(sermonData) {
-  try {
-    // sermonData should be FormData if image is included
-    const response = await api.post(
-      API_ENDPOINTS.SERMONS.CREATE, 
-      sermonData,
-      {
-        headers: {
-          'Content-Type': sermonData instanceof FormData ? 'multipart/form-data' : 'application/json'
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-},
+    try {
+      const response = await api.post(API_ENDPOINTS.SERMONS.CREATE, sermonData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 
-async updateSermon(id, updates) {
-  try {
-    // updates can be FormData (with image) or regular object
-    const response = await api.put(
-      API_ENDPOINTS.SERMONS.UPDATE(id), 
-      updates,
-      {
-        headers: {
-          'Content-Type': updates instanceof FormData ? 'multipart/form-data' : 'application/json'
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-},
+  /**
+   * Update sermon (admin only)
+   */
+  async updateSermon(id, updates) {
+    try {
+      const response = await api.put(API_ENDPOINTS.SERMONS.UPDATE(id), updates);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 
   /**
    * Delete sermon (admin only)

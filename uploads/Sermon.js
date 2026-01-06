@@ -42,11 +42,6 @@ const sermonSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  thumbnailPublicId: {
-  type: String,
-  default: null
-  // ✅ Store Cloudinary public_id for deletion
-  },
   videoUrl: {
     type: String,
     default: null

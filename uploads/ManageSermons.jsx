@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Pin, } from 'lucide-react';
+import { Plus, Edit, Trash2, Pin, X } from 'lucide-react';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
 import Button from '../common/Button';
@@ -61,64 +61,42 @@ const ManageSermons = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (sermonType === 'photo' && !formData.thumbnail) {
-    alert('Please upload or add a thumbnail URL for photo sermons');
-    return;
-  }
-  if (sermonType === 'video' && !formData.videoUrl) {
-    alert('Please add a YouTube video URL for video sermons');
-    return;
-  }
+    e.preventDefault();
+    
+    if (sermonType === 'photo' && !formData.thumbnail) {
+      alert('Please upload or add a thumbnail URL for photo sermons');
+      return;
+    }
+    if (sermonType === 'video' && !formData.videoUrl) {
+      alert('Please add a YouTube video URL for video sermons');
+      return;
+    }
 
-  try {
-    setLoading(true);
-    
-    // ✅ Use FormData if image exists (for Cloudinary upload)
-    let dataToSubmit = formData;
-    
-    if (formData.thumbnail instanceof File) {
-      // Image file selected - use FormData
-      const form = new FormData();
-      form.append('title', formData.title);
-      form.append('pastor', formData.pastor);
-      form.append('date', formData.date);
-      form.append('category', formData.category);
-      form.append('description', formData.description);
-      form.append('videoUrl', formData.videoUrl || '');
-      form.append('type', sermonType);
-      if (formData.thumbnail instanceof File) {
-        form.append('thumbnail', formData.thumbnail);
-      } else if (formData.thumbnail) {
-        form.append('thumbnail', formData.thumbnail);
-      }
-      dataToSubmit = form;
-    } else {
-      // Just URL or no image - send as JSON
-      dataToSubmit = {
+    try {
+      setLoading(true);
+      
+      const dataToSubmit = {
         ...formData,
         type: sermonType
       };
-    }
 
-    if (editingId) {
-      await sermonService.updateSermon(editingId, dataToSubmit);
-      alert('Sermon updated successfully!');
-    } else {
-      await sermonService.createSermon(dataToSubmit);
-      alert('Sermon added successfully!');
-    }
+      if (editingId) {
+        await sermonService.updateSermon(editingId, dataToSubmit);
+        alert('Sermon updated successfully!');
+      } else {
+        await sermonService.createSermon(dataToSubmit);
+        alert('Sermon added successfully!');
+      }
 
-    setShowForm(false);
-    resetForm();
-    fetchSermons();
-  } catch (error) {
-    alert('Error saving sermon: ' + error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+      setShowForm(false);
+      resetForm();
+      fetchSermons();
+    } catch (error) {
+      alert('Error saving sermon: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (sermon) => {
     setFormData(sermon);
@@ -156,16 +134,16 @@ const ManageSermons = () => {
   };
 
   const handleImageUpload = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result); // Show preview
-      setFormData({ ...formData, thumbnail: file }); // Store File object (not base64!)
-    };
-    reader.readAsDataURL(file);
-  }
-};
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        setFormData({ ...formData, thumbnail: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const getTypeIcon = (type) => {
     switch(type) {

@@ -1,11 +1,5 @@
-// ============================================
-// FILE 1: backend/routes/sermonRoutes.js
-// REPLACE ENTIRE FILE
-// ============================================
-
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
-const { upload } = require('../config/cloudinaryConfig');
 const {
   getSermons,
   getSermon,
@@ -21,22 +15,20 @@ const router = express.Router();
 router.get('/', getSermons);
 router.get('/:id', getSermon);
 
-// ===== PROTECTED & AUTHORIZED ROUTES =====
-// Create sermon - with optional image upload
+// ===== PROTECTED & AUTHORIZED ROUTES (Admin/Pastor/Bishop only) =====
+// Create sermon
 router.post(
   '/',
   protect,
   authorize('pastor', 'bishop', 'admin'),
-  upload.single('thumbnail'), // ✅ Optional image upload via Cloudinary
   createSermon
 );
 
-// Update sermon - with optional image upload
+// Update sermon
 router.put(
   '/:id',
   protect,
   authorize('pastor', 'bishop', 'admin'),
-  upload.single('thumbnail'), // ✅ Optional image upload via Cloudinary
   updateSermon
 );
 
@@ -48,7 +40,7 @@ router.delete(
   deleteSermon
 );
 
-// Like sermon
+// ===== LIKE ROUTE (Authenticated users only) =====
 router.post('/:id/like', protect, toggleLike);
 
 module.exports = router;
