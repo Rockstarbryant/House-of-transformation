@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, X, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, X, Search, ChevronDown } from 'lucide-react';
 import SermonCardText from '../components/sermons/SermonCardText';
 import SermonCard from '../components/sermons/SermonCard';
 import Loader from '../components/common/Loader';
@@ -19,8 +19,10 @@ const SermonsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
 
-  const categories = ['All', 'Sunday Service', 'Bible Study', 'Special Event', 'Youth Ministry'];
+  const categories = ['All', 'Sunday Service', 'Bible Study', 'Special Event', 'Youth Ministry', 'Prayer Meeting'];
 
   useEffect(() => {
     fetchSermons();
@@ -30,23 +32,39 @@ const SermonsPage = () => {
     filterSermons();
   }, [selectedType, selectedCategory, searchTerm, allSermons]);
 
+  // Handle scroll to collapse/expand header
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Collapse header when scrolling down, expand when scrolling up
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setIsHeaderCollapsed(true);
+      } else if (currentScrollY < lastScrollY.current) {
+        setIsHeaderCollapsed(false);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const fetchSermons = async () => {
     try {
       setLoading(true);
       const data = await sermonService.getSermons({ limit: 100 });
       const sermons = data.sermons || data;
       
-      // ✅ FIX: Ensure all sermons have descriptionHtml fallback to description
       const sermonsWithDefaults = sermons.map(s => ({
         ...s,
         type: s.type || detectSermonType(s),
-        descriptionHtml: s.descriptionHtml || s.description || '', // Fallback chain
+        descriptionHtml: s.descriptionHtml || s.description || '',
         description: s.description || ''
       }));
       
       console.log('📚 Fetched sermons:', sermonsWithDefaults.length);
-      console.log('🔍 First sermon data:', sermonsWithDefaults[0]);
-      
       setAllSermons(sermonsWithDefaults);
       setError(null);
     } catch (err) {
@@ -64,8 +82,12 @@ const SermonsPage = () => {
   };
 
   const filterSermons = () => {
-    let result = allSermons;
+    let result = [...allSermons];
 
+    // ✅ FIX: Sort by date FIRST (most recent first)
+    result = result.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Then apply filters
     if (selectedType !== 'all') {
       result = result.filter(s => detectSermonType(s) === selectedType);
     }
@@ -101,10 +123,15 @@ const SermonsPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <div className="pt-24 pb-20 bg-amber-200 min-h-screen">
-      <div className="max-w-3xl mx-auto">
-        {/* Sticky Header */}
-        <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-4 flex justify-between items-center">
+    <div className="pt-20 pb-20 bg-amber-200 min-h-screen">
+      {/* ✅ DYNAMIC COLLAPSIBLE HEADER */}
+      <div
+        className={`fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300 ${
+          isHeaderCollapsed ? 'opacity-0 -translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'
+        }`}
+      >
+        {/* Header Title & Controls */}
+        <div className="px-4 py-4 max-w-3xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Sermons</h1>
             <p className="text-slate-600 text-sm mt-1">
@@ -136,20 +163,8 @@ const SermonsPage = () => {
           </div>
         </div>
 
-        {!canPostSermon() && user && (
-          <div className="px-4 py-4">
-            <PermissionAlert
-              title="Cannot Add Sermons"
-              message="Only pastors and bishops can upload sermons."
-              requiredRole="pastor"
-              currentRole={user.role}
-              actionType="sermon upload"
-            />
-          </div>
-        )}
-
         {/* Search Bar */}
-        <div className="px-4 py-4 border-b border-slate-200 bg-white">
+        <div className="px-4 pb-4 border-t border-slate-200 max-w-3xl mx-auto">
           <div className="flex items-center gap-3 bg-slate-100 rounded-full px-4 py-3">
             <Search size={18} className="text-slate-500" />
             <input
@@ -171,26 +186,28 @@ const SermonsPage = () => {
         </div>
 
         {/* Category Filter */}
-        <div className="px-4 py-3 flex gap-2 overflow-x-auto pb-2 border-b border-slate-200 bg-white">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all ${
-                selectedCategory === cat
-                  ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
-                  : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="px-4 pb-4 border-t border-slate-200 max-w-3xl mx-auto">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 ${
+                  selectedCategory === cat
+                    ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
+                    : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Advanced Type Filter */}
         {showAdvancedFilter && (
-          <div className="border-b border-slate-200 bg-slate-50">
-            <div className="flex overflow-x-auto px-4">
+          <div className="border-t border-slate-200 bg-slate-50 max-w-3xl mx-auto">
+            <div className="flex overflow-x-auto px-4 scrollbar-hide">
               {[
                 { id: 'all', label: 'All', icon: '📚' },
                 { id: 'text', label: 'Text', icon: '📝' },
@@ -200,7 +217,7 @@ const SermonsPage = () => {
                 <button
                   key={type.id}
                   onClick={() => setSelectedType(type.id)}
-                  className={`px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors ${
+                  className={`px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
                     selectedType === type.id
                       ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -211,6 +228,21 @@ const SermonsPage = () => {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-3xl mx-auto px-4">
+        {!canPostSermon() && user && (
+          <div className="py-4">
+            <PermissionAlert
+              title="Cannot Add Sermons"
+              message="Only pastors and bishops can upload sermons."
+              requiredRole="pastor"
+              currentRole={user.role}
+              actionType="sermon upload"
+            />
           </div>
         )}
 
@@ -234,26 +266,30 @@ const SermonsPage = () => {
           </div>
         ) : (
           <div className="divide-y divide-slate-200 space-y-4">
-            {/* Text Sermons */}
-            {filteredSermons
-              .filter(s => detectSermonType(s) === 'text')
-              .map(sermon => (
-                <div key={sermon._id} className="px-4 py-4">
+            {/* ✅ FIX: Mix all sermon types together, sorted by date */}
+            {filteredSermons.map(sermon => (
+              <div key={sermon._id} className="py-4">
+                {detectSermonType(sermon) === 'text' ? (
                   <SermonCardText sermon={sermon} />
-                </div>
-              ))}
-
-            {/* Media Sermons */}
-            {filteredSermons
-              .filter(s => detectSermonType(s) !== 'text')
-              .map(sermon => (
-                <div key={sermon._id} className="px-4 py-4">
+                ) : (
                   <SermonCard sermon={sermon} type={detectSermonType(sermon)} />
-                </div>
-              ))}
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* Scroll to top indicator */}
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };

@@ -8,6 +8,8 @@ import LiveStreamSection from '../components/home/LiveStreamSection';
 import EventList from '../components/events/EventList';
 import MinistryCard from '../components/ministries/MinistryCard';
 import DonationSection from '../components/donations/DonationSection';
+import SermonCard from '../components/sermons/SermonCard';
+import SermonCardText from '../components/sermons/SermonCardText';
 import Loader from '../components/common/Loader';
 import Button from '../components/common/Button';
 import { SEO_META } from '../utils/constants';
@@ -15,7 +17,7 @@ import { sermonService } from '../services/api/sermonService';
 import { Link } from 'react-router-dom';
 
 const HomePage = () => {
-  const [sermons, setSermons] = useState([]);
+  const [featuredSermon, setFeaturedSermon] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,17 +39,31 @@ const HomePage = () => {
   const fetchSermons = async () => {
     try {
       setLoading(true);
-      const data = await sermonService.getSermons({ limit: 3 });
+      const data = await sermonService.getSermons({ limit: 100 });
       const allSermons = data.sermons || [];
-      const recentSermons = allSermons
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 3);
-      setSermons(recentSermons);
+      
+      // ✅ FIX: First check for pinned sermons, then fall back to most recent
+      const pinnedSermon = allSermons.find(s => s.pinned);
+      
+      if (pinnedSermon) {
+        setFeaturedSermon(pinnedSermon);
+      } else {
+        // Get most recent sermon by date
+        const recentSermon = allSermons
+          .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+        setFeaturedSermon(recentSermon);
+      }
     } catch (error) {
       console.error('Error fetching sermons:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const detectSermonType = (sermon) => {
+    if (sermon.videoUrl) return 'video';
+    if (sermon.thumbnail) return 'photo';
+    return 'text';
   };
 
   return (
@@ -68,7 +84,7 @@ const HomePage = () => {
       {/* Live Stream Section */}
       <LiveStreamSection />
 
-      {/* Latest Sermon Section */}
+      {/* ✅ UPDATED: Latest Sermon Section - Shows 1 Card Only */}
       <section className="py-16 md:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           {/* Section Header */}
@@ -76,51 +92,34 @@ const HomePage = () => {
             <div className="flex items-center gap-3 mb-4">
               <Pin size={28} className="text-blue-600" />
               <span className="text-sm font-bold text-blue-600 uppercase tracking-widest">
-                Latest Sermon
+                {featuredSermon?.pinned ? 'Featured Sermon' : 'Latest Sermon'}
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Watch the Latest <span className="text-blue-600">Sermon</span>
+              {featuredSermon?.pinned ? 'Featured' : 'Latest'} <span className="text-blue-600">Sermon</span>
             </h2>
             <p className="text-xl text-slate-600">
-              Grow in faith with our most recent teachings and messages
+              {featuredSermon?.pinned 
+                ? 'Our pastor\'s most important message for you' 
+                : 'Grow in faith with our most recent teachings and messages'}
             </p>
           </div>
 
           {loading ? (
             <Loader />
-          ) : sermons.length === 0 ? (
+          ) : !featuredSermon ? (
             <div className="text-center py-16">
               <p className="text-slate-600 text-lg">No sermons available yet</p>
             </div>
           ) : (
             <div>
-              {/* Featured Sermon Card */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl overflow-hidden shadow-2xl mb-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 md:p-12">
-                  <div className="flex flex-col justify-center">
-                    <span className="inline-block w-fit px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-bold mb-4">
-                      Featured Sermon
-                    </span>
-                    <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                      {sermons[0]?.title || 'Latest Teaching'}
-                    </h3>
-                    <p className="text-slate-300 text-lg mb-6 line-clamp-3">
-                      {sermons[0]?.description || 'Join us for an inspiring message'}
-                    </p>
-                    <Link to="/sermons">
-                      <Button variant="secondary" size="lg" className="w-fit">
-                        Watch Now <ArrowRight size={20} />
-                      </Button>
-                    </Link>
-                  </div>
-                  <div className="bg-blue-600/20 rounded-2xl h-80 flex items-center justify-center border-2 border-blue-600/40">
-                    <div className="text-center">
-                      <div className="text-6xl mb-4">🎙️</div>
-                      <p className="text-white font-semibold">Sermon Media</p>
-                    </div>
-                  </div>
-                </div>
+              {/* ✅ Single Sermon Card - Uses Same Components as SermonPage */}
+              <div className="mb-12">
+                {detectSermonType(featuredSermon) === 'text' ? (
+                  <SermonCardText sermon={featuredSermon} />
+                ) : (
+                  <SermonCard sermon={featuredSermon} />
+                )}
               </div>
 
               {/* Browse All Sermons */}
