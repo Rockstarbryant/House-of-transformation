@@ -73,7 +73,7 @@ exports.createSermon = asyncHandler(async (req, res) => {
   console.log('🖼️  Images files:', req.files?.images?.length || 0);
   console.log('📋 Form data:', req.body);
 
-  const { title, pastor, date, category, description, videoUrl, type } = req.body;
+  const { title, pastor, date, category, description,  descriptionHtml, videoUrl, type } = req.body;
 
   if (!title || !pastor || !date) {
     return res.status(400).json({ success: false, message: 'Title, pastor, and date are required' });
@@ -85,6 +85,7 @@ exports.createSermon = asyncHandler(async (req, res) => {
     date,
     category: category || 'Sunday Service',
     description,
+    descriptionHtml,
     videoUrl,
     type: type || 'text',
     likes: 0,
@@ -207,6 +208,11 @@ exports.updateSermon = asyncHandler(async (req, res) => {
     
     console.log(`✅ ${updateData.images.length} new images uploaded`);
   }
+
+  if (req.body.descriptionHtml !== undefined) {
+  updateData.descriptionHtml = req.body.descriptionHtml;
+  }
+
 
   const updatedSermon = await Sermon.findByIdAndUpdate(
     req.params.id,
