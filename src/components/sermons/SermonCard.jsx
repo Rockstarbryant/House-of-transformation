@@ -78,10 +78,17 @@ const SermonCard = ({ sermon }) => {
 
   // ✅ FIX #1: Proper DOMPurify config to allow Cloudinary images
   const sanitizedHtml = DOMPurify.sanitize(contentHtml, {
-    ADD_TAGS: ['img'],
-    ADD_ATTR: ['src', 'alt', 'class', 'style'],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'img', 'a'],
+    ALLOWED_ATTR: ['src', 'alt', 'class', 'style', 'href', 'title'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_UNKNOWN_PROTOCOLS: true
   });
+
+  // Debug: Check if images are in HTML
+  if (contentHtml.includes('<img')) {
+    console.log(`✅ Images detected in ${sermon.title}`);
+    console.log(`📸 Sanitized HTML includes img:`, sanitizedHtml.includes('<img'));
+  }
 
   // Check if content has substantial text (more than preview length)
   const hasMoreContent = (sermon.descriptionHtml || sermon.description).length > 180;
