@@ -1,7 +1,6 @@
-// src/components/sermons/SermonCard.jsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Eye, Play, Calendar, ArrowRight } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, Play, Calendar, ArrowRight, X } from 'lucide-react';
 import { formatDate } from '../../utils/helpers';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
@@ -9,7 +8,7 @@ import Card from '../common/Card';
 const SermonCard = ({ sermon }) => {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(sermon.likes || 0);
-  const [showVideo, setShowVideo] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const handleLike = async () => {
@@ -22,37 +21,96 @@ const SermonCard = ({ sermon }) => {
     }
   };
 
+  // Universal video embed extractor
   const getVideoEmbedUrl = (url) => {
     if (!url) return '';
-    const videoId = url.includes('youtu.be')
-      ? url.split('/').pop()
-      : url.split('v=')[1]?.split('&')[0];
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
+      return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1` : '';
+    }
+
+    if (url.includes('facebook.com')) {
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=500`;
+    }
+
+    if (url.includes('vimeo.com')) {
+      const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : '';
+    }
+
+    if (url.includes('tiktok.com')) {
+      return url;
+    }
+
+    return url;
   };
 
-  const truncateText = (text, maxLength = 180) => {
-    if (!text || text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+  const hasVideo = sermon.videoUrl && getVideoEmbedUrl(sermon.videoUrl);
+  const hasThumbnail = sermon.thumbnail;
+  const hasMedia = hasVideo || hasThumbnail;
+
+  // Get preview text from HTML content
+  const getPreviewText = (html, limit = 180) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    const text = temp.innerText || temp.textContent || '';
+    if (text.length <= limit) return text;
+    return text.substring(0, limit).trim() + '...';
   };
 
-  const displayText = expanded ? sermon.description : truncateText(sermon.description);
-
-  const hasMedia = sermon.videoUrl || sermon.thumbnail;
+  const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
 
   return (
     <>
       <Card className="flex flex-col hover:shadow-lg transition-shadow h-full overflow-hidden">
-        {/* Media Section - Thumbnail with Play Button */}
+        
+        {/* Header: Category + Date */}
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+          {sermon.category && (
+            <span className="inline-block px-3 py-1 bg-red-100 text-blue-800 text-xs font-semibold rounded-full">
+              {sermon.category}
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-xs text-gray-500">
+            <Calendar size={12} />
+            {formatDate(sermon.date, 'short')}
+          </span>
+        </div>
+
+        {/* Pastor Info */}
+        <div className="px-5 pt-4 pb-3 flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {sermon.pastor?.charAt(0).toUpperCase() || 'P'}
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">
+              {sermon.pastor || 'Pastor'}
+            </p>
+            <p className="text-xs text-gray-500">@Busia_HOT</p>
+          </div>
+        </div>
+
+        {/* Title */}
+        <h3 className="px-5 text-lg font-bold text-red-900 line-clamp-2 leading-snug underline text-center mb-3">
+          {sermon.title}
+        </h3>
+
+        {/* Main Thumbnail/Video (After Title) */}
         {hasMedia && (
-          <div className="relative aspect-video bg-slate-100 overflow-hidden group">
+          <div className="relative aspect-video bg-slate-100 overflow-hidden group mx-5 mb-4 rounded-lg">
             <img
-              src={sermon.thumbnail || 'https://via.placeholder.com/600x340?text=Sermon+Thumbnail'}
+              src={hasThumbnail ? sermon.thumbnail : 'https://via.placeholder.com/600x340?text=Sermon'}
               alt={sermon.title}
               className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.src = 'https://via.placeholder.com/600x340?text=Image+Error';
+              }}
             />
-            {sermon.videoUrl && (
+            {hasVideo && (
               <button
-                onClick={() => setShowVideo(true)}
+                onClick={() => setShowVideoModal(true)}
                 className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"
               >
                 <div className="bg-white/90 backdrop-blur-sm p-4 rounded-full shadow-xl group-hover:scale-110 transition-transform">
@@ -63,122 +121,93 @@ const SermonCard = ({ sermon }) => {
           </div>
         )}
 
-        {/* Card Body */}
-        <div className="p-5 flex flex-col flex-grow text-left">
-          {/* Header: Category + Date */}
-          <div className="flex items-center justify-between mb-3">
-            {sermon.category && (
-              <span className="inline-block px-3 py-1 bg-red-100 text-blue-800 text-xs font-semibold rounded-full">
-                {sermon.category}
-              </span>
-            )}
-            <span className="flex items-center gap-1 text-xs text-gray-500">
-              <Calendar size={12} />
-              {formatDate(sermon.date, 'short')}
-            </span>
-          </div>
-
-          
-
-          {/* Pastor Info */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {sermon.pastor?.charAt(0).toUpperCase() || 'P'}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 text-sm">
-                {sermon.pastor || 'Pastor'}
-              </p>
-              <p className="text-xs text-gray-500">@Busia_HOT</p>
-            </div>
-          </div>
-
-          {/* Title */}
-          <h3 className="text-lg font-bold text-red-900 line-clamp-2 mb-3 leading-snug underline text-center">
-            {sermon.title}
-          </h3>
-
-          {/* Description Preview */}
-          {sermon.description && (
-            <div className="flex-grow mb-4">
-              <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap text-center font-semibold italic">
-                {displayText}
-              </p>
-              {sermon.description.length > 180 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpanded(!expanded);
-                  }}
-                  className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
-                >
-                  {expanded ? 'Show Less' : 'Read More'}
-                </button>
-              )}
-            </div>
+        {/* HTML Content Preview */}
+        <div className="px-5 flex-grow mb-4">
+          {expanded ? (
+            // Full content with HTML rendered
+            <div 
+              className="prose prose-sm max-w-none text-gray-800"
+              dangerouslySetInnerHTML={{ __html: sermon.descriptionHtml || sermon.description }}
+            />
+          ) : (
+            // Preview text only
+            <p className="text-gray-800 text-sm leading-relaxed text-center font-semibold italic">
+              {previewText}
+            </p>
           )}
 
-          {/* Footer: Stats + Action Button */}
-          <div className="pt-4 border-t border-gray-200 space-y-4">
-            {/* Interaction Stats */}
-            <div className="flex justify-between text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <MessageCircle size={16} />
-                <span>{sermon.comments || 0}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Eye size={16} />
-                <span>{sermon.views || 0}</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLike();
-                }}
-                className="flex items-center gap-1 text-red-500 hover:text-red-600 transition"
-              >
-                <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
-                <span>{likes}</span>
-              </button>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 text-gray-600 hover:text-green-600 transition"
-              >
-                <Share2 size={16} />
-              </button>
-            </div>
-
-            {/* Watch Sermon Button */}
-            <Link
-              to={`/sermons/${sermon._id}`}
-              className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all transform hover:-translate-y-0.5 group"
+          {sermon.descriptionHtml && sermon.descriptionHtml.length > 180 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }}
+              className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
             >
-              <span>{sermon.videoUrl ? 'Watch Sermon' : 'View Sermon'}</span>
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
+              {expanded ? 'Show Less' : 'Read More'}
+            </button>
+          )}
+        </div>
+
+        {/* Footer: Stats + Action */}
+        <div className="px-5 pt-4 border-t border-gray-200 space-y-4">
+          {/* Interaction Stats */}
+          <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <MessageCircle size={16} />
+              <span>{sermon.comments || 0}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Eye size={16} />
+              <span>{sermon.views || 0}</span>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLike();
+              }}
+              className="flex items-center gap-1 text-red-500 hover:text-red-600 transition"
+            >
+              <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+              <span>{likes}</span>
+            </button>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-gray-600 hover:text-green-600 transition"
+            >
+              <Share2 size={16} />
+            </button>
           </div>
+
+          {/* Watch/View Sermon Button */}
+          <Link
+            to={`/sermons/${sermon._id}`}
+            className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all transform hover:-translate-y-0.5 group"
+          >
+            <span>{hasVideo ? 'Watch Sermon' : 'View Sermon'}</span>
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
       </Card>
 
-      {/* Fullscreen Video Modal */}
-      {showVideo && sermon.videoUrl && (
+      {/* Video Modal */}
+      {showVideoModal && hasVideo && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowVideo(false)}
+          onClick={() => setShowVideoModal(false)}
         >
           <div
             className="relative max-w-5xl w-full bg-black rounded-2xl overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setShowVideo(false)}
+              onClick={() => setShowVideoModal(false)}
               className="absolute top-4 right-4 z-10 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              <X size={24} />
             </button>
-            <div className="relative pt-[56.25%]">
+            
+            <div className="relative" style={{ paddingBottom: sermon.videoUrl?.includes('tiktok.com') ? '177.78%' : '56.25%' }}>
               <iframe
                 className="absolute inset-0 w-full h-full"
                 src={getVideoEmbedUrl(sermon.videoUrl)}

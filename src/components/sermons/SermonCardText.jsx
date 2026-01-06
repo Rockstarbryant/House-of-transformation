@@ -1,4 +1,3 @@
-// src/components/sermons/SermonCardText.jsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Eye, Calendar, ArrowRight } from 'lucide-react';
@@ -21,12 +20,17 @@ const SermonCardText = ({ sermon }) => {
     }
   };
 
-  const truncateText = (text, maxLength = 180) => {
-    if (!text || text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+  // Get preview text from HTML content
+  const getPreviewText = (html, limit = 180) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    const text = temp.innerText || temp.textContent || '';
+    if (text.length <= limit) return text;
+    return text.substring(0, limit).trim() + '...';
   };
 
-  const displayText = expanded ? sermon.description : truncateText(sermon.description);
+  const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
 
   return (
     <Card className="flex flex-col hover:shadow-lg transition-shadow h-full bg-slate-300 text-left">
@@ -61,36 +65,37 @@ const SermonCardText = ({ sermon }) => {
         </div>
       </div>
 
-      {/* Sermon Description Preview */}
+      {/* Sermon Description */}
       <div className="flex-grow mb-4">
 
         {/* Sermon Title */}
         <h3 className="text-lg font-bold text-red-900 line-clamp-2 leading-snug underline text-center">
           {sermon.title}
         </h3>
-        <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap text-center font-semibold italic">
-          {displayText}
-        </p>
-        {sermon.description && sermon.description.length > 180 && !expanded && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded(true);
-            }}
-            className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
-          >
-            Read More
-          </button>
+
+        {/* Content Preview or Full */}
+        {expanded ? (
+          // Full content with HTML rendered
+          <div 
+            className="prose prose-sm max-w-none text-gray-800 mt-3"
+            dangerouslySetInnerHTML={{ __html: sermon.descriptionHtml || sermon.description }}
+          />
+        ) : (
+          // Preview text only
+          <p className="text-gray-800 text-sm leading-relaxed text-center font-semibold italic mt-3">
+            {previewText}
+          </p>
         )}
-        {expanded && (
+
+        {sermon.descriptionHtml && sermon.descriptionHtml.length > 180 && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setExpanded(false);
+              setExpanded(!expanded);
             }}
             className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
           >
-            Show Less
+            {expanded ? 'Show Less' : 'Read More'}
           </button>
         )}
       </div>
@@ -125,8 +130,14 @@ const SermonCardText = ({ sermon }) => {
           </button>
         </div>
 
-        {/* Read Full Sermon Button */}
-        
+        {/* View Full Sermon Button */}
+        <Link
+          to={`/sermons/${sermon._id}`}
+          className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all transform hover:-translate-y-0.5 group"
+        >
+          <span>View Full Sermon</span>
+          <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+        </Link>
       </div>
     </Card>
   );

@@ -1,9 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Pin, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Pin, X, Image as ImageIcon } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
+
+// TipTap Toolbar Component
+const TipTapToolbar = ({ editor }) => {
+  if (!editor) return null;
+
+  const insertImage = async () => {
+    const url = prompt('Enter image URL or upload:');
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
+
+  return (
+    <div className="border border-gray-300 rounded-t-lg bg-gray-50 p-3 flex flex-wrap gap-2">
+      <button
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        disabled={!editor.can().chain().focus().toggleBold().run()}
+        className={`px-3 py-2 rounded font-bold ${
+          editor.isActive('bold') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
+        }`}
+      >
+        B
+      </button>
+
+      <button
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        disabled={!editor.can().chain().focus().toggleItalic().run()}
+        className={`px-3 py-2 rounded italic ${
+          editor.isActive('italic') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
+        }`}
+      >
+        I
+      </button>
+
+      <button
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        className={`px-3 py-2 rounded text-sm font-bold ${
+          editor.isActive('heading', { level: 2 }) ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
+        }`}
+      >
+        H2
+      </button>
+
+      <button
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        className={`px-3 py-2 rounded ${
+          editor.isActive('bulletList') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
+        }`}
+      >
+        • List
+      </button>
+
+      <button
+        onClick={insertImage}
+        className="px-3 py-2 rounded bg-white border border-gray-300 flex items-center gap-1"
+      >
+        <ImageIcon size={16} /> Image
+      </button>
+
+      <button
+        onClick={() => editor.chain().focus().clearContent().run()}
+        className="px-3 py-2 rounded bg-red-100 text-red-600 border border-red-300 text-sm"
+      >
+        Clear
+      </button>
+    </div>
+  );
+};
 
 const ManageSermons = () => {
   const [sermons, setSermons] = useState([]);
@@ -11,7 +82,6 @@ const ManageSermons = () => {
   const [editingId, setEditingId] = useState(null);
   const [sermonType, setSermonType] = useState('text');
   const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
   const [pinnedCount, setPinnedCount] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
@@ -19,14 +89,36 @@ const ManageSermons = () => {
     date: '',
     category: 'Sunday Service',
     description: '',
+    descriptionHtml: '',
     thumbnail: '',
     videoUrl: '',
     type: 'text'
   });
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Image.configure({
+        HTMLAttributes: {
+          class: 'max-w-full h-auto rounded-lg my-4'
+        }
+      })
+    ],
+    content: formData.descriptionHtml || '<p>Start typing...</p>',
+    onUpdate: ({ editor }) => {
+      setFormData({ ...formData, descriptionHtml: editor.getHTML() });
+    }
+  });
+
   useEffect(() => {
     fetchSermons();
   }, []);
+
+  useEffect(() => {
+    if (editor) {
+      editor.commands.setContent(formData.descriptionHtml || '<p></p>');
+    }
+  }, [editingId, editor]);
 
   const fetchSermons = async () => {
     try {
@@ -46,13 +138,16 @@ const ManageSermons = () => {
       date: '',
       category: 'Sunday Service',
       description: '',
+      descriptionHtml: '',
       thumbnail: '',
       videoUrl: '',
       type: 'text'
     });
     setSermonType('text');
     setEditingId(null);
-    setImagePreview(null);
+    if (editor) {
+      editor.commands.setContent('<p></p>');
+    }
   };
 
   const handleTypeChange = (type) => {
@@ -60,61 +155,67 @@ const ManageSermons = () => {
     setFormData({ ...formData, type });
   };
 
+  const handleThumbnailUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, thumbnail: file });
+    }
+  };
+
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (sermonType === 'photo' && !formData.thumbnail) {
-    alert('Please upload or add a thumbnail URL for photo sermons');
-    return;
-  }
-  if (sermonType === 'video' && !formData.videoUrl) {
-    alert('Please add a YouTube video URL for video sermons');
-    return;
-  }
+    e.preventDefault();
 
-  try {
-    setLoading(true);
-    
-    const dataToSubmit = {
-      ...formData,
-      type: sermonType
-    };
-
-    if (editingId) {
-      await sermonService.updateSermon(editingId, dataToSubmit);
-      alert('Sermon updated successfully!');
-    } else {
-      await sermonService.createSermon(dataToSubmit);
-      alert('Sermon added successfully!');
+    if (sermonType === 'photo' && !formData.thumbnail) {
+      alert('Please upload a thumbnail for photo sermons');
+      return;
+    }
+    if (sermonType === 'video' && !formData.videoUrl) {
+      alert('Please add a video URL for video sermons');
+      return;
+    }
+    if (!formData.descriptionHtml || formData.descriptionHtml === '<p></p>') {
+      alert('Please add some content to the description');
+      return;
     }
 
-    setShowForm(false);
-    resetForm();
-    fetchSermons();
-  } catch (error) {
-    console.error('Error saving sermon:', error);
-    if (error.response?.status === 413) {
-      alert('❌ File too large. Max size is 5MB.');
-    } else if (error.response?.status === 401) {
-      alert('❌ Not authorized. Please login as admin.');
-    } else {
+    try {
+      setLoading(true);
+
+      const dataToSubmit = {
+        ...formData,
+        type: sermonType,
+        description: editor?.getText() || '' // Plain text version
+      };
+
+      if (editingId) {
+        await sermonService.updateSermon(editingId, dataToSubmit);
+        alert('Sermon updated successfully!');
+      } else {
+        await sermonService.createSermon(dataToSubmit);
+        alert('Sermon added successfully!');
+      }
+
+      setShowForm(false);
+      resetForm();
+      fetchSermons();
+    } catch (error) {
+      console.error('Error saving sermon:', error);
       alert('Error saving sermon: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleEdit = (sermon) => {
-  setFormData({
-    ...sermon,
-    thumbnail: sermon.thumbnail || '' // Set URL string, not File object
-  });
-  setSermonType(sermon.type || 'text');
-  setEditingId(sermon._id);
-  setImagePreview(sermon.thumbnail); // Show existing image
-  setShowForm(true);
-};
+    setFormData({
+      ...sermon,
+      thumbnail: sermon.thumbnail || '',
+      descriptionHtml: sermon.descriptionHtml || ''
+    });
+    setSermonType(sermon.type || 'text');
+    setEditingId(sermon._id);
+    setShowForm(true);
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm('Delete this sermon?')) {
@@ -144,27 +245,12 @@ const ManageSermons = () => {
     }
   };
 
-  const handleImageUpload = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    // Store the File object, not base64
-    setFormData({ ...formData, thumbnail: file });
-    
-    // Create preview for display only
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
-  }
-  };
-
   const getTypeIcon = (type) => {
     switch(type) {
       case 'text': return '📝';
       case 'photo': return '📸';
       case 'video': return '🎥';
-      default: return '📺';
+      default: return '📋';
     }
   };
 
@@ -215,7 +301,7 @@ const ManageSermons = () => {
               {[
                 { id: 'text', label: 'Text Only', icon: '📝', desc: 'Just title and description' },
                 { id: 'photo', label: 'Photo + Text', icon: '📸', desc: 'With thumbnail image' },
-                { id: 'video', label: 'Video + Text', icon: '🎥', desc: 'YouTube video' }
+                { id: 'video', label: 'Video + Text', icon: '🎥', desc: 'YouTube, Facebook, etc' }
               ].map(type => (
                 <button
                   key={type.id}
@@ -272,82 +358,48 @@ const ManageSermons = () => {
               <option>Prayer Meeting</option>
             </select>
 
+            {/* TipTap Rich Text Editor */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                rows="6"
-                placeholder="Sermon description or key points..."
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Sermon Content *
+              </label>
+              <TipTapToolbar editor={editor} />
+              <div className="border border-t-0 border-gray-300 rounded-b-lg p-4 bg-white min-h-96 prose prose-sm max-w-none">
+                <EditorContent editor={editor} />
+              </div>
+              <p className="text-xs text-gray-600 mt-2">
+                💡 Click "Image" button to insert photos anywhere in your text. Format text with bold, italic, headings, and lists.
+              </p>
             </div>
 
             {(sermonType === 'photo' || sermonType === 'video') && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  {sermonType === 'photo' ? 'Thumbnail Image *' : 'Thumbnail Image *'}
+                  Thumbnail Image *
                 </label>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                      Upload Image (JPG, PNG)
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/gif"
-                      onChange={handleImageUpload}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                      Or paste Image URL
-                    </label>
-                    <Input
-                      name="thumbnail"
-                      value={formData.thumbnail}
-                      onChange={(e) => {
-                        setFormData({...formData, thumbnail: e.target.value});
-                        setImagePreview(e.target.value);
-                      }}
-                      placeholder="https://example.com/image.jpg"
-                    />
-                  </div>
-                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif"
+                  onChange={handleThumbnailUpload}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+                <p className="text-xs text-gray-600 mt-1">This appears as the main preview image in the card</p>
               </div>
             )}
 
             {sermonType === 'video' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  YouTube Video URL *
+                  Video URL *
                 </label>
                 <Input
                   name="videoUrl"
                   value={formData.videoUrl}
                   onChange={(e) => setFormData({...formData, videoUrl: e.target.value})}
-                  placeholder="https://www.youtube.com/watch?v=..."
+                  placeholder="https://www.youtube.com/watch?v=... or https://fb.watch/..."
                   required={sermonType === 'video'}
                 />
-                <p className="text-xs text-gray-600 mt-1">
-                  Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
-                </p>
-              </div>
-            )}
-
-            {imagePreview && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Preview</label>
-                <img 
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full h-48 object-cover rounded-lg"
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/500x300?text=Invalid+URL';
-                  }}
-                />
+                <p className="text-xs text-gray-600 mt-1">✅ Supports: YouTube, Facebook, Vimeo, TikTok, etc.</p>
               </div>
             )}
 
@@ -371,7 +423,7 @@ const ManageSermons = () => {
         </Card>
       )}
 
-      {/* Pinned Sermons Section */}
+      {/* Pinned Sermons */}
       {pinnedSermons.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
@@ -406,7 +458,6 @@ const ManageSermons = () => {
                     <button 
                       onClick={() => handlePin(sermon._id)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Unpin"
                     >
                       <Pin size={20} fill="currentColor" />
                     </button>
@@ -430,7 +481,7 @@ const ManageSermons = () => {
         </div>
       )}
 
-      {/* Unpinned Sermons Section */}
+      {/* All Sermons */}
       {unpinnedSermons.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-blue-900 mb-4">All Sermons</h2>
@@ -453,16 +504,12 @@ const ManageSermons = () => {
                       <span className="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded-full">
                         {new Date(sermon.date).toLocaleDateString()}
                       </span>
-                      <span className="text-xs bg-purple-100 text-purple-900 px-3 py-1 rounded-full font-semibold">
-                        {sermon.type || 'text'}
-                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4">
                     <button 
                       onClick={() => handlePin(sermon._id)}
                       className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Pin to homepage"
                     >
                       <Pin size={20} />
                     </button>

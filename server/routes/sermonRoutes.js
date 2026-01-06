@@ -17,21 +17,27 @@ router.get('/', getSermons);
 router.get('/:id', getSermon);
 
 // ===== PROTECTED & AUTHORIZED ROUTES (Admin/Pastor/Bishop only) =====
-// Create sermon (with optional file upload)
+// Create sermon (with optional thumbnail + multiple images)
 router.post(
   '/',
   protect,
   authorize('pastor', 'bishop', 'admin'),
-  upload.single('thumbnail'),
+  upload.fields([
+    { name: 'thumbnail', maxCount: 1 },
+    { name: 'images', maxCount: 4 }
+  ]),
   createSermon
 );
 
-// Update sermon (with optional file upload)
+// Update sermon (with optional thumbnail + multiple images)
 router.put(
   '/:id',
   protect,
   authorize('pastor', 'bishop', 'admin'),
-  upload.single('thumbnail'),
+  upload.fields([
+    { name: 'thumbnail', maxCount: 1 },
+    { name: 'images', maxCount: 4 }
+  ]),
   updateSermon
 );
 

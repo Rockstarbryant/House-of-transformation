@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const imageSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: true
+  },
+  publicId: String,
+  position: Number
+}, { _id: false });
+
 const sermonSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -27,7 +36,12 @@ const sermonSchema = new mongoose.Schema({
   description: {
     type: String,
     trim: true,
-    maxlength: [5000, 'Description cannot be more than 5000 characters']
+    maxlength: [10000, 'Description cannot be more than 10000 characters']
+  },
+  // TipTap stores content as HTML
+  descriptionHtml: {
+    type: String,
+    default: null
   },
   // Media fields
   type: {
@@ -45,6 +59,17 @@ const sermonSchema = new mongoose.Schema({
   thumbnailPublicId: {
     type: String,
     default: null
+  },
+  // Images embedded in TipTap content
+  images: {
+    type: [imageSchema],
+    default: [],
+    validate: {
+      validator: function(v) {
+        return v.length <= 10; // More images since they're embedded
+      },
+      message: 'Maximum 10 images allowed'
+    }
   },
   videoUrl: {
     type: String,

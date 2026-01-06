@@ -31,24 +31,44 @@ export const sermonService = {
   },
 
   /**
-   * Create sermon with optional file upload
-   * If file is selected, sends FormData with thumbnail file
-   * Otherwise sends JSON data with thumbnail URL
+   * Create sermon with file uploads (thumbnail + multiple images)
+   * Detects File objects and sends FormData
    */
   async createSermon(sermonData) {
     try {
-      // If thumbnail is a File object (from input), use FormData
-      if (sermonData.thumbnail instanceof File) {
+      // Check if we have any files to upload
+      const hasThumbnailFile = sermonData.thumbnail instanceof File;
+      const hasImages = Array.isArray(sermonData.images) && 
+                       sermonData.images.some(img => img instanceof File);
+
+      if (hasThumbnailFile || hasImages) {
+        // Use FormData for file uploads
         const formData = new FormData();
+        
+        // Add basic fields
         formData.append('title', sermonData.title);
         formData.append('pastor', sermonData.pastor);
         formData.append('date', sermonData.date);
         formData.append('category', sermonData.category);
         formData.append('description', sermonData.description);
         formData.append('type', sermonData.type);
-        formData.append('thumbnail', sermonData.thumbnail);
+        
         if (sermonData.videoUrl) {
           formData.append('videoUrl', sermonData.videoUrl);
+        }
+
+        // Add thumbnail file
+        if (hasThumbnailFile) {
+          formData.append('thumbnail', sermonData.thumbnail);
+        }
+
+        // Add multiple images
+        if (hasImages) {
+          sermonData.images.forEach((img, idx) => {
+            if (img instanceof File) {
+              formData.append(`images`, img);
+            }
+          });
         }
 
         const response = await api.post(API_ENDPOINTS.SERMONS.CREATE, formData, {
@@ -56,7 +76,7 @@ export const sermonService = {
         });
         return response.data;
       } else {
-        // Send as JSON if thumbnail is URL or not provided
+        // No files, send as JSON
         const response = await api.post(API_ENDPOINTS.SERMONS.CREATE, sermonData);
         return response.data;
       }
@@ -67,15 +87,35 @@ export const sermonService = {
   },
 
   /**
-   * Update sermon with optional file upload
+   * Update sermon with optional file uploads
    */
   async updateSermon(id, updates) {
     try {
-      if (updates.thumbnail instanceof File) {
+      const hasThumbnailFile = updates.thumbnail instanceof File;
+      const hasImages = Array.isArray(updates.images) && 
+                       updates.images.some(img => img instanceof File);
+
+      if (hasThumbnailFile || hasImages) {
+        // Use FormData for file uploads
         const formData = new FormData();
+
+        // Add all fields
         Object.keys(updates).forEach(key => {
           if (key === 'thumbnail') {
-            formData.append('thumbnail', updates[key]);
+            if (updates[key] instanceof File) {
+              formData.append('thumbnail', updates[key]);
+            } else if (typeof updates[key] === 'string') {
+              formData.append('thumbnail', updates[key]);
+            }
+          } else if (key === 'images') {
+            // Only append File objects for images, skip URL strings
+            if (Array.isArray(updates[key])) {
+              updates[key].forEach(img => {
+                if (img instanceof File) {
+                  formData.append('images', img);
+                }
+              });
+            }
           } else if (updates[key] !== null && updates[key] !== undefined) {
             formData.append(key, updates[key]);
           }
@@ -86,6 +126,7 @@ export const sermonService = {
         });
         return response.data;
       } else {
+        // No files, send as JSON
         const response = await api.put(API_ENDPOINTS.SERMONS.UPDATE(id), updates);
         return response.data;
       }

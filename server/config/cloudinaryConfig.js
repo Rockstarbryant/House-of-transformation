@@ -1,8 +1,3 @@
-// ============================================
-// FIXED: backend/config/cloudinaryConfig.js
-// REPLACE ENTIRE FILE
-// ============================================
-
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
@@ -30,11 +25,11 @@ const storage = new CloudinaryStorage({
   }
 });
 
-// Create multer instance
+// Create multer instance with file size and type limits
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 5 * 1024 * 1024 // 5MB per file
   },
   fileFilter: (req, file, cb) => {
     const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];

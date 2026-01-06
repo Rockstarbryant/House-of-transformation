@@ -68,9 +68,10 @@ exports.getSermon = asyncHandler(async (req, res) => {
 // @route   POST /api/sermons
 // @access  Private/Admin
 exports.createSermon = asyncHandler(async (req, res) => {
-  console.log('📝 Sermon upload received');
-  console.log('📄 req.file:', req.file ? 'EXISTS' : 'MISSING');
-  console.log('📋 req.body:', req.body);
+  console.log('📝 Sermon creation started');
+  console.log('📄 Thumbnail file:', req.files?.thumbnail ? 'EXISTS' : 'MISSING');
+  console.log('🖼️  Images files:', req.files?.images?.length || 0);
+  console.log('📋 Form data:', req.body);
 
   const { title, pastor, date, category, description, videoUrl, type } = req.body;
 
@@ -88,20 +89,21 @@ exports.createSermon = asyncHandler(async (req, res) => {
     type: type || 'text',
     likes: 0,
     views: 0,
-    comments: 0
+    comments: 0,
+    images: []
   };
 
-  // Handle photo/thumbnail upload
+  // Handle thumbnail upload
   if (type === 'photo' || type === 'video') {
     let thumbnailUrl = null;
     let publicId = null;
 
     if (req.file) {
-      // File uploaded via form
+      // File uploaded via form (using upload.single('thumbnail'))
       thumbnailUrl = req.file.secure_url || req.file.path;
       publicId = req.file.public_id;
       console.log('✅ Thumbnail from Cloudinary:', thumbnailUrl);
-    } else if (req.body.thumbnail) {
+    } else if (req.body.thumbnail && typeof req.body.thumbnail === 'string') {
       // URL provided manually
       thumbnailUrl = req.body.thumbnail;
       console.log('✅ Thumbnail from URL:', thumbnailUrl);
@@ -117,6 +119,19 @@ exports.createSermon = asyncHandler(async (req, res) => {
 
   if (type === 'video' && !videoUrl) {
     return res.status(400).json({ success: false, message: 'Video URL is required' });
+  }
+
+  // Handle multiple images
+  if (req.files?.images) {
+    const imageFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+    
+    sermonData.images = imageFiles.slice(0, 4).map((file, idx) => ({
+      url: file.secure_url || file.path,
+      publicId: file.public_id,
+      position: idx + 1
+    }));
+    
+    console.log(`✅ ${sermonData.images.length} images uploaded to Cloudinary`);
   }
 
   const sermon = await Sermon.create(sermonData);
@@ -136,11 +151,14 @@ exports.updateSermon = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Video URL is required' });
   }
 
+  const sermon = await Sermon.findById(req.params.id);
+  if (!sermon) {
+    return res.status(404).json({ success: false, message: 'Sermon not found' });
+  }
+
   // Handle new thumbnail upload
   if (req.file) {
-    const sermon = await Sermon.findById(req.params.id);
-    
-    if (sermon && sermon.thumbnailPublicId) {
+    if (sermon.thumbnailPublicId) {
       const { cloudinary } = require('../config/cloudinaryConfig');
       try {
         await cloudinary.uploader.destroy(sermon.thumbnailPublicId);
@@ -154,18 +172,42 @@ exports.updateSermon = asyncHandler(async (req, res) => {
     updateData.thumbnailPublicId = req.file.public_id;
   }
 
-  const sermon = await Sermon.findByIdAndUpdate(
+  // Handle new images upload
+  if (req.files?.images) {
+    // Delete old images from Cloudinary
+    if (sermon.images && sermon.images.length > 0) {
+      const { cloudinary } = require('../config/cloudinaryConfig');
+      for (const img of sermon.images) {
+        try {
+          if (img.publicId) {
+            await cloudinary.uploader.destroy(img.publicId);
+            console.log('✅ Old image deleted:', img.publicId);
+          }
+        } catch (error) {
+          console.error('Error deleting old image:', error);
+        }
+      }
+    }
+
+    const imageFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+    
+    updateData.images = imageFiles.slice(0, 4).map((file, idx) => ({
+      url: file.secure_url || file.path,
+      publicId: file.public_id,
+      position: idx + 1
+    }));
+    
+    console.log(`✅ ${updateData.images.length} new images uploaded`);
+  }
+
+  const updatedSermon = await Sermon.findByIdAndUpdate(
     req.params.id,
     updateData,
     { new: true, runValidators: true }
   );
   
-  if (!sermon) {
-    return res.status(404).json({ success: false, message: 'Sermon not found' });
-  }
-  
-  console.log('✅ Sermon updated:', sermon._id);
-  res.json({ success: true, sermon });
+  console.log('✅ Sermon updated:', updatedSermon._id);
+  res.json({ success: true, sermon: updatedSermon });
 });
 
 // @desc    Delete sermon
@@ -178,13 +220,29 @@ exports.deleteSermon = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Sermon not found' });
   }
 
+  const { cloudinary } = require('../config/cloudinaryConfig');
+
+  // Delete thumbnail
   if (sermon.thumbnailPublicId) {
-    const { cloudinary } = require('../config/cloudinaryConfig');
     try {
       await cloudinary.uploader.destroy(sermon.thumbnailPublicId);
-      console.log('✅ Thumbnail deleted from Cloudinary:', sermon.thumbnailPublicId);
+      console.log('✅ Thumbnail deleted:', sermon.thumbnailPublicId);
     } catch (error) {
       console.error('Error deleting thumbnail:', error);
+    }
+  }
+
+  // Delete all images
+  if (sermon.images && sermon.images.length > 0) {
+    for (const img of sermon.images) {
+      try {
+        if (img.publicId) {
+          await cloudinary.uploader.destroy(img.publicId);
+          console.log('✅ Image deleted:', img.publicId);
+        }
+      } catch (error) {
+        console.error('Error deleting image:', error);
+      }
     }
   }
 
