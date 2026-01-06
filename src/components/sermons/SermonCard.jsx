@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Eye, Play, Calendar, ArrowRight, X } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { formatDate } from '../../utils/helpers';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
@@ -62,6 +63,12 @@ const SermonCard = ({ sermon }) => {
 
   const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
 
+  // Sanitize HTML to prevent XSS but allow images
+  const sanitizedHtml = DOMPurify.sanitize(sermon.descriptionHtml || sermon.description, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'img'],
+    ALLOWED_ATTR: ['src', 'alt', 'class', 'style']
+  });
+
   return (
     <>
       <Card className="flex flex-col hover:shadow-lg transition-shadow h-full overflow-hidden">
@@ -121,16 +128,16 @@ const SermonCard = ({ sermon }) => {
           </div>
         )}
 
-        {/* HTML Content Preview */}
+        {/* HTML Content Preview/Full */}
         <div className="px-5 flex-grow mb-4">
           {expanded ? (
-            // Full content with HTML rendered
+            // Full content with HTML rendered (with images)
             <div 
-              className="prose prose-sm max-w-none text-gray-800"
-              dangerouslySetInnerHTML={{ __html: sermon.descriptionHtml || sermon.description }}
+              className="prose prose-sm max-w-none text-gray-800 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic"
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
             />
           ) : (
-            // Preview text only
+            // Preview text only (no images)
             <p className="text-gray-800 text-sm leading-relaxed text-center font-semibold italic">
               {previewText}
             </p>

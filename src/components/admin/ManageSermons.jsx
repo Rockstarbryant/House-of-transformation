@@ -1,15 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Pin, X, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Edit, Trash2, Pin, X, Image as ImageIcon, RotateCcw, RotateCw } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
 import { sermonService } from '../../services/api/sermonService';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 
-// TipTap Toolbar Component
-const TipTapToolbar = ({ editor, onImageUpload }) => {
+// Debounce utility
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+// Memoized Toolbar Component
+const TipTapToolbar = React.memo(({ editor, onImageUpload, uploading }) => {
   if (!editor) return null;
 
   const handleImageFileUpload = (e) => {
@@ -17,70 +27,121 @@ const TipTapToolbar = ({ editor, onImageUpload }) => {
     if (file) {
       onImageUpload(file, editor);
     }
-    // Reset input
     e.target.value = '';
   };
 
+  const handleClearContent = () => {
+    if (window.confirm('Clear all sermon content? This cannot be undone.')) {
+      editor.chain().focus().clearContent().run();
+    }
+  };
+
   return (
-    <div className="border border-gray-300 rounded-t-lg bg-gray-50 p-3 flex flex-wrap gap-2">
-      <button
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        disabled={!editor.can().chain().focus().toggleBold().run()}
-        className={`px-3 py-2 rounded font-bold ${
-          editor.isActive('bold') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
-        }`}
-      >
-        B
-      </button>
+    <div className="border border-gray-300 rounded-t-lg bg-gradient-to-r from-gray-50 to-blue-50 p-3 flex flex-wrap gap-2 items-center">
+      {/* Formatting Buttons */}
+      <div className="flex gap-1 border-r border-gray-300 pr-3">
+        <button
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          disabled={!editor.can().chain().focus().toggleBold().run()}
+          className={`px-3 py-2 rounded font-bold transition-colors ${
+            editor.isActive('bold') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100'
+          }`}
+          title="Bold (Ctrl+B)"
+          aria-label="Bold text"
+        >
+          B
+        </button>
 
-      <button
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        disabled={!editor.can().chain().focus().toggleItalic().run()}
-        className={`px-3 py-2 rounded italic ${
-          editor.isActive('italic') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
-        }`}
-      >
-        I
-      </button>
+        <button
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          disabled={!editor.can().chain().focus().toggleItalic().run()}
+          className={`px-3 py-2 rounded italic transition-colors ${
+            editor.isActive('italic') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100'
+          }`}
+          title="Italic (Ctrl+I)"
+          aria-label="Italic text"
+        >
+          I
+        </button>
 
-      <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        className={`px-3 py-2 rounded text-sm font-bold ${
-          editor.isActive('heading', { level: 2 }) ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
-        }`}
-      >
-        H2
-      </button>
+        <button
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={`px-3 py-2 rounded text-sm font-bold transition-colors ${
+            editor.isActive('heading', { level: 2 }) ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100'
+          }`}
+          title="Heading 2"
+          aria-label="Heading 2"
+        >
+          H2
+        </button>
 
-      <button
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        className={`px-3 py-2 rounded ${
-          editor.isActive('bulletList') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'
-        }`}
-      >
-        • List
-      </button>
+        <button
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={`px-3 py-2 rounded transition-colors ${
+            editor.isActive('bulletList') ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100'
+          }`}
+          title="Bullet list"
+          aria-label="Bullet list"
+        >
+          • List
+        </button>
+      </div>
 
-      {/* File Upload Input */}
-      <label className="px-3 py-2 rounded bg-white border border-gray-300 flex items-center gap-1 cursor-pointer hover:bg-gray-50">
-        <ImageIcon size={16} /> Upload
+      {/* Undo / Redo */}
+      <div className="flex gap-1 border-r border-gray-300 pr-3">
+        <button
+          onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().chain().focus().undo().run()}
+          className="px-3 py-2 rounded bg-white border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Undo (Ctrl+Z)"
+          aria-label="Undo"
+        >
+          <RotateCcw size={16} />
+        </button>
+
+        <button
+          onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().chain().focus().redo().run()}
+          className="px-3 py-2 rounded bg-white border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Redo (Ctrl+Y)"
+          aria-label="Redo"
+        >
+          <RotateCw size={16} />
+        </button>
+      </div>
+
+      {/* Image Upload */}
+      <label 
+        className={`px-3 py-2 rounded bg-white border border-gray-300 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors ${
+          uploading ? 'opacity-50 pointer-events-none' : ''
+        }`}
+        title="Upload image"
+      >
+        <ImageIcon size={16} /> {uploading ? 'Uploading...' : 'Upload'}
         <input
           type="file"
           accept="image/*"
           onChange={handleImageFileUpload}
+          disabled={uploading}
           className="hidden"
+          aria-label="Upload image"
         />
       </label>
 
+      {/* Clear Content */}
       <button
-        onClick={() => editor.chain().focus().clearContent().run()}
-        className="px-3 py-2 rounded bg-red-100 text-red-600 border border-red-300 text-sm"
+        onClick={handleClearContent}
+        className="px-3 py-2 rounded bg-red-100 text-red-600 border border-red-300 text-sm hover:bg-red-200 transition-colors"
+        title="Clear all content"
+        aria-label="Clear content"
       >
         Clear
       </button>
     </div>
   );
-};
+});
+
+TipTapToolbar.displayName = 'TipTapToolbar';
 
 const ManageSermons = () => {
   const [sermons, setSermons] = useState([]);
@@ -90,31 +151,46 @@ const ManageSermons = () => {
   const [loading, setLoading] = useState(false);
   const [pinnedCount, setPinnedCount] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [descriptionHtml, setDescriptionHtml] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     pastor: '',
     date: '',
     category: 'Sunday Service',
     description: '',
-    descriptionHtml: '',
     thumbnail: '',
     videoUrl: '',
     type: 'text'
   });
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
 
+  // Debounced update function - OPTIMIZED for performance
+  const debouncedUpdateHtml = useCallback(
+    debounce((html) => {
+      setDescriptionHtml(html);
+    }, 300),
+    []
+  );
+
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: {
+          levels: [2, 3] // Only H2 and H3, no H1 in sermons
+        }
+      }),
       Image.configure({
         HTMLAttributes: {
           class: 'max-w-full h-auto rounded-lg my-4'
         }
+      }),
+      Placeholder.configure({
+        placeholder: 'Start typing your sermon content...'
       })
     ],
-    content: formData.descriptionHtml || '<p></p>',
+    content: '<p></p>',
     onUpdate: ({ editor }) => {
-      setFormData({ ...formData, descriptionHtml: editor.getHTML() });
+      debouncedUpdateHtml(editor.getHTML());
     }
   });
 
@@ -122,11 +198,11 @@ const ManageSermons = () => {
     fetchSermons();
   }, []);
 
+  // Only reset editor when editingId changes, prevent unnecessary resets
   useEffect(() => {
-    if (editor && editingId) {
-      editor.commands.setContent(formData.descriptionHtml || '<p></p>');
-    }
-  }, [editingId, editor]);
+    if (!editor || !editingId) return;
+    editor.commands.setContent(descriptionHtml || '<p></p>', false);
+  }, [editingId]);
 
   const fetchSermons = async () => {
     try {
@@ -146,11 +222,11 @@ const ManageSermons = () => {
       date: '',
       category: 'Sunday Service',
       description: '',
-      descriptionHtml: '',
       thumbnail: '',
       videoUrl: '',
       type: 'text'
     });
+    setDescriptionHtml('');
     setSermonType('text');
     setEditingId(null);
     setThumbnailPreview(null);
@@ -164,15 +240,26 @@ const ManageSermons = () => {
     setFormData({ ...formData, type });
   };
 
-  // Handle file upload to Cloudinary and insert into editor
+  // Handle file upload to Cloudinary
   const handleImageUpload = async (file, editorInstance) => {
     try {
       setUploading(true);
+      
+      // Insert temporary placeholder
+      const placeholderId = `upload-${Date.now()}`;
+      editorInstance
+        .chain()
+        .focus()
+        .setImage({ 
+          src: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%239ca3af"%3EUploading...%3C/text%3E%3C/svg%3E',
+          alt: placeholderId 
+        })
+        .run();
+
       const cloudinaryFormData = new FormData();
       cloudinaryFormData.append('file', file);
-      cloudinaryFormData.append('upload_preset', 'church_sermons'); // Set in Cloudinary dashboard
+      cloudinaryFormData.append('upload_preset', 'church_sermons');
 
-      // Upload to Cloudinary
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
         {
@@ -184,14 +271,27 @@ const ManageSermons = () => {
       const data = await response.json();
       
       if (data.secure_url) {
-        // Insert image into editor
-        editorInstance.chain().focus().setImage({ src: data.secure_url }).run();
+        // Replace placeholder with actual image
+        const { state } = editorInstance;
+        const { doc } = state;
+        
+        doc.descendants((node) => {
+          if (node.type.name === 'image' && node.attrs.alt === placeholderId) {
+            editorInstance
+              .chain()
+              .focus()
+              .setImage({ src: data.secure_url, alt: file.name })
+              .run();
+          }
+        });
       } else {
         alert('Image upload failed');
+        editorInstance.chain().focus().deleteSelection().run();
       }
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('Error uploading image: ' + error.message);
+      editorInstance.chain().focus().deleteSelection().run();
     } finally {
       setUploading(false);
     }
@@ -201,12 +301,8 @@ const ManageSermons = () => {
     const file = e.target.files[0];
     if (file) {
       setFormData({ ...formData, thumbnail: file });
-      
-      // Create preview
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result);
-      };
+      reader.onloadend = () => setThumbnailPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
@@ -218,7 +314,7 @@ const ManageSermons = () => {
       alert('Please add a video URL for video sermons');
       return;
     }
-    if (!formData.descriptionHtml || formData.descriptionHtml === '<p></p>') {
+    if (!descriptionHtml || descriptionHtml === '<p></p>') {
       alert('Please add some content to the description');
       return;
     }
@@ -229,6 +325,7 @@ const ManageSermons = () => {
       const dataToSubmit = {
         ...formData,
         type: sermonType,
+        descriptionHtml,
         description: editor?.getText() || ''
       };
 
@@ -257,6 +354,7 @@ const ManageSermons = () => {
       thumbnail: sermon.thumbnail || '',
       descriptionHtml: sermon.descriptionHtml || ''
     });
+    setDescriptionHtml(sermon.descriptionHtml || '');
     setThumbnailPreview(sermon.thumbnail);
     setSermonType(sermon.type || 'text');
     setEditingId(sermon._id);
@@ -404,18 +502,24 @@ const ManageSermons = () => {
               <option>Prayer Meeting</option>
             </select>
 
-            {/* TipTap Rich Text Editor */}
+            {/* TipTap Rich Text Editor - OPTIMIZED */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Sermon Content *
               </label>
-              <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
-              <div className="border border-t-0 border-gray-300 rounded-b-lg p-4 bg-white min-h-96 prose prose-sm max-w-none">
+              <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} uploading={uploading} />
+              <div className="border border-t-0 border-gray-300 rounded-b-lg bg-white min-h-96 p-4">
                 <EditorContent editor={editor} />
               </div>
-              <p className="text-xs text-gray-600 mt-2">
-                💡 Click "Upload" button to insert photos from your device. Format text with bold, italic, headings, and lists. {uploading && '⏳ Uploading...'}
-              </p>
+              <div className="bg-blue-50 border border-t-0 border-gray-300 rounded-b-lg px-4 py-3 text-xs text-blue-700 space-y-1">
+                <p><strong>💡 Editor Tips:</strong></p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li><strong>Format:</strong> Bold (B), Italic (I), Heading 2 (H2), Bullet List (•)</li>
+                  <li><strong>Undo/Redo:</strong> Use the ↶ ↷ buttons or Ctrl+Z / Ctrl+Y</li>
+                  <li><strong>Images:</strong> Click "Upload" to add photos from your device</li>
+                  <li><strong>Clear:</strong> Use "Clear" button to start over (with confirmation)</li>
+                </ul>
+              </div>
             </div>
 
             {/* Thumbnail - Optional */}
@@ -479,7 +583,7 @@ const ManageSermons = () => {
         </Card>
       )}
 
-      {/* Pinned & Unpinned Sermons List */}
+      {/* Pinned Sermons */}
       {pinnedSermons.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
