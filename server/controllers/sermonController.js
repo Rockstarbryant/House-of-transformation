@@ -140,14 +140,6 @@ exports.createSermon = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, sermon });
 });
 
-// In sermonController.js, add this after creating sermon:
-sermon.imageUrls = sermon.images?.map(img => ({
-  url: img.url,
-  trustedUrl: img.url.replace(
-    'https://res.cloudinary.com',
-    'https://res-trusted.cloudinary.com'  // Bypass tracking
-  )
-})) || [];
 
 // @desc    Update sermon
 // @route   PUT /api/sermons/:id
