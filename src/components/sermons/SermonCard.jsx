@@ -21,34 +21,50 @@ const SermonCard = ({ sermon }) => {
     }
   };
 
-  // Universal video embed extractor
+  // Universal video embed extractor - IMPROVED
   const getVideoEmbedUrl = (url) => {
     if (!url) return '';
 
+    // YouTube - multiple formats support
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
-      return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1` : '';
+      let videoId;
+      
+      if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      } else if (url.includes('youtube.com/watch')) {
+        videoId = new URL(url).searchParams.get('v');
+      } else if (url.includes('youtube.com/embed/')) {
+        videoId = url.split('embed/')[1]?.split('?')[0];
+      }
+      
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
     }
 
-    if (url.includes('facebook.com')) {
-      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=500`;
+    // Facebook - requires app approval (show message instead)
+    if (url.includes('facebook.com') || url.includes('fb.watch')) {
+      return null; // Return null to show warning
     }
 
+    // Vimeo
     if (url.includes('vimeo.com')) {
       const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
       return videoId ? `https://player.vimeo.com/video/${videoId}` : '';
     }
 
+    // TikTok
     if (url.includes('tiktok.com')) {
       return url;
     }
 
-    return url;
+    return '';
   };
 
   const hasVideo = sermon.videoUrl && getVideoEmbedUrl(sermon.videoUrl);
+  const isFacebookVideo = sermon.videoUrl?.includes('facebook.com') || sermon.videoUrl?.includes('fb.watch');
   const hasThumbnail = sermon.thumbnail;
-  const hasMedia = hasVideo || hasThumbnail;
+  const hasMedia = hasVideo || hasThumbnail || isFacebookVideo;
 
   // Get preview text from HTML content
   const getPreviewText = (html, limit = 180) => {
@@ -131,13 +147,27 @@ const SermonCard = ({ sermon }) => {
                 e.target.src = 'https://via.placeholder.com/600x340?text=Image+Error';
               }}
             />
-            {hasVideo && (
+            {hasVideo && !isFacebookVideo && (
               <button
                 onClick={() => setShowVideoModal(true)}
                 className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"
               >
                 <div className="bg-white/90 backdrop-blur-sm p-4 rounded-full shadow-xl group-hover:scale-110 transition-transform">
                   <Play size={32} className="text-blue-600 fill-current" />
+                </div>
+              </button>
+            )}
+            {isFacebookVideo && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open(sermon.videoUrl, '_blank');
+                }}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"
+              >
+                <div className="bg-white/90 backdrop-blur-sm px-4 py-3 rounded-lg shadow-xl group-hover:scale-105 transition-transform text-center">
+                  <Play size={32} className="text-blue-600 fill-current mx-auto mb-1" />
+                  <p className="text-xs font-semibold text-gray-800">Open on Facebook</p>
                 </div>
               </button>
             )}
@@ -209,8 +239,8 @@ const SermonCard = ({ sermon }) => {
         </div>
       </Card>
 
-      {/* Video Modal */}
-      {showVideoModal && hasVideo && (
+      {/* Video Modal - only for embeddable videos */}
+      {showVideoModal && hasVideo && !isFacebookVideo && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
           onClick={() => setShowVideoModal(false)}
