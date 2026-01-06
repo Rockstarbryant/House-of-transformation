@@ -93,13 +93,13 @@ exports.createSermon = asyncHandler(async (req, res) => {
     images: []
   };
 
-  // Handle thumbnail upload
+  // Handle thumbnail upload (OPTIONAL)
   if (type === 'photo' || type === 'video') {
     let thumbnailUrl = null;
     let publicId = null;
 
     if (req.file) {
-      // File uploaded via form (using upload.single('thumbnail'))
+      // File uploaded via form
       thumbnailUrl = req.file.secure_url || req.file.path;
       publicId = req.file.public_id;
       console.log('✅ Thumbnail from Cloudinary:', thumbnailUrl);
@@ -109,12 +109,11 @@ exports.createSermon = asyncHandler(async (req, res) => {
       console.log('✅ Thumbnail from URL:', thumbnailUrl);
     }
 
-    if (!thumbnailUrl) {
-      return res.status(400).json({ success: false, message: 'Thumbnail is required' });
+    // Thumbnail is now OPTIONAL - use default if not provided
+    if (thumbnailUrl) {
+      sermonData.thumbnail = thumbnailUrl;
+      sermonData.thumbnailPublicId = publicId || null;
     }
-
-    sermonData.thumbnail = thumbnailUrl;
-    sermonData.thumbnailPublicId = publicId || null;
   }
 
   if (type === 'video' && !videoUrl) {

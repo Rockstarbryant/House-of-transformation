@@ -9,14 +9,16 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 
 // TipTap Toolbar Component
-const TipTapToolbar = ({ editor }) => {
+const TipTapToolbar = ({ editor, onImageUpload }) => {
   if (!editor) return null;
 
-  const insertImage = async () => {
-    const url = prompt('Enter image URL or upload:');
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
+  const handleImageFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      onImageUpload(file, editor);
     }
+    // Reset input
+    e.target.value = '';
   };
 
   return (
@@ -59,12 +61,16 @@ const TipTapToolbar = ({ editor }) => {
         • List
       </button>
 
-      <button
-        onClick={insertImage}
-        className="px-3 py-2 rounded bg-white border border-gray-300 flex items-center gap-1"
-      >
-        <ImageIcon size={16} /> Image
-      </button>
+      {/* File Upload Input */}
+      <label className="px-3 py-2 rounded bg-white border border-gray-300 flex items-center gap-1 cursor-pointer hover:bg-gray-50">
+        <ImageIcon size={16} /> Upload
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageFileUpload}
+          className="hidden"
+        />
+      </label>
 
       <button
         onClick={() => editor.chain().focus().clearContent().run()}
@@ -83,6 +89,7 @@ const ManageSermons = () => {
   const [sermonType, setSermonType] = useState('text');
   const [loading, setLoading] = useState(false);
   const [pinnedCount, setPinnedCount] = useState(0);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     pastor: '',
@@ -94,6 +101,7 @@ const ManageSermons = () => {
     videoUrl: '',
     type: 'text'
   });
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
 
   const editor = useEditor({
     extensions: [
@@ -104,7 +112,7 @@ const ManageSermons = () => {
         }
       })
     ],
-    content: formData.descriptionHtml || '<p>Start typing...</p>',
+    content: formData.descriptionHtml || '<p></p>',
     onUpdate: ({ editor }) => {
       setFormData({ ...formData, descriptionHtml: editor.getHTML() });
     }
@@ -115,7 +123,7 @@ const ManageSermons = () => {
   }, []);
 
   useEffect(() => {
-    if (editor) {
+    if (editor && editingId) {
       editor.commands.setContent(formData.descriptionHtml || '<p></p>');
     }
   }, [editingId, editor]);
@@ -145,6 +153,7 @@ const ManageSermons = () => {
     });
     setSermonType('text');
     setEditingId(null);
+    setThumbnailPreview(null);
     if (editor) {
       editor.commands.setContent('<p></p>');
     }
@@ -155,20 +164,56 @@ const ManageSermons = () => {
     setFormData({ ...formData, type });
   };
 
+  // Handle file upload to Cloudinary and insert into editor
+  const handleImageUpload = async (file, editorInstance) => {
+    try {
+      setUploading(true);
+      const cloudinaryFormData = new FormData();
+      cloudinaryFormData.append('file', file);
+      cloudinaryFormData.append('upload_preset', 'church_sermons'); // Set in Cloudinary dashboard
+
+      // Upload to Cloudinary
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: 'POST',
+          body: cloudinaryFormData
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.secure_url) {
+        // Insert image into editor
+        editorInstance.chain().focus().setImage({ src: data.secure_url }).run();
+      } else {
+        alert('Image upload failed');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Error uploading image: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleThumbnailUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       setFormData({ ...formData, thumbnail: file });
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (sermonType === 'photo' && !formData.thumbnail) {
-      alert('Please upload a thumbnail for photo sermons');
-      return;
-    }
     if (sermonType === 'video' && !formData.videoUrl) {
       alert('Please add a video URL for video sermons');
       return;
@@ -184,7 +229,7 @@ const ManageSermons = () => {
       const dataToSubmit = {
         ...formData,
         type: sermonType,
-        description: editor?.getText() || '' // Plain text version
+        description: editor?.getText() || ''
       };
 
       if (editingId) {
@@ -212,6 +257,7 @@ const ManageSermons = () => {
       thumbnail: sermon.thumbnail || '',
       descriptionHtml: sermon.descriptionHtml || ''
     });
+    setThumbnailPreview(sermon.thumbnail);
     setSermonType(sermon.type || 'text');
     setEditingId(sermon._id);
     setShowForm(true);
@@ -363,19 +409,20 @@ const ManageSermons = () => {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Sermon Content *
               </label>
-              <TipTapToolbar editor={editor} />
+              <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
               <div className="border border-t-0 border-gray-300 rounded-b-lg p-4 bg-white min-h-96 prose prose-sm max-w-none">
                 <EditorContent editor={editor} />
               </div>
               <p className="text-xs text-gray-600 mt-2">
-                💡 Click "Image" button to insert photos anywhere in your text. Format text with bold, italic, headings, and lists.
+                💡 Click "Upload" button to insert photos from your device. Format text with bold, italic, headings, and lists. {uploading && '⏳ Uploading...'}
               </p>
             </div>
 
+            {/* Thumbnail - Optional */}
             {(sermonType === 'photo' || sermonType === 'video') && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Thumbnail Image *
+                  Thumbnail Image (Optional)
                 </label>
                 <input
                   type="file"
@@ -383,7 +430,16 @@ const ManageSermons = () => {
                   onChange={handleThumbnailUpload}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
                 />
-                <p className="text-xs text-gray-600 mt-1">This appears as the main preview image in the card</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  If not uploaded, a default thumbnail will be used (like YouTube)
+                </p>
+
+                {thumbnailPreview && (
+                  <div className="mt-3">
+                    <p className="text-sm font-semibold mb-2">Preview:</p>
+                    <img src={thumbnailPreview} alt="Thumbnail" className="w-40 h-24 object-cover rounded" />
+                  </div>
+                )}
               </div>
             )}
 
@@ -404,7 +460,7 @@ const ManageSermons = () => {
             )}
 
             <div className="flex gap-4 pt-4">
-              <Button type="submit" variant="primary" disabled={loading}>
+              <Button type="submit" variant="primary" disabled={loading || uploading}>
                 {loading ? 'Saving...' : editingId ? 'Update Sermon' : 'Add Sermon'}
               </Button>
               <Button 
@@ -423,7 +479,7 @@ const ManageSermons = () => {
         </Card>
       )}
 
-      {/* Pinned Sermons */}
+      {/* Pinned & Unpinned Sermons List */}
       {pinnedSermons.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
@@ -481,7 +537,6 @@ const ManageSermons = () => {
         </div>
       )}
 
-      {/* All Sermons */}
       {unpinnedSermons.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-blue-900 mb-4">All Sermons</h2>

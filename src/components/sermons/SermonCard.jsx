@@ -136,7 +136,7 @@ const SermonCard = ({ sermon }) => {
             </p>
           )}
 
-          {sermon.descriptionHtml && sermon.descriptionHtml.length > 180 && (
+          {(sermon.descriptionHtml || sermon.description) && (sermon.descriptionHtml || sermon.description).length > 180 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
