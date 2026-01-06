@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, MessageCircle, Share2, Eye, Play, Calendar, ArrowRight, X } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -61,17 +61,27 @@ const SermonCard = ({ sermon }) => {
     return text.substring(0, limit).trim() + '...';
   };
 
-  const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
+  const contentHtml = sermon.descriptionHtml || sermon.description || '';
+  const previewText = getPreviewText(contentHtml);
+
+  // Debug logging
+  useEffect(() => {
+    if (sermon._id) {
+      console.log(`🎤 SermonCard [${sermon.title}]:`, {
+        hasDescriptionHtml: !!sermon.descriptionHtml,
+        hasDescription: !!sermon.description,
+        contentLength: contentHtml.length,
+        firstChar: contentHtml.substring(0, 50)
+      });
+    }
+  }, [sermon._id, sermon.descriptionHtml, sermon.description]);
 
   // ✅ FIX #1: Proper DOMPurify config to allow Cloudinary images
-  const sanitizedHtml = DOMPurify.sanitize(
-    sermon.descriptionHtml || sermon.description,
-    {
-      ADD_TAGS: ['img'],
-      ADD_ATTR: ['src', 'alt', 'class', 'style'],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-    }
-  );
+  const sanitizedHtml = DOMPurify.sanitize(contentHtml, {
+    ADD_TAGS: ['img'],
+    ADD_ATTR: ['src', 'alt', 'class', 'style'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+  });
 
   // Check if content has substantial text (more than preview length)
   const hasMoreContent = (sermon.descriptionHtml || sermon.description).length > 180;

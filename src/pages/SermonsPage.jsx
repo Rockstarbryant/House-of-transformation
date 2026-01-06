@@ -36,12 +36,18 @@ const SermonsPage = () => {
       const data = await sermonService.getSermons({ limit: 100 });
       const sermons = data.sermons || data;
       
-      const sermonsWithType = sermons.map(s => ({
+      // ✅ FIX: Ensure all sermons have descriptionHtml fallback to description
+      const sermonsWithDefaults = sermons.map(s => ({
         ...s,
-        type: s.type || detectSermonType(s)
+        type: s.type || detectSermonType(s),
+        descriptionHtml: s.descriptionHtml || s.description || '', // Fallback chain
+        description: s.description || ''
       }));
       
-      setAllSermons(sermonsWithType);
+      console.log('📚 Fetched sermons:', sermonsWithDefaults.length);
+      console.log('🔍 First sermon data:', sermonsWithDefaults[0]);
+      
+      setAllSermons(sermonsWithDefaults);
       setError(null);
     } catch (err) {
       console.error('Error fetching sermons:', err);
@@ -72,7 +78,7 @@ const SermonsPage = () => {
       result = result.filter(s =>
         s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.pastor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        (s.descriptionHtml || s.description)?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -89,7 +95,7 @@ const SermonsPage = () => {
   const { canPostSermon, user } = useAuthContext();
 
   const handleAddSermon = () => {
-    alert('Sermon creation form coming soon');
+    window.location.href = '/admin/sermons';
   };
 
   if (loading) return <Loader />;
@@ -232,18 +238,18 @@ const SermonsPage = () => {
             {filteredSermons
               .filter(s => detectSermonType(s) === 'text')
               .map(sermon => (
-                <SermonCardText key={sermon._id} sermon={sermon} />
+                <div key={sermon._id} className="px-4 py-4">
+                  <SermonCardText sermon={sermon} />
+                </div>
               ))}
 
             {/* Media Sermons */}
             {filteredSermons
               .filter(s => detectSermonType(s) !== 'text')
               .map(sermon => (
-                <SermonCard
-                  key={sermon._id}
-                  sermon={sermon}
-                  type={detectSermonType(sermon)}
-                />
+                <div key={sermon._id} className="px-4 py-4">
+                  <SermonCard sermon={sermon} type={detectSermonType(sermon)} />
+                </div>
               ))}
           </div>
         )}
