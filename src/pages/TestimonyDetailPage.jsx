@@ -1,5 +1,5 @@
 // src/pages/TestimonyDetailPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Heart, Calendar, User, Share2, AlertCircle } from 'lucide-react';
 import Card from '../components/common/Card';
@@ -15,15 +15,11 @@ const TestimonyDetailPage = () => {
   const [liked, setLiked] = useState(false);
   const [relatedTestimonies, setRelatedTestimonies] = useState([]);
 
-  useEffect(() => {
-    fetchTestimony();
-    fetchRelatedTestimonies();
-  }, [id]);
-
-  const fetchTestimony = async () => {
+  // ✅ FIXED: Wrap functions with useCallback to memoize them
+  const fetchTestimony = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await feedbackService.getFeedback(id);
+      const response = await feedbackService.getFeedbackById(id);
       
       if (response.success) {
         setTestimony(response.feedback);
@@ -36,9 +32,9 @@ const TestimonyDetailPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchRelatedTestimonies = async () => {
+  const fetchRelatedTestimonies = useCallback(async () => {
     try {
       const response = await feedbackService.getPublicTestimonies();
       
@@ -53,7 +49,13 @@ const TestimonyDetailPage = () => {
     } catch (err) {
       console.error('Error fetching related testimonies:', err);
     }
-  };
+  }, [id]);
+
+  // ✅ FIXED: Now include the memoized functions in dependency array
+  useEffect(() => {
+    fetchTestimony();
+    fetchRelatedTestimonies();
+  }, [fetchTestimony, fetchRelatedTestimonies]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);

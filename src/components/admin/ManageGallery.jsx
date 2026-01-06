@@ -5,9 +5,6 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 
-//const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://house-of-transformation.onrender.com';
-
 const ManageGallery = () => {
   const [photos, setPhotos] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -63,15 +60,13 @@ const ManageGallery = () => {
     try {
       setLoading(true);
       
-      // Create FormData object for file upload
       const uploadData = new FormData();
       uploadData.append('photo', formData.photo);
       uploadData.append('title', formData.title);
       uploadData.append('description', formData.description);
       uploadData.append('category', formData.category);
 
-
-       console.log('Uploading to:', '/gallery/upload'); // Debug log
+      console.log('Uploading to: /gallery/upload');
       await galleryService.uploadPhoto(uploadData);
       
       alert('Photo uploaded successfully!');
@@ -86,20 +81,19 @@ const ManageGallery = () => {
       fetchPhotos();
     } catch (error) {
       console.error('Error uploading:', error);
-       // Better error messages
-    if (error.response?.status === 404) {
-      alert('❌ Upload endpoint not found. Check backend configuration.');
-    } else if (error.response?.status === 413) {
-      alert('❌ File too large. Max size is 5MB.');
-    } else if (error.response?.status === 401) {
-      alert('❌ Not authorized. Please login as admin.');
-    } else {
-      alert('❌ Error: ' + (error.response?.data?.message || error.message));
+      if (error.response?.status === 404) {
+        alert('❌ Upload endpoint not found. Check backend configuration.');
+      } else if (error.response?.status === 413) {
+        alert('❌ File too large. Max size is 5MB.');
+      } else if (error.response?.status === 401) {
+        alert('❌ Not authorized. Please login as admin.');
+      } else {
+        alert('❌ Error: ' + (error.response?.data?.message || error.message));
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm('Delete this photo?')) {
@@ -210,17 +204,22 @@ const ManageGallery = () => {
       <div className="grid md:grid-cols-3 gap-6">
         {photos.map((photo) => (
           <Card key={photo._id} padding="none" hover>
+            {/* ✅ FIXED: Use imageUrl directly - it's already a Cloudinary URL */}
             <img 
-              src={`${API_BASE}${photo.imageUrl}`}
+              src={photo.imageUrl}
               alt={photo.title}
               className="w-full h-64 object-cover rounded-t-xl"
               onError={(e) => {
-                e.target.src = '🖼️';
+                console.error('Image failed to load:', photo.imageUrl);
+                e.target.src = 'https://via.placeholder.com/400x300?text=Image+Error';
               }}
             />
             <div className="p-4">
               <h3 className="font-bold text-blue-900 mb-1">{photo.title}</h3>
-              <p className="text-sm text-gray-600 mb-3">{photo.category}</p>
+              <p className="text-sm text-gray-600 mb-2">{photo.category}</p>
+              <p className="text-xs text-gray-500 mb-3">
+                Uploaded: {new Date(photo.createdAt).toLocaleDateString()}
+              </p>
               <button
                 onClick={() => handleDelete(photo._id)}
                 className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
