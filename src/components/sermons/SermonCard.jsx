@@ -63,15 +63,23 @@ const SermonCard = ({ sermon }) => {
 
   const previewText = getPreviewText(sermon.descriptionHtml || sermon.description);
 
-  // Sanitize HTML to prevent XSS but allow images
-  const sanitizedHtml = DOMPurify.sanitize(sermon.descriptionHtml || sermon.description, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'img'],
-    ALLOWED_ATTR: ['src', 'alt', 'class', 'style']
-  });
+  // ✅ FIX #1: Proper DOMPurify config to allow Cloudinary images
+  const sanitizedHtml = DOMPurify.sanitize(
+    sermon.descriptionHtml || sermon.description,
+    {
+      ADD_TAGS: ['img'],
+      ADD_ATTR: ['src', 'alt', 'class', 'style'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+    }
+  );
+
+  // Check if content has substantial text (more than preview length)
+  const hasMoreContent = (sermon.descriptionHtml || sermon.description).length > 180;
 
   return (
     <>
-      <Card className="flex flex-col hover:shadow-lg transition-shadow h-full overflow-hidden">
+      {/* ✅ FIX #3: Removed overflow-hidden, added overflow-visible */}
+      <Card className="flex flex-col hover:shadow-lg transition-shadow h-full overflow-visible">
         
         {/* Header: Category + Date */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
@@ -106,7 +114,7 @@ const SermonCard = ({ sermon }) => {
 
         {/* Main Thumbnail/Video (After Title) */}
         {hasMedia && (
-          <div className="relative aspect-video bg-slate-100 overflow-hidden group mx-5 mb-4 rounded-lg">
+          <div className="relative aspect-video bg-slate-100 overflow-hidden group mx-5 mb-4 rounded-lg flex-shrink-0">
             <img
               src={hasThumbnail ? sermon.thumbnail : 'https://via.placeholder.com/600x340?text=Sermon'}
               alt={sermon.title}
@@ -128,36 +136,32 @@ const SermonCard = ({ sermon }) => {
           </div>
         )}
 
-        {/* HTML Content Preview/Full */}
+        {/* ✅ FIX #2: Show HTML content always, clamp height when collapsed */}
         <div className="px-5 flex-grow mb-4">
-          {expanded ? (
-            // Full content with HTML rendered (with images)
-            <div 
-              className="prose prose-sm max-w-none text-gray-800 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic"
-              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-            />
-          ) : (
-            // Preview text only (no images)
-            <p className="text-gray-800 text-sm leading-relaxed text-center font-semibold italic">
-              {previewText}
-            </p>
-          )}
+          {/* Always render HTML content (with images), but clamp height when collapsed */}
+          <div
+            className={`prose prose-sm max-w-none text-gray-800 transition-all duration-300 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic ${
+              expanded ? '' : 'max-h-60 overflow-hidden'
+            }`}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+          />
 
-          {(sermon.descriptionHtml || sermon.description) && (sermon.descriptionHtml || sermon.description).length > 180 && (
+          {/* Show "Read More" button only if content exceeds preview height */}
+          {hasMoreContent && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);
               }}
-              className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-2 inline-block"
+              className="text-blue-600 font-semibold text-sm hover:text-blue-700 mt-3 inline-block"
             >
-              {expanded ? 'Show Less' : 'Read More'}
+              {expanded ? 'Show Less ↑' : 'Read More ↓'}
             </button>
           )}
         </div>
 
         {/* Footer: Stats + Action */}
-        <div className="px-5 pt-4 border-t border-gray-200 space-y-4">
+        <div className="px-5 pt-4 border-t border-gray-200 space-y-4 mt-auto">
           {/* Interaction Stats */}
           <div className="flex justify-between text-sm text-gray-600">
             <div className="flex items-center gap-1">
