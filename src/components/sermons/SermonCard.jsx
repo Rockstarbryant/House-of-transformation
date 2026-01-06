@@ -21,7 +21,7 @@ const SermonCard = ({ sermon }) => {
     }
   };
 
-  // Universal video embed extractor - IMPROVED
+  // Universal video embed extractor
   const getVideoEmbedUrl = (url) => {
     if (!url) return '';
 
@@ -42,11 +42,6 @@ const SermonCard = ({ sermon }) => {
       }
     }
 
-    // Facebook - requires app approval (show message instead)
-    if (url.includes('facebook.com') || url.includes('fb.watch')) {
-      return null; // Return null to show warning
-    }
-
     // Vimeo
     if (url.includes('vimeo.com')) {
       const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
@@ -58,15 +53,14 @@ const SermonCard = ({ sermon }) => {
       return url;
     }
 
+    // Facebook - return null (open in new tab instead)
+    if (url.includes('facebook.com') || url.includes('fb.watch')) {
+      return null;
+    }
+
     return '';
   };
 
-  const hasVideo = sermon.videoUrl && getVideoEmbedUrl(sermon.videoUrl);
-  const isFacebookVideo = sermon.videoUrl?.includes('facebook.com') || sermon.videoUrl?.includes('fb.watch');
-  const hasThumbnail = sermon.thumbnail;
-  const hasMedia = hasVideo || hasThumbnail || isFacebookVideo;
-
-  // Get preview text from HTML content
   const getPreviewText = (html, limit = 180) => {
     if (!html) return '';
     const temp = document.createElement('div');
@@ -79,30 +73,31 @@ const SermonCard = ({ sermon }) => {
   const contentHtml = sermon.descriptionHtml || sermon.description || '';
   const previewText = getPreviewText(contentHtml);
 
+  // ✅ FIX #1: Explicitly check for video type
+  const isVideo = sermon.type === 'video' && sermon.videoUrl;
+  const hasThumbnail = Boolean(sermon.thumbnail);
+  const videoEmbedUrl = isVideo ? getVideoEmbedUrl(sermon.videoUrl) : null;
+  const isFacebookVideo = isVideo && (sermon.videoUrl?.includes('facebook.com') || sermon.videoUrl?.includes('fb.watch'));
+
   // Debug logging
   useEffect(() => {
     if (sermon._id) {
-      const hasImages = contentHtml.includes('<img');
       console.log(`🎤 SermonCard [${sermon.title}]:`, {
-        hasDescriptionHtml: !!sermon.descriptionHtml,
-        hasDescription: !!sermon.description,
-        contentLength: contentHtml.length,
-        hasImages,
-        firstImg: hasImages ? contentHtml.match(/<img[^>]+>/)?.[0] : 'none'
+        type: sermon.type,
+        hasVideoUrl: !!sermon.videoUrl,
+        isVideo,
+        hasThumbnail,
+        hasImages: contentHtml.includes('<img'),
+        contentLength: contentHtml.length
       });
     }
-  }, [sermon._id, sermon.descriptionHtml, sermon.description, contentHtml]);
+  }, [sermon._id, sermon.type, sermon.videoUrl, isVideo]);
 
-  // ✅ FIX: Use HTML directly (from TipTap, already safe)
-  // Images from TipTap + Cloudinary are safe and trusted
+  // Use HTML directly (TipTap output is safe)
   const sanitizedHtml = contentHtml;
-
-  // Check if content has substantial text (more than preview length)
-  const hasMoreContent = (sermon.descriptionHtml || sermon.description).length > 180;
 
   return (
     <>
-      {/* ✅ FIX #3: Removed overflow-hidden, added overflow-visible */}
       <Card className="flex flex-col hover:shadow-lg transition-shadow h-full overflow-visible">
         
         {/* Header: Category + Date */}
@@ -136,56 +131,70 @@ const SermonCard = ({ sermon }) => {
           {sermon.title}
         </h3>
 
-        {/* Main Thumbnail/Video (After Title) */}
-        {hasMedia && (
+        {/* ✅ FIX #2: ALWAYS SHOW VIDEO PREVIEW FOR VIDEO SERMONS */}
+        {isVideo && (
+          <div className="px-5 mb-4">
+            <button
+              onClick={() => setShowVideoModal(true)}
+              className="relative w-full aspect-video rounded-lg overflow-hidden bg-black group"
+              title="Click to watch video"
+            >
+              {/* Thumbnail or fallback */}
+              <img
+                src={
+                  hasThumbnail
+                    ? sermon.thumbnail
+                    : 'https://via.placeholder.com/600x340?text=Video+Sermon'
+                }
+                alt={sermon.title}
+                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition"
+                onError={(e) => {
+                  e.target.src = 'https://via.placeholder.com/600x340?text=Video+Error';
+                }}
+              />
+
+              {/* Play overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white/90 p-4 rounded-full shadow-lg group-hover:scale-110 transition">
+                  <Play size={32} className="text-blue-700 fill-current" />
+                </div>
+              </div>
+
+              {/* Facebook warning */}
+              {isFacebookVideo && (
+                <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs py-2 px-3 text-center">
+                  Opens on Facebook
+                </div>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Main Thumbnail (only if NOT video or no thumbnail) */}
+        {!isVideo && hasThumbnail && (
           <div className="relative aspect-video bg-slate-100 overflow-hidden group mx-5 mb-4 rounded-lg flex-shrink-0">
             <img
-              src={hasThumbnail ? sermon.thumbnail : 'https://via.placeholder.com/600x340?text=Sermon'}
+              src={sermon.thumbnail}
               alt={sermon.title}
               className="w-full h-full object-cover"
               onError={(e) => {
                 e.target.src = 'https://via.placeholder.com/600x340?text=Image+Error';
               }}
             />
-            {hasVideo && !isFacebookVideo && (
-              <button
-                onClick={() => setShowVideoModal(true)}
-                className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"
-              >
-                <div className="bg-white/90 backdrop-blur-sm p-4 rounded-full shadow-xl group-hover:scale-110 transition-transform">
-                  <Play size={32} className="text-blue-600 fill-current" />
-                </div>
-              </button>
-            )}
-            {isFacebookVideo && (
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.open(sermon.videoUrl, '_blank');
-                }}
-                className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all"
-              >
-                <div className="bg-white/90 backdrop-blur-sm px-4 py-3 rounded-lg shadow-xl group-hover:scale-105 transition-transform text-center">
-                  <Play size={32} className="text-blue-600 fill-current mx-auto mb-1" />
-                  <p className="text-xs font-semibold text-gray-800">Open on Facebook</p>
-                </div>
-              </button>
-            )}
           </div>
         )}
 
-        {/* ✅ FIX #2: Show HTML content always, clamp height when collapsed */}
+        {/* HTML Content (Text + Images) */}
         <div className="px-5 flex-grow mb-4">
-          {/* Always render HTML content (with images), but clamp height when collapsed */}
           <div
-            className={`prose prose-sm max-w-none text-gray-800 transition-all duration-300 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic ${
+            className={`prose prose-sm max-w-none text-gray-800 transition-all duration-300 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_img]:border [&_img]:border-gray-200 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic ${
               expanded ? '' : 'max-h-60 overflow-hidden'
             }`}
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
 
           {/* Show "Read More" button only if content exceeds preview height */}
-          {hasMoreContent && (
+          {contentHtml.length > 180 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -197,6 +206,13 @@ const SermonCard = ({ sermon }) => {
             </button>
           )}
         </div>
+
+        {/* Image loading warning (if images blocked by tracking prevention) */}
+        {contentHtml.includes('<img') && (
+          <div className="text-xs text-amber-600 mt-2 px-5 p-2 bg-amber-50 rounded">
+            💡 If images don't show, try opening in incognito mode or disabling tracking prevention.
+          </div>
+        )}
 
         {/* Footer: Stats + Action */}
         <div className="px-5 pt-4 border-t border-gray-200 space-y-4 mt-auto">
@@ -233,14 +249,14 @@ const SermonCard = ({ sermon }) => {
             to={`/sermons/${sermon._id}`}
             className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all transform hover:-translate-y-0.5 group"
           >
-            <span>{hasVideo ? 'Watch Sermon' : 'View Sermon'}</span>
+            <span>{isVideo ? 'Watch Sermon' : 'View Sermon'}</span>
             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
       </Card>
 
-      {/* Video Modal - only for embeddable videos */}
-      {showVideoModal && hasVideo && !isFacebookVideo && (
+      {/* ✅ FIX #3: VIDEO MODAL (condition simplified) */}
+      {showVideoModal && sermon.videoUrl && videoEmbedUrl && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
           onClick={() => setShowVideoModal(false)}
@@ -259,7 +275,7 @@ const SermonCard = ({ sermon }) => {
             <div className="relative" style={{ paddingBottom: sermon.videoUrl?.includes('tiktok.com') ? '177.78%' : '56.25%' }}>
               <iframe
                 className="absolute inset-0 w-full h-full"
-                src={getVideoEmbedUrl(sermon.videoUrl)}
+                src={videoEmbedUrl}
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -268,6 +284,11 @@ const SermonCard = ({ sermon }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Facebook video fallback - open in new tab */}
+      {showVideoModal && isFacebookVideo && (
+        <script>{`window.open('${sermon.videoUrl}', '_blank'); window.location.reload();`}</script>
       )}
     </>
   );
