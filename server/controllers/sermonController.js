@@ -78,7 +78,7 @@ exports.getSermon = async (req, res) => {
 // @access  Private/Admin
 exports.createSermon = async (req, res) => {
   try {
-    const { title, pastor, date, category, description, videoUrl, type } = req.body;
+    const { title, pastor, date, category, description, thumbnail, videoUrl, type } = req.body;
 
     // Validate required fields
     if (!title || !pastor || !date) {
@@ -86,27 +86,12 @@ exports.createSermon = async (req, res) => {
     }
 
     // Validate type-specific fields
-    if (type === 'photo' && !req.file) {
-      return res.status(400).json({ message: 'Image is required for photo sermons' });
+    if (type === 'photo' && !thumbnail) {
+      return res.status(400).json({ message: 'Thumbnail is required for photo sermons' });
     }
     
     if (type === 'video' && !videoUrl) {
       return res.status(400).json({ message: 'Video URL is required for video sermons' });
-    }
-
-    // Get image from Cloudinary (if uploaded) or use provided URL
-    let thumbnail = null;
-    if (req.file) {
-      // ✅ Image uploaded via Cloudinary
-      thumbnail = req.file.secure_url || req.file.path;
-    } else if (req.body.thumbnail) {
-      // Image URL provided directly (allow pasting URLs)
-      thumbnail = req.body.thumbnail;
-    }
-
-    // For photo sermons, thumbnail is required
-    if (type === 'photo' && !thumbnail) {
-      return res.status(400).json({ message: 'Thumbnail image is required for photo sermons' });
     }
 
     const sermon = await Sermon.create({
@@ -115,14 +100,21 @@ exports.createSermon = async (req, res) => {
       date,
       category: category || 'Sunday Service',
       description,
-      thumbnail: thumbnail || null, // ✅ Cloudinary URL or direct URL
-      thumbnailPublicId: req.file?.public_id || null, // ✅ For deletion
-      videoUrl: videoUrl || null,
+      thumbnail,
+      videoUrl,
       type: type || 'text',
       likes: 0,
       views: 0,
       comments: 0
     });
+    // In sermonController.js createSermon, add this:
+console.log('=== SERMON CREATE DEBUG ===');
+console.log('Token:', req.headers.authorization?.substring(0, 20));
+console.log('User ID:', req.user?._id);
+console.log('User Name:', req.user?.name);
+console.log('User Role:', req.user?.role);
+console.log('User Object:', JSON.stringify(req.user, null, 2));
+console.log('========================');
 
     res.status(201).json({ success: true, sermon });
   } catch (error) {
@@ -135,56 +127,28 @@ exports.createSermon = async (req, res) => {
 // @access  Private/Admin
 exports.updateSermon = async (req, res) => {
   try {
-    const { type, videoUrl } = req.body;
-
-    // Find existing sermon
-    const sermon = await Sermon.findById(req.params.id);
-    if (!sermon) {
-      return res.status(404).json({ message: 'Sermon not found' });
-    }
+    const { type, thumbnail, videoUrl } = req.body;
 
     // Validate type-specific fields
-    if (type === 'photo' && !req.file && !req.body.thumbnail && !sermon.thumbnail) {
-      return res.status(400).json({ message: 'Thumbnail image is required for photo sermons' });
+    if (type === 'photo' && !thumbnail) {
+      return res.status(400).json({ message: 'Thumbnail is required for photo sermons' });
     }
     
-    if (type === 'video' && !videoUrl && !sermon.videoUrl) {
+    if (type === 'video' && !videoUrl) {
       return res.status(400).json({ message: 'Video URL is required for video sermons' });
     }
 
-    // Prepare update data
-    const updateData = { ...req.body };
-
-    // Handle image upload
-    if (req.file) {
-      // New image uploaded - use Cloudinary URL
-      updateData.thumbnail = req.file.secure_url || req.file.path;
-      updateData.thumbnailPublicId = req.file.public_id;
-
-      // Delete old image from Cloudinary if exists
-      if (sermon.thumbnailPublicId) {
-        const { cloudinary } = require('../config/cloudinaryConfig');
-        try {
-          await cloudinary.uploader.destroy(sermon.thumbnailPublicId);
-        } catch (err) {
-          console.error('Error deleting old image:', err);
-        }
-      }
-    } else if (req.body.thumbnail && req.body.thumbnail !== sermon.thumbnail) {
-      // New URL provided (paste from URL)
-      updateData.thumbnail = req.body.thumbnail;
-      // Clear public ID since it's a direct URL
-      updateData.thumbnailPublicId = null;
-    }
-
-    // Update sermon
-    const updatedSermon = await Sermon.findByIdAndUpdate(
+    const sermon = await Sermon.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      req.body,
       { new: true, runValidators: true }
     );
-
-    res.json({ success: true, sermon: updatedSermon });
+    
+    if (!sermon) {
+      return res.status(404).json({ message: 'Sermon not found' });
+    }
+    
+    res.json({ success: true, sermon });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
