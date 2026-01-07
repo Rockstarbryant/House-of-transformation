@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Archive, Plus, Grid3x3, List, Calendar, Users, BookOpen, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Archive, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLivestream, useLivestreamAdmin } from '../../hooks/useLivestream';
 
 const ManageLiveStream = () => {
@@ -20,6 +20,10 @@ const ManageLiveStream = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
 
+  // Preacher and Scripture inputs
+  const [preacherInputs, setPreacherInputs] = useState(['']);
+  const [scriptureInputs, setScriptureInputs] = useState(['']);
+
   const [formData, setFormData] = useState({
     title: '',
     type: 'sermon',
@@ -35,12 +39,44 @@ const ManageLiveStream = () => {
   });
 
   const streamTypes = [
-    { value: 'sermon', label: '🎤 Sermon' },
-    { value: 'praise_worship', label: '🎵 Praise & Worship' },
-    { value: 'full_service', label: '⛪ Full Service' },
-    { value: 'sunday_school', label: '📚 Sunday School' },
-    { value: 'special_event', label: '🎉 Special Event' }
+    { value: 'sermon', label: 'Sermon' },
+    { value: 'praise_worship', label: 'Praise & Worship' },
+    { value: 'full_service', label: 'Full Service' },
+    { value: 'sunday_school', label: 'Sunday School' },
+    { value: 'special_event', label: 'Special Event' }
   ];
+
+  // Preacher field management
+  const addPreacherField = () => {
+    setPreacherInputs([...preacherInputs, '']);
+  };
+
+  const removePreacherField = (index) => {
+    setPreacherInputs(preacherInputs.filter((_, i) => i !== index));
+  };
+
+  const updatePreacher = (index, value) => {
+    const updated = [...preacherInputs];
+    updated[index] = value;
+    setPreacherInputs(updated);
+    setFormData({...formData, preacherNames: updated.filter(p => p.trim())});
+  };
+
+  // Scripture field management
+  const addScriptureField = () => {
+    setScriptureInputs([...scriptureInputs, '']);
+  };
+
+  const removeScriptureField = (index) => {
+    setScriptureInputs(scriptureInputs.filter((_, i) => i !== index));
+  };
+
+  const updateScripture = (index, value) => {
+    const updated = [...scriptureInputs];
+    updated[index] = value;
+    setScriptureInputs(updated);
+    setFormData({...formData, scriptures: updated.filter(s => s.trim())});
+  };
 
   // Fetch archives when filter changes
   useEffect(() => {
@@ -55,7 +91,6 @@ const ManageLiveStream = () => {
     e.preventDefault();
     
     if (editingId) {
-      // EDITING - only send changed fields
       const result = await updateStream(editingId, {
         title: formData.title,
         type: formData.type,
@@ -64,7 +99,8 @@ const ManageLiveStream = () => {
         facebookUrl: formData.facebookUrl,
         preacherNames: formData.preacherNames,
         scriptures: formData.scriptures,
-        description: formData.description
+        description: formData.description,
+        isPublic: formData.isPublic
       });
       if (result.success) {
         resetForm();
@@ -72,7 +108,6 @@ const ManageLiveStream = () => {
         publicFetchArchives({ type: filterType });
       }
     } else {
-      // CREATING - send all fields
       const result = await createStream(formData);
       if (result.success) {
         resetForm();
@@ -102,6 +137,8 @@ const ManageLiveStream = () => {
   };
 
   const handleEditStream = (stream) => {
+    setPreacherInputs(stream.preacherNames && stream.preacherNames.length > 0 ? stream.preacherNames : ['']);
+    setScriptureInputs(stream.scriptures && stream.scriptures.length > 0 ? stream.scriptures : ['']);
     setFormData({
       title: stream.title,
       type: stream.type,
@@ -121,6 +158,8 @@ const ManageLiveStream = () => {
   };
 
   const resetForm = () => {
+    setPreacherInputs(['']);
+    setScriptureInputs(['']);
     setFormData({
       title: '',
       type: 'sermon',
@@ -141,9 +180,22 @@ const ManageLiveStream = () => {
     ? publicArchives.filter(s => s.title.toLowerCase().includes(searchTerm.toLowerCase()))
     : publicArchives;
 
+  const getEmbedUrl = (stream) => {
+    if (stream.youtubeVideoId) {
+      return `https://www.youtube.com/embed/${stream.youtubeVideoId}`;
+    }
+    if (stream.youtubeUrl?.includes('youtube')) {
+      return stream.youtubeUrl;
+    }
+    if (stream.facebookUrl) {
+      return stream.facebookUrl;
+    }
+    return null;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold text-blue-900 mb-8">Manage Livestreams</h1>
+      <h1 className="text-4xl font-bold text-gray-900 mb-8">Manage Livestreams</h1>
 
       {/* SUCCESS/ERROR ALERTS */}
       {success && (
@@ -169,7 +221,21 @@ const ManageLiveStream = () => {
             </div>
             <span className="bg-red-600 text-white px-4 py-1 rounded-full text-sm font-bold">Active</span>
           </div>
-          <h3 className="text-xl font-bold mb-2">{publicActiveStream.title}</h3>
+          <h3 className="text-xl font-bold mb-4">{publicActiveStream.title}</h3>
+          
+          {/* Video Preview */}
+          {getEmbedUrl(publicActiveStream) && (
+            <div className="aspect-video rounded-lg overflow-hidden shadow-lg mb-4">
+              <iframe
+                src={getEmbedUrl(publicActiveStream)}
+                className="w-full h-full"
+                allowFullScreen
+                allow="autoplay"
+                title={publicActiveStream.title}
+              />
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
               <p className="text-sm text-gray-600">Type</p>
@@ -206,84 +272,184 @@ const ManageLiveStream = () => {
 
       {/* CREATE/EDIT FORM */}
       {view === 'create' && (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 mb-8">
           <h2 className="text-2xl font-bold mb-6">{editingId ? 'Edit Stream' : 'Create New Stream'}</h2>
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Stream Title"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              className="w-full border rounded px-3 py-2"
-              required
-            />
-            <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full border rounded px-3 py-2">
-              {streamTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border rounded px-3 py-2">
-              <option value="scheduled">Scheduled</option>
-              <option value="live">Live Now</option>
-              <option value="archived">Archived</option>
-            </select>
-            <div className="border rounded px-3 py-2 bg-gray-50">
-              <label className="flex items-center gap-2 cursor-pointer">
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Stream Title *</label>
+              <input
+                type="text"
+                placeholder="e.g., Sunday Morning Service"
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            {/* Type & Status */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Stream Type *</label>
+                <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {streamTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Status *</label>
+                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="scheduled">Scheduled</option>
+                  <option value="live">Live Now</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Description</label>
+              <textarea
+                placeholder="Brief description of the stream (optional)"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows="3"
+              />
+            </div>
+
+            {/* Date & Time */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Start Date & Time *</label>
+              <input
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData({...formData, startTime: e.target.value})}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            {/* URLs */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">YouTube URL</label>
+                <input
+                  type="url"
+                  placeholder="https://www.youtube.com/embed/VIDEO_ID"
+                  value={formData.youtubeUrl}
+                  onChange={(e) => setFormData({...formData, youtubeUrl: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Facebook URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://facebook.com/watch/..."
+                  value={formData.facebookUrl}
+                  onChange={(e) => setFormData({...formData, facebookUrl: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* PREACHERS SECTION */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Preachers</h3>
+                <button
+                  type="button"
+                  onClick={addPreacherField}
+                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+                >
+                  + Add Preacher
+                </button>
+              </div>
+              <div className="space-y-2">
+                {preacherInputs.map((preacher, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={`Preacher ${index + 1} name`}
+                      value={preacher}
+                      onChange={(e) => updatePreacher(index, e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {preacherInputs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePreacherField(index)}
+                        className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition font-semibold"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 mt-2">Add multiple preachers if they co-preached</p>
+            </div>
+
+            {/* SCRIPTURES SECTION */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Scripture References</h3>
+                <button
+                  type="button"
+                  onClick={addScriptureField}
+                  className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+                >
+                  + Add Scripture
+                </button>
+              </div>
+              <div className="space-y-2">
+                {scriptureInputs.map((scripture, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g., John 3:16 or Romans 12:1-5"
+                      value={scripture}
+                      onChange={(e) => updateScripture(index, e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    {scriptureInputs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeScriptureField(index)}
+                        className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition font-semibold"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 mt-2">Add main scriptures referenced in the sermon</p>
+            </div>
+
+            {/* Public Access Toggle */}
+            <div className="border border-gray-300 rounded-lg px-4 py-3 bg-gray-50">
+              <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.isPublic}
                   onChange={(e) => setFormData({...formData, isPublic: e.target.checked})}
                   className="w-4 h-4"
                 />
-                <span className="font-semibold text-gray-700">Public Access</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Public Access</span>
+                  <p className="text-xs text-gray-600">
+                    {formData.isPublic 
+                      ? 'Anyone can view this stream' 
+                      : 'Only registered members can view (coming soon)'}
+                  </p>
+                </div>
               </label>
-              <p className="text-xs text-gray-600 mt-1 ml-6">
-                {formData.isPublic 
-                  ? 'Anyone can view this stream' 
-                  : 'Only registered members can view (coming soon)'}
-              </p>
             </div>
-            <textarea
-              placeholder="Description (optional)"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              className="w-full border rounded px-3 py-2"
-              rows="3"
-            />
-            <input
-              type="datetime-local"
-              value={formData.startTime}
-              onChange={(e) => setFormData({...formData, startTime: e.target.value})}
-              className="w-full border rounded px-3 py-2"
-              required
-            />
-            <input
-              type="url"
-              placeholder="YouTube URL (embed or watch)"
-              value={formData.youtubeUrl}
-              onChange={(e) => setFormData({...formData, youtubeUrl: e.target.value})}
-              className="w-full border rounded px-3 py-2"
-            />
-            <input
-              type="url"
-              placeholder="Facebook URL (optional)"
-              value={formData.facebookUrl}
-              onChange={(e) => setFormData({...formData, facebookUrl: e.target.value})}
-              className="w-full border rounded px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Preacher Names (comma-separated, e.g., John Doe, Jane Smith)"
-              value={formData.preacherNames.join(', ')}
-              onChange={(e) => setFormData({...formData, preacherNames: e.target.value.split(',').map(p => p.trim()).filter(p => p)})}
-              className="w-full border rounded px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Scripture References (comma-separated, e.g., John 3:16, Romans 12:1)"
-              value={formData.scriptures.join(', ')}
-              onChange={(e) => setFormData({...formData, scriptures: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
-              className="w-full border rounded px-3 py-2"
-            />
-            <button onClick={handleCreateStream} className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
+
+            {/* Submit Button */}
+            <button onClick={handleCreateStream} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50" disabled={loading}>
               {loading ? 'Processing...' : editingId ? 'Update Stream' : 'Create Stream'}
             </button>
           </div>
@@ -305,7 +471,7 @@ const ManageLiveStream = () => {
               <option value="">All Types</option>
               {streamTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
-            <button onClick={() => setGridView(!gridView)} className="border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition">
+            <button onClick={() => setGridView(!gridView)} className="border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition font-semibold">
               {gridView ? 'List View' : 'Grid View'}
             </button>
           </div>
@@ -316,6 +482,19 @@ const ManageLiveStream = () => {
             <div className={gridView ? 'grid md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
               {filteredArchives.map(stream => (
                 <div key={stream._id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition p-5">
+                  {/* Video Preview */}
+                  {getEmbedUrl(stream) && (
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                      <iframe
+                        src={getEmbedUrl(stream)}
+                        className="w-full h-full"
+                        allowFullScreen
+                        allow="autoplay"
+                        title={stream.title}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between mb-3">
                     <span className="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full capitalize">
                       {stream.type.replace('_', ' ')}
@@ -367,19 +546,19 @@ const ManageLiveStream = () => {
           </div>
           
           <div className="grid md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
               <p className="text-sm text-gray-600 mb-1">Total Streams</p>
               <p className="text-3xl font-bold text-blue-700">{publicArchives.length}</p>
             </div>
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
+            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
               <p className="text-sm text-gray-600 mb-1">Live Now</p>
               <p className="text-3xl font-bold text-red-700">{publicArchives.filter(s => s.status === 'live').length}</p>
             </div>
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-4 border border-amber-200">
+            <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
               <p className="text-sm text-gray-600 mb-1">Scheduled</p>
               <p className="text-3xl font-bold text-amber-700">{publicArchives.filter(s => s.status === 'scheduled').length}</p>
             </div>
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+            <div className="bg-gray-100 rounded-lg p-4 border border-gray-300">
               <p className="text-sm text-gray-600 mb-1">Archived</p>
               <p className="text-3xl font-bold text-gray-700">{publicArchives.filter(s => s.status === 'archived').length}</p>
             </div>
@@ -390,13 +569,13 @@ const ManageLiveStream = () => {
             {publicArchives && publicArchives.length > 0 ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {publicArchives.slice(0, 6).map(stream => (
-                  <div key={stream._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onClick={() => { setView('archive'); setFilterType(stream.type); }}>
+                  <div key={stream._id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onClick={() => { setView('archive'); setFilterType(stream.type); }}>
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold text-gray-900 flex-1">{stream.title}</h4>
                       <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ml-2 ${
                         stream.status === 'live' ? 'bg-red-100 text-red-700' :
                         stream.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
-                        'bg-gray-100 text-gray-700'
+                        'bg-gray-200 text-gray-700'
                       }`}>
                         {stream.status}
                       </span>

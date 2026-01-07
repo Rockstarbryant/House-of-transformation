@@ -13,7 +13,7 @@
     "build": "echo 'Build complete'"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.24.0",
+    "@anthropic-ai/sdk": "^0.24.3",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.40.0",
     "cors": "^2.8.5",
@@ -31,7 +31,8 @@
     "multer": "^1.4.5-lts.1",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^6.10.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "youtube-transcript-api": "^3.0.6"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

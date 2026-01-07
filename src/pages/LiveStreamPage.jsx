@@ -8,6 +8,7 @@ const LiveStreamPage = () => {
   const [sortBy, setSortBy] = useState('-startTime');
   const [selectedStream, setSelectedStream] = useState(null);
   const [gridView, setGridView] = useState(true);
+  const [showCaptions, setShowCaptions] = useState(false);
 
   const streamTypes = [
     { value: '', label: 'All Livestreams' },
@@ -74,6 +75,7 @@ const LiveStreamPage = () => {
                   className="w-full h-full"
                   allowFullScreen
                   allow="autoplay"
+                  title={activeStream.title}
                 />
               </div>
             )}
@@ -236,6 +238,7 @@ const LiveStreamPage = () => {
                     className="w-full h-full"
                     allowFullScreen
                     allow="autoplay"
+                    title={selectedStream.title}
                   />
                 </div>
               )}
@@ -267,18 +270,37 @@ const LiveStreamPage = () => {
                   </div>
                 )}
 
-                {selectedStream.aiSummary?.summary && (
+                {selectedStream.aiSummary?.keyPoints && selectedStream.aiSummary.keyPoints.length > 0 && (
                   <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-                    <h3 className="text-sm font-semibold text-blue-900 mb-2">✨ AI Summary</h3>
-                    <p className="text-blue-900 mb-3">{selectedStream.aiSummary.summary}</p>
-                    {selectedStream.aiSummary.keyPoints?.length > 0 && (
-                      <div>
-                        <p className="font-semibold text-blue-900 text-sm mb-2">Key Points:</p>
-                        <ul className="list-disc list-inside text-blue-800 text-sm space-y-1">
-                          {selectedStream.aiSummary.keyPoints.map((point, idx) => (
-                            <li key={idx}>{point}</li>
-                          ))}
-                        </ul>
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">Key Points</h3>
+                    <ul className="list-disc list-inside text-blue-800 text-sm space-y-1">
+                      {selectedStream.aiSummary.keyPoints.map((point, idx) => (
+                        <li key={idx}>{point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedStream.aiSummary?.captions && selectedStream.aiSummary.captions.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-900">AI Captions</h3>
+                      <button
+                        onClick={() => setShowCaptions(!showCaptions)}
+                        className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition"
+                      >
+                        {showCaptions ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+
+                    {showCaptions && (
+                      <div className="bg-gray-100 rounded-lg p-4 max-h-48 overflow-y-auto text-sm">
+                        {selectedStream.aiSummary.captions.map((caption, idx) => (
+                          <div key={idx} className="mb-2 text-gray-800">
+                            <span className="font-semibold text-blue-600">[{caption.timestamp}] {caption.speaker}:</span>
+                            <p className="ml-4 text-gray-700">{caption.text}</p>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

@@ -75,11 +75,19 @@ const livestreamSchema = new mongoose.Schema({
 
   // AI Features
   aiSummary: {
-    summary: String,
-    keyPoints: [String],
-    generatedAt: Date,
-    aiModel: String
-  },
+  summary: String,
+  keyPoints: [String],
+  captions: [
+    {
+      timestamp: String,    // "00:05"
+      speaker: String,       // "Speaker 1"
+      text: String          // "What they said"
+    }
+  ],
+  speakerNotes: {},        // { "Speaker 1": "Summary...", ... }
+  generatedAt: Date,
+  aiModel: String
+},
 
   // Archive Info
   archivedAt: Date,
