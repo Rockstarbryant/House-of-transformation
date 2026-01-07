@@ -1,24 +1,23 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter with timeout and better config
+// SendGrid transporter
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  },
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-  socketTimeout: 10000
+    user: 'apikey', // This is literally the string 'apikey'
+    pass: process.env.SENDGRID_API_KEY
+  }
 });
 
-// Verify connection on startup
+// Verify connection
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email service error:', error.message);
-    console.error('Check: 1) App Password enabled 2) 2FA enabled 3) EMAIL_PASSWORD env set');
+    console.error('Check SENDGRID_API_KEY in environment variables');
   } else {
-    console.log('✓ Email service ready');
+    console.log('✓ SendGrid email service ready');
   }
 });
 
