@@ -130,15 +130,6 @@ const SermonCardText = ({ sermon }) => {
             <Share2 size={16} />
           </button>
         </div>
-
-        {/* View Full Sermon Button */}
-        <Link
-          to={`/sermons/${sermon._id}`}
-          className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all transform hover:-translate-y-0.5 group"
-        >
-          <span>View Full Sermon</span>
-          <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-        </Link>
       </div>
     </Card>
   );

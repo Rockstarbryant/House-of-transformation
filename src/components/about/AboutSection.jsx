@@ -24,8 +24,8 @@ const AboutSection = ({ preview = false }) => {
     // This is the version shown on the Homepage (short preview with Read More button)
     return (
       <section className="py-20 bg-white-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
+        <div className="max-w-full mx-auto px-4">
+          <div className="text-center mb-8">
             <h2 className="text-4xl md:text-5xl bg-red-900 font-bold text-slate-900 mb-4">About H.O.T</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Touching & transforming lives through the anointed gospel.
