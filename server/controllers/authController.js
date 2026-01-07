@@ -87,7 +87,7 @@ exports.verifyEmail = async (req, res) => {
     }
 
     // Mark email as verified
-    user.isEmailVerified = true;
+   // user.isEmailVerified = true;
     user.emailVerificationToken = null;
     user.emailVerificationExpiry = null;
     await user.save();

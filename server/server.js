@@ -11,6 +11,9 @@ require('./config/cloudinaryConfig');
 
 // Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+console.log('🔑 SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
+console.log('🔑 Key starts with SG.:', process.env.SENDGRID_API_KEY?.startsWith('SG.'));
+console.log('🔑 Key length:', process.env.SENDGRID_API_KEY?.length);
 
 // Connect to database
 connectDB();
