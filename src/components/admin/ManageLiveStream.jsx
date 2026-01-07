@@ -8,7 +8,8 @@ const ManageLiveStream = () => {
     loading, 
     error, 
     success, 
-    createStream, 
+    createStream,
+    updateStream,
     archiveStream, 
     deleteStream 
   } = useLivestreamAdmin();
@@ -51,11 +52,32 @@ const ManageLiveStream = () => {
 
   const handleCreateStream = async (e) => {
     e.preventDefault();
-    const result = await createStream(formData);
-    if (result.success) {
-      resetForm();
-      setView('manage');
-      publicFetchArchives({ type: filterType });
+    
+    if (editingId) {
+      // EDITING - only send changed fields
+      const result = await updateStream(editingId, {
+        title: formData.title,
+        type: formData.type,
+        status: formData.status,
+        youtubeUrl: formData.youtubeUrl,
+        facebookUrl: formData.facebookUrl,
+        preacherNames: formData.preacherNames,
+        scriptures: formData.scriptures,
+        description: formData.description
+      });
+      if (result.success) {
+        resetForm();
+        setView('manage');
+        publicFetchArchives({ type: filterType });
+      }
+    } else {
+      // CREATING - send all fields
+      const result = await createStream(formData);
+      if (result.success) {
+        resetForm();
+        setView('manage');
+        publicFetchArchives({ type: filterType });
+      }
     }
   };
 
