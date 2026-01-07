@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 
+// Resend transporter
 const transporter = nodemailer.createTransport({
   host: 'smtp.resend.com',
   port: 465,
@@ -10,9 +11,11 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Verify connection
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email service error:', error.message);
+    console.error('Check RESEND_API_KEY in environment variables');
   } else {
     console.log('✓ Resend email service ready');
   }
@@ -27,7 +30,7 @@ const emailService = {
       const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
       const mailOptions = {
-        from: `"House of Transformation" <${process.env.EMAIL_USER}>`,
+        from: 'House of Transformation <onboarding@resend.dev>',
         to: user.email,
         subject: 'Verify Your Email - House of Transformation',
         html: `
@@ -80,7 +83,7 @@ const emailService = {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
       const mailOptions = {
-        from: `"House of Transformation" <${process.env.EMAIL_USER}>`,
+        from: 'House of Transformation <onboarding@resend.dev>',
         to: user.email,
         subject: 'Reset Your Password - House of Transformation',
         html: `
