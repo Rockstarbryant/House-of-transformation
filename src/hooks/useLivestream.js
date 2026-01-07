@@ -3,6 +3,7 @@ import { livestreamService } from '../services/api/livestreamService';
 
 /**
  * Hook for public livestream operations (no auth required)
+ * Follows same pattern as eventService, feedbackService, etc
  */
 export const useLivestream = () => {
   const [activeStream, setActiveStream] = useState(null);
@@ -26,6 +27,7 @@ export const useLivestream = () => {
     } catch (err) {
       setError(err.message);
       console.error('Error fetching active stream:', err);
+      setActiveStream(null);
     } finally {
       setLoading(false);
     }
@@ -39,8 +41,8 @@ export const useLivestream = () => {
       const result = await livestreamService.getArchives(filters);
       
       if (result.success) {
-        setArchives(result.data);
-        setPagination(result.pagination);
+        setArchives(result.data || []);
+        setPagination(result.pagination || {});
       } else {
         setError(result.message);
         setArchives([]);
@@ -48,6 +50,7 @@ export const useLivestream = () => {
     } catch (err) {
       setError(err.message);
       console.error('Error fetching archives:', err);
+      setArchives([]);
     } finally {
       setLoading(false);
     }
@@ -78,8 +81,9 @@ export const useLivestream = () => {
   // Auto-fetch active stream on mount & setup refresh interval
   useEffect(() => {
     fetchActiveStream();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchActiveStream, 30000);
+    // Only refresh every 2 minutes to check if stream status changed
+    // Don't refresh too frequently to avoid blinking
+    const interval = setInterval(fetchActiveStream, 120000); // 2 minutes
     return () => clearInterval(interval);
   }, [fetchActiveStream]);
 
@@ -97,14 +101,13 @@ export const useLivestream = () => {
 
 /**
  * Hook for admin livestream operations (requires auth)
+ * Follows same pattern as event/feedback admin operations
  */
 export const useLivestreamAdmin = () => {
   const [streams, setStreams] = useState([]);
-  const [currentStream, setCurrentStream] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
 
   // Create new stream
   const createStream = useCallback(async (streamData) => {
@@ -117,7 +120,6 @@ export const useLivestreamAdmin = () => {
       
       if (result.success) {
         setSuccess(result.message);
-        setCurrentStream(result.data);
         return { success: true, data: result.data };
       } else {
         setError(result.message);
@@ -143,7 +145,6 @@ export const useLivestreamAdmin = () => {
       
       if (result.success) {
         setSuccess(result.message);
-        setCurrentStream(result.data);
         return { success: true, data: result.data };
       } else {
         setError(result.message);
@@ -169,7 +170,6 @@ export const useLivestreamAdmin = () => {
       
       if (result.success) {
         setSuccess(result.message);
-        setCurrentStream(result.data);
         return { success: true, data: result.data };
       } else {
         setError(result.message);
@@ -195,7 +195,6 @@ export const useLivestreamAdmin = () => {
       
       if (result.success) {
         setSuccess(result.message);
-        setCurrentStream(result.data);
         return { success: true, data: result.data };
       } else {
         setError(result.message);
@@ -245,7 +244,6 @@ export const useLivestreamAdmin = () => {
       const result = await livestreamService.getAnalytics(filters);
       
       if (result.success) {
-        setAnalytics(result.data);
         return { success: true, data: result.data };
       } else {
         setError(result.message);
@@ -273,11 +271,9 @@ export const useLivestreamAdmin = () => {
 
   return {
     streams,
-    currentStream,
     loading,
     error,
     success,
-    analytics,
     createStream,
     updateStream,
     archiveStream,
