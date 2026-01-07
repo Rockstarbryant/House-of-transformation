@@ -4,25 +4,17 @@ const Livestream = require('../models/livestreamModel');
 const { protect, authorize } = require('../middleware/auth');
 const asyncHandler = require('express-async-handler');
 
-// ===== MIDDLEWARE: Check if user is admin =====
-const requireRole = (role) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized - authentication required' 
-      });
-    }
-    
-    if (req.user.role !== role) {
-      return res.status(403).json({ 
-        success: false, 
-        message: `Forbidden - ${role} role required` 
-      });
-    }
-    
-    next();
-  };
+// ===== HELPER: Extract Video ID from URL =====
+const extractVideoId = (url, platform) => {
+  if (platform === 'youtube') {
+    const match = url.match(/(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)([^&\n?#]+)/);
+    return match ? match[1] : null;
+  }
+  if (platform === 'facebook') {
+    const match = url.match(/\/(\d+)/);
+    return match ? match[1] : null;
+  }
+  return null;
 };
 
 // ===== GET: Active/Live Stream (PUBLIC) =====
