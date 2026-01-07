@@ -7,6 +7,7 @@ export const livestreamService = {
    */
   async getActiveStream() {
     try {
+      console.log('Fetching active stream from: /livestreams/active'); // Debug
       const response = await api.get('/livestreams/active');
       return {
         success: true,
@@ -14,9 +15,10 @@ export const livestreamService = {
       };
     } catch (error) {
       if (error.response?.status === 404) {
+        console.log('No active stream found (404)');
         return { success: false, message: 'No active stream' };
       }
-      console.error('Error fetching active stream:', error);
+      console.error('Error fetching active stream:', error.response?.data || error.message);
       return {
         success: false,
         message: error.response?.data?.message || error.message
@@ -36,17 +38,23 @@ export const livestreamService = {
       if (filters.limit) params.append('limit', filters.limit);
       if (filters.skip) params.append('skip', filters.skip);
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      
+      // For admin: include scheduled and live. For public: only archived
+      if (filters.includeScheduled === true) {
+        params.append('includeScheduled', 'true');
+      }
 
-      const response = await api.get(
-        `/livestreams/archives${params.toString() ? '?' + params.toString() : ''}`
-      );
+      const url = `/livestreams/archives${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('Fetching archives from:', url); // Debug
+      
+      const response = await api.get(url);
       return {
         success: true,
-        data: response.data.data,
-        pagination: response.data.pagination
+        data: response.data.data || [],
+        pagination: response.data.pagination || {}
       };
     } catch (error) {
-      console.error('Error fetching archives:', error);
+      console.error('Error fetching archives:', error.response?.data || error.message);
       return {
         success: false,
         message: error.response?.data?.message || error.message,
