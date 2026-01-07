@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Save, Archive, Edit2, Trash2, Plus, Search, Filter, Grid3x3, List, Calendar, Users, BookOpen, CheckCircle, AlertCircle } from 'lucide-react';
+import { Play, Archive, Plus, Grid3x3, List, Calendar, Users, BookOpen, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLivestream, useLivestreamAdmin } from '../../hooks/useLivestream';
 
 const ManageLiveStream = () => {
   const { activeStream: publicActiveStream, archives: publicArchives, fetchArchives: publicFetchArchives } = useLivestream();
   const { 
-    currentStream, 
     loading, 
     error, 
     success, 
     createStream, 
-    updateStream, 
     archiveStream, 
     deleteStream 
   } = useLivestreamAdmin();
@@ -46,7 +44,8 @@ const ManageLiveStream = () => {
   useEffect(() => {
     publicFetchArchives({ 
       type: filterType, 
-      limit: 50 
+      limit: 50,
+      includeScheduled: true
     });
   }, [filterType, publicFetchArchives]);
 
@@ -310,15 +309,28 @@ const ManageLiveStream = () => {
       {view === 'manage' && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-          <p className="text-gray-600 mb-4">Total Archives: {publicArchives.length}</p>
+          <p className="text-gray-600 mb-4">Total Streams: {publicArchives.length} (Scheduled, Live, & Archived)</p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {publicArchives.slice(0, 6).map(stream => (
-              <div key={stream._id} className="border rounded p-3 hover:bg-gray-50 cursor-pointer" onClick={() => { setView('archive'); setFilterType(stream.type); }}>
-                <h4 className="font-bold text-sm mb-1">{stream.title}</h4>
-                <p className="text-xs text-gray-600 mb-2">{new Date(stream.startTime).toLocaleDateString()}</p>
-                <p className="text-xs text-blue-600">Filter by {stream.type}</p>
-              </div>
-            ))}
+            {publicArchives.length > 0 ? (
+              publicArchives.slice(0, 6).map(stream => (
+                <div key={stream._id} className="border rounded p-3 hover:bg-gray-50 cursor-pointer" onClick={() => { setView('archive'); setFilterType(stream.type); }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-bold text-sm">{stream.title}</h4>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      stream.status === 'live' ? 'bg-red-100 text-red-700' :
+                      stream.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {stream.status === 'live' ? '🔴 Live' : stream.status === 'scheduled' ? '📅 Scheduled' : '📦 Archived'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">{new Date(stream.startTime).toLocaleDateString()}</p>
+                  <p className="text-xs text-blue-600">Filter by {stream.type}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-sm col-span-3">No streams yet. Create one to get started!</p>
+            )}
           </div>
         </div>
       )}

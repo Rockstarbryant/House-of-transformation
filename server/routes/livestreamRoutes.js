@@ -32,9 +32,18 @@ router.get('/active', asyncHandler(async (req, res) => {
 
 // ===== GET: All Archives (PUBLIC) =====
 router.get('/archives', asyncHandler(async (req, res) => {
-  const { type, preacher, sortBy = '-startTime', limit = 20, skip = 0 } = req.query;
+  const { type, preacher, sortBy = '-startTime', limit = 20, skip = 0, includeScheduled } = req.query;
 
-  const filter = { status: 'archived', isPublic: true };
+  const filter = { isPublic: true };
+  
+  // If includeScheduled is true, show live + scheduled. Otherwise show only archived
+  if (!includeScheduled) {
+    filter.status = 'archived';
+  } else {
+    // Show archived AND live AND scheduled (exclude ended)
+    filter.status = { $in: ['archived', 'live', 'scheduled'] };
+  }
+  
   if (type) filter.type = type;
   if (preacher) filter.preachers = preacher;
 
