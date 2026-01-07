@@ -27,6 +27,7 @@ const ManageLiveStream = () => {
     youtubeUrl: '',
     facebookUrl: '',
     startTime: '',
+    status: 'scheduled',
     preachers: [],
     preacherNames: [],
     scriptures: [],
@@ -85,6 +86,7 @@ const ManageLiveStream = () => {
       youtubeUrl: stream.youtubeUrl || '',
       facebookUrl: stream.facebookUrl || '',
       startTime: new Date(stream.startTime).toISOString().slice(0, 16),
+      status: stream.status,
       preachers: stream.preachers,
       preacherNames: stream.preacherNames,
       scriptures: stream.scriptures,
@@ -101,6 +103,7 @@ const ManageLiveStream = () => {
       youtubeUrl: '',
       facebookUrl: '',
       startTime: '',
+      status: 'scheduled',
       preachers: [],
       preacherNames: [],
       scriptures: [],
@@ -191,6 +194,11 @@ const ManageLiveStream = () => {
             />
             <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full border rounded px-3 py-2">
               {streamTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border rounded px-3 py-2">
+              <option value="scheduled">📅 Scheduled</option>
+              <option value="live">🔴 Live Now</option>
+              <option value="archived">📦 Archived</option>
             </select>
             <textarea
               placeholder="Description (optional)"
