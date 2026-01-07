@@ -86,7 +86,7 @@ const HomePage = () => {
 
       {/* ✅ UPDATED: Latest Sermon Section - Shows 1 Card Only */}
       <section className="py-16 md:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-full mx-auto px-4 md:px-6">
           {/* Section Header */}
           <div className="mb-12 md:mb-16">
             <div className="flex items-center gap-3 mb-4">
@@ -137,7 +137,7 @@ const HomePage = () => {
 
       {/* Upcoming Events Section */}
       <section className="py-16 md:py-24 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-full mx-auto px-4 md:px-6">
           <div className="mb-12 md:mb-16">
             <span className="inline-block px-4 py-2 bg-orange-100 text-orange-800 rounded-full text-sm font-bold mb-4 uppercase tracking-widest">
               What's Happening
@@ -155,7 +155,7 @@ const HomePage = () => {
 
       {/* Ministries Section */}
       <section className="py-16 md:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-full mx-auto px-4 md:px-6">
           <div className="mb-12 md:mb-16">
             <span className="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-bold mb-4 uppercase tracking-widest">
               Get Connected

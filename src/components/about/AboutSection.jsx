@@ -35,15 +35,15 @@ const AboutSection = ({ preview = false }) => {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1 space-y-6">
               <h3 className="text-3xl font-bold text-red-900">Welcome to House of Transformation (H.O.T)</h3>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 House of Transformation Ministries (H.O.T) is a vibrant community in Busia County, Kenya, where the transformative Gospel of the Kingdom of God is preached with power, and lives are genuinely changed spiritually, physically, and communally.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 As a ministry extending from our roots in Nairobi, we are committed to creating a welcoming space for worship, fellowship, healing, and growth for people from all walks of life.
               </p>
-
+              <div className="mt-12"> </div>
               <Link to="/about">
-                <Button variant="secondary" size="lg">
+                <Button variant="secondary" size="sm">
                   Learn More About Us
                 </Button>
               </Link>
@@ -84,10 +84,10 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Welcome to H.O.T</h2>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               House of Transformation Ministries (H.O.T) is a dynamic community located in Busia County, Kenya. We are a ministry outreach with deep roots in Nairobi, dedicated to preaching the powerful Gospel of the Kingdom of God and seeing real transformation in people's lives.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               Founded on faith, hope, and love, we create a welcoming environment where everyone – whether a longtime believer or someone new to faith – can encounter God, experience healing, and grow spiritually. Our Busia Main Campus is a beacon of hope, fostering vibrant worship, deep fellowship, and active service.
             </p>
           </div>
@@ -111,10 +111,10 @@ const AboutSection = ({ preview = false }) => {
           </div>
           <div className="space-y-6 order-1 md:order-2">
             <h2 className="text-4xl font-bold text-slate-900">Our Mission</h2>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               To preach the transformative Gospel of the Kingdom of God, changing lives spiritually and physically.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               We believe in a Gospel that actively restores relationships, heals wounds, and empowers people to live with purpose. Through teaching, outreach, and community initiatives in Busia and beyond, we address every aspect of life – helping people overcome challenges and overcome their God-given destiny.
             </p>
           </div>
@@ -124,10 +124,10 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Our Vision</h2>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               A global movement of transformation, starting from Busia and Nairobi, reaching all of Kenya, Africa, and the world.
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               We envision societies built on justice, compassion, and faith, where every person experiences the life-changing power of Jesus Christ. From our local hub in Busia, we aim to plant ministries worldwide, uniting people in worship, learning, and service.
             </p>
           </div>
@@ -188,10 +188,10 @@ const AboutSection = ({ preview = false }) => {
             </div>
             <div className="space-y-6 order-1 md:order-2">
               <h3 className="text-3xl font-bold text-slate-900">The Birth of H.O.T in Nairobi</h3>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 Founded around 1989 as Nairobi Gospel Assembly Church, House of Transformation Ministries began as a place of vibrant worship and community outreach in Nairobi, Kenya. Over the years, it grew into a powerful ministry focused on spiritual renewal and holistic change.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 Under visionary leadership, the church rebranded to House of Transformation (H.O.T.) to emphasize its mission of preaching the Kingdom Gospel and transforming lives across all spheres. Celebrating over 36 years of ministry, we've witnessed countless stories of faith, healing, and growth.
               </p>
             </div>
@@ -201,10 +201,10 @@ const AboutSection = ({ preview = false }) => {
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-6">
               <h3 className="text-3xl font-bold text-slate-900">Expansion to Busia: A Beacon in the West</h3>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 As the ministry expanded beyond Nairobi, the Busia Main Campus was established as a key outreach in western Kenya. This branch addresses the unique needs of Busia County's diverse communities, including the Luhya and Iteso people, amid challenges like cross-border trade and local development.
               </p>
-              <p className="text-lg text-gray-700 leading-relaxed text-justify">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 Though exact founding details are rooted in the church's growth phase post-rebranding, Busia has become a thriving hub for powerful services, youth empowerment, and community transformation. It's a testament to our commitment to spreading the Gospel nationwide.
               </p>
             </div>
@@ -233,7 +233,9 @@ const AboutSection = ({ preview = false }) => {
               />
               <h3 className="text-2xl font-bold text-slate-900">Apostle Aloys A. Rutivi</h3>
               <p className="text-gray-600">Founding Pastor & Visionary Leader</p>
-              <p className="text-lg text-gray-700">Instrumental in shaping H.O.T.'s direction with a focus on mentorship, discipleship, and Kingdom principles.</p>
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
+                Instrumental in shaping H.O.T.'s direction with a focus on mentorship, discipleship, and Kingdom principles.
+              </p>
             </Card>
             
             <Card className="text-center space-y-4">
@@ -244,7 +246,9 @@ const AboutSection = ({ preview = false }) => {
               />
               <h3 className="text-2xl font-bold text-slate-900">Lavern Rutivi</h3>
               <p className="text-gray-600">Worship & Outreach Coordinator</p>
-              <p className="text-lg text-gray-700">Leads dynamic worship experiences and community initiatives, inspiring transformation through music and service.</p>
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
+                Leads dynamic worship experiences and community initiatives, inspiring transformation through music and service.
+              </p>
             </Card>
             
             <Card className="text-center space-y-4">
@@ -255,7 +259,9 @@ const AboutSection = ({ preview = false }) => {
               />
               <h3 className="text-2xl font-bold text-slate-900">Our Dedicated Team</h3>
               <p className="text-gray-600">Pastors, Volunteers & Departments</p>
-              <p className="text-lg text-gray-700">From worship to youth and administration, our team works unitedly to fulfill our mission across Nairobi and Busia.</p>
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
+                From worship to youth and administration, our team works unitedly to fulfill our mission across Nairobi and Busia.
+              </p>
             </Card>
           </div>
         </div>
@@ -264,7 +270,7 @@ const AboutSection = ({ preview = false }) => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-900">Community Impact & Outreach</h2>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
+            <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
               At H.O.T., transformation extends beyond our walls. We're committed to serving Busia, Nairobi, and beyond through practical actions that address real needs.
             </p>
             <ul className="space-y-6 text-lg text-gray-700 text-justify">
@@ -310,7 +316,7 @@ const AboutSection = ({ preview = false }) => {
             Sunday Services: 9:00 AM • 11:00 AM • 1:00 PM<br />
             Busia Main Campus, Busia County, Kenya
           </p>
-          <p className="text-lg text-gray-700 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify max-w-3xl mx-auto">
             Whether you're in Busia, Nairobi, or watching online, we welcome you with open arms. Come experience the power of transformed lives!
           </p>
           <Button variant="secondary" size="lg">

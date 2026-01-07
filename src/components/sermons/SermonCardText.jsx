@@ -25,7 +25,7 @@ const SermonCardText = ({ sermon }) => {
     const fragmentUrl = sermon._id ? `${baseUrl}#sermon-${sermon._id}` : baseUrl;
 
     const title = sermon.title || 'Inspiring Sermon';
-    const text = `Listen to "${title}" by ${sermon.pastor || 'Pastor'} at Busia House of Triumph`;
+    const text = `Check out this sermon "${title}" by ${sermon.pastor || 'Pastor'} at Busia House of Transformatiion`;
 
     if (navigator.share) {
       navigator.share({
