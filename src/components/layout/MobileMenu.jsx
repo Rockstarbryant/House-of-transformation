@@ -20,6 +20,7 @@ const MobileMenu = ({
 
   const dropdownLinks = [
     { path: '/sermons', label: 'Sermons' },
+    { path: '/Livestream', label: 'Past Livestreams' },
     { path: '/events', label: 'Events' },
     { path: '/gallery', label: 'Gallery' },
     { path: '/blog', label: 'blogs' }

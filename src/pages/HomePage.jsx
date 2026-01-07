@@ -70,6 +70,9 @@ const HomePage = () => {
     <div className="home-page bg-white-200">
       {/* Hero Section */}
       <HeroSection />
+
+       {/* Live Stream Section */}
+      <LiveStreamSection />
       
       {/* Quick Info Bar */}
       <QuickInfoBar />
@@ -80,9 +83,6 @@ const HomePage = () => {
           <AboutSection preview />
         </div>
       </section>
-
-      {/* Live Stream Section */}
-      <LiveStreamSection />
 
       {/* ✅ UPDATED: Latest Sermon Section - Shows 1 Card Only */}
       <section className="py-16 md:py-24 bg-white">
