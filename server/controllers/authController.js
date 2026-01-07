@@ -13,6 +13,8 @@ const generateToken = (id) => {
 // @desc    Register user
 // @route   POST /api/auth/signup
 // @access  Public
+// Replace the signup function in authController.js with this:
+
 exports.signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -30,15 +32,8 @@ exports.signup = async (req, res) => {
     const verificationToken = user.generateEmailVerificationToken();
     await user.save({ validateBeforeSave: false });
 
-    // Send verification email
-    try {
-      await emailService.sendVerificationEmail(user, verificationToken);
-    } catch (error) {
-      console.error('Error sending verification email:', error);
-      // Don't fail signup if email fails, but log it
-    }
-
-    res.status(201).json({
+    // Send response immediately - don't wait for email
+    const response = {
       success: true,
       message: 'Signup successful! Please check your email to verify your account.',
       user: {
@@ -49,7 +44,17 @@ exports.signup = async (req, res) => {
         isEmailVerified: user.isEmailVerified
       },
       token: generateToken(user._id)
-    });
+    };
+
+    res.status(201).json(response);
+
+    // Send email asynchronously (after response)
+    emailService.sendVerificationEmail(user, verificationToken)
+      .catch(error => {
+        console.error('Error sending verification email:', error);
+        // Log to monitoring service in production
+      });
+
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

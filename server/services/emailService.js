@@ -1,18 +1,22 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter
+// Create transporter with timeout and better config
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
-  }
+  },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
-// Verify connection
+// Verify connection on startup
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email service error:', error.message);
+    console.error('Check: 1) App Password enabled 2) 2FA enabled 3) EMAIL_PASSWORD env set');
   } else {
     console.log('✓ Email service ready');
   }
@@ -27,7 +31,7 @@ const emailService = {
       const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
       const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"House of Transformation" <${process.env.EMAIL_USER}>`,
         to: user.email,
         subject: 'Verify Your Email - House of Transformation',
         html: `
@@ -67,7 +71,7 @@ const emailService = {
       console.log(`✓ Verification email sent to ${user.email}`);
       return true;
     } catch (error) {
-      console.error('Error sending verification email:', error);
+      console.error('❌ Verification email failed:', error.message);
       throw error;
     }
   },
@@ -80,7 +84,7 @@ const emailService = {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
       const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"House of Transformation" <${process.env.EMAIL_USER}>`,
         to: user.email,
         subject: 'Reset Your Password - House of Transformation',
         html: `
@@ -122,7 +126,7 @@ const emailService = {
       console.log(`✓ Password reset email sent to ${user.email}`);
       return true;
     } catch (error) {
-      console.error('Error sending password reset email:', error);
+      console.error('❌ Password reset email failed:', error.message);
       throw error;
     }
   }
