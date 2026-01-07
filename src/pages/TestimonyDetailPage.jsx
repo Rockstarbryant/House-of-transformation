@@ -203,7 +203,7 @@ const TestimonyDetailPage = () => {
           {/* Story Content */}
           <div className="p-8 md:p-12">
             <div className="prose prose-lg max-w-none">
-              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light">
+              <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-wrap font-light text-justify">
                 {testimony.feedbackData?.story || 'No story content available.'}
               </p>
             </div>

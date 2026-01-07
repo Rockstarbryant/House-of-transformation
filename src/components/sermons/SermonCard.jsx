@@ -234,7 +234,7 @@ const SermonCard = ({ sermon }) => {
           {/* HTML Content (Text + Images) */}
           <div className="px-5 flex-grow mb-4">
             <div
-              className={`prose prose-sm max-w-none text-gray-800 transition-all duration-300 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_img]:border [&_img]:border-gray-200 [&_p]:text-gray-800 [&_strong]:font-bold [&_em]:italic ${
+              className={`prose prose-lg max-w-none text-gray-800 transition-all duration-300 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_img]:border [&_img]:border-gray-200 [&_p]:leading-relaxed [&_p]:whitespace-pre-wrap [&_p]:font-light [&_p]:text-justify [&_p]:text-xl ${
                 expanded ? '' : 'max-h-60 overflow-hidden'
               }`}
               dangerouslySetInnerHTML={{ __html: sanitizedHtml }}

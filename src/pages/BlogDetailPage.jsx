@@ -126,7 +126,7 @@ const BlogDetailPage = () => {
           >
             <ArrowLeft size={20} /> Back to Blog
           </button>
-          <Card className="p-12 text-center">
+          <Card className="p-12 text-justify">
             <AlertCircle className="mx-auto text-red-500 mb-4" size={64} />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Blog Post</h2>
             <p className="text-gray-600 mb-6">{error}</p>
@@ -152,7 +152,7 @@ const BlogDetailPage = () => {
           >
             <ArrowLeft size={20} /> Back to Blog
           </button>
-          <Card className="p-12 text-center">
+          <Card className="p-12 text-justify">
             <AlertCircle className="mx-auto text-gray-400 mb-4" size={64} />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Blog Post Not Found</h2>
             <p className="text-gray-600">This blog post no longer exists or has been removed.</p>
@@ -308,7 +308,7 @@ const BlogDetailPage = () => {
             {/* Body Content */}
             <div className="prose prose-lg max-w-none mb-12">
               {post.content ? (
-                <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-lg">
+                <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-lg text-justify">
                   {post.content}
                 </div>
               ) : (
@@ -335,7 +335,7 @@ const BlogDetailPage = () => {
             </div>
 
             {/* CTA Section */}
-            <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white rounded-2xl p-8 text-center mb-8">
+            <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white rounded-2xl p-8 text-justify mb-8">
               <h3 className="text-2xl font-bold mb-3">Found this helpful?</h3>
               <p className="text-blue-100 mb-6">Share this post with your community or read more on our blog.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
