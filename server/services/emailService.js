@@ -1,23 +1,20 @@
 const nodemailer = require('nodemailer');
 
-// SendGrid transporter
 const transporter = nodemailer.createTransport({
-  host: 'smtp.sendgrid.net',
-  port: 587,
-  secure: false,
+  host: 'smtp.resend.com',
+  port: 465,
+  secure: true,
   auth: {
-    user: 'apikey', // This is literally the string 'apikey'
-    pass: process.env.SENDGRID_API_KEY
+    user: 'resend',
+    pass: process.env.RESEND_API_KEY
   }
 });
 
-// Verify connection
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email service error:', error.message);
-    console.error('Check SENDGRID_API_KEY in environment variables');
   } else {
-    console.log('✓ SendGrid email service ready');
+    console.log('✓ Resend email service ready');
   }
 });
 
