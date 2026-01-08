@@ -3,8 +3,12 @@ import Input from '../common/Input';
 import Button from '../common/Button';
 import { useAuthContext } from '../../context/AuthContext';
 import { Loader } from 'lucide-react';
+import { volunteerService } from '../../services/api/volunteerService';
 
-const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
+// eslint-disable-next-line no-unused-vars
+
+// eslint-disable-next-line no-unused-vars
+const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting, onApplicationExists }) => {
   const { user } = useAuthContext();
   
   const [formData, setFormData] = useState({
@@ -19,6 +23,9 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [editingApplicationId, setEditingApplicationId] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [editTimeRemaining, setEditTimeRemaining] = useState(null);
 
   // Auto-fill user data if logged in
   useEffect(() => {
@@ -36,6 +43,38 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
       }));
     }
   }, [user, ministry]);
+
+  // Check for existing applications on mount
+  useEffect(() => {
+    if (user) {
+      const checkExistingApplication = async () => {
+        try {
+          const response = await volunteerService.checkExistingApplication();
+          
+          if (response.hasApplication) {
+            setEditingApplicationId(response.application.id);
+            
+            if (response.application.isEditable) {
+              // Calculate time remaining for editing
+              const appliedAt = new Date(response.application.appliedAt);
+              const editableUntil = new Date(appliedAt.getTime() + 3 * 60 * 60 * 1000);
+              const now = new Date();
+              const timeRemaining = Math.max(0, editableUntil - now);
+              setEditTimeRemaining(timeRemaining);
+            }
+            
+            if (onApplicationExists) {
+              onApplicationExists(response.application);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking existing application:', error);
+        }
+      };
+
+      checkExistingApplication();
+    }
+  }, [user, onApplicationExists]);
 
   // If user is not authenticated, show message
   if (!user) {
@@ -110,7 +149,13 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
     e.preventDefault();
     
     if (validateForm()) {
-      await onSubmit(formData);
+      if (editingApplicationId) {
+        // Edit existing application
+        await onSubmit(formData, editingApplicationId, true);
+      } else {
+        // Submit new application
+        await onSubmit(formData);
+      }
     }
   };
 
@@ -122,8 +167,32 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
     'Community Outreach'
   ];
 
+  const formatTimeRemaining = (ms) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5 bg-brown-100">
+      {/* Edit Mode Notice */}
+      {editingApplicationId && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-900 font-semibold mb-2">Editing Your Application</p>
+          <p className="text-blue-800 text-sm mb-2">
+            You can edit your application one time within 3 hours of submission.
+            {editTimeRemaining && (
+              <span className="font-semibold">
+                {' '}Time remaining: {formatTimeRemaining(editTimeRemaining)}
+              </span>
+            )}
+          </p>
+          <p className="text-blue-700 text-xs">
+            After editing, no further changes will be allowed.
+          </p>
+        </div>
+      )}
+
       {/* Required Fields Section */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
@@ -154,11 +223,12 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
             onChange={handleChange}
             required
             placeholder="your.email@example.com"
-            disabled={isSubmitting}
+            disabled={isSubmitting || true}  // Disabled - cannot change email
           />
           {errors.email && (
             <p className="text-red-600 text-sm mt-1">{errors.email}</p>
           )}
+          <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
         </div>
 
         <div>
@@ -192,7 +262,7 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
             value={formData.ministry}
             onChange={handleChange}
             required
-            disabled={isSubmitting || !!ministry}
+            disabled={isSubmitting || (editingApplicationId && !!ministry)}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
             <option value="">Select a ministry</option>
@@ -306,10 +376,10 @@ const ApplicationForm = ({ ministry, onSubmit, onClose, isSubmitting }) => {
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
               <Loader className="animate-spin" size={20} />
-              Submitting...
+              {editingApplicationId ? 'Updating...' : 'Submitting...'}
             </span>
           ) : (
-            'Submit Application'
+            editingApplicationId ? 'Update Application' : 'Submit Application'
           )}
         </Button>
       </div>

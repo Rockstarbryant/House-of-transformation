@@ -1,7 +1,9 @@
 const express = require('express');
 const {
   getOpportunities,
+  checkExistingApplication,
   apply,
+  editApplication,
   getProfile,
   getMyApplications,
   getAllApplications,
@@ -18,7 +20,9 @@ const router = express.Router();
 router.get('/opportunities', getOpportunities);
 
 // ===== PROTECTED ROUTES (AUTH REQUIRED) =====
+router.get('/check-application', protect, checkExistingApplication);
 router.post('/apply', protect, apply);
+router.put('/:id/edit', protect, editApplication);
 router.get('/profile', protect, getProfile);
 router.get('/my-applications', protect, getMyApplications);
 

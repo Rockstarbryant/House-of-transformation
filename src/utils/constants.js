@@ -73,7 +73,9 @@ export const API_ENDPOINTS = {
   },
   VOLUNTEERS: {
     OPPORTUNITIES: '/volunteers/opportunities',
+    CHECK_APPLICATION: '/volunteers/check-application',
     APPLY: '/volunteers/apply',
+    EDIT_APPLICATION: (id) => `/volunteers/${id}/edit`,
     PROFILE: '/volunteers/profile',
     MY_APPLICATIONS: '/volunteers/my-applications',
     ALL_APPLICATIONS: '/volunteers/applications',

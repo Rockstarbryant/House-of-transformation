@@ -9,6 +9,8 @@ const ServiceAreaCard = ({ name, description, imageUrl, teamCount, timeCommitmen
 
   return (
     <Card hover className="flex flex-col h-full group overflow-hidden">
+      {/* Header */}
+      <h3 className="text-2xl font-bold text-blue-900 mb-2">{name}</h3>
       {/* Image Section */}
       <div className="w-full h-48 mb-4 rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
         {imageUrl ? (
@@ -29,7 +31,6 @@ const ServiceAreaCard = ({ name, description, imageUrl, teamCount, timeCommitmen
       </div>
 
       {/* Content */}
-      <h3 className="text-2xl font-bold text-blue-900 mb-2">{name}</h3>
       <p className="text-gray-600 mb-6 flex-grow text-sm leading-relaxed">{description}</p>
 
       {/* Meta Information */}

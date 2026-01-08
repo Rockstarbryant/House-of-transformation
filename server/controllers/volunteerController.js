@@ -1,13 +1,20 @@
 const Volunteer = require('../models/Volunteer');
 const User = require('../models/User');
 
+// Helper function to get client IP
+const getClientIp = (req) => {
+  return req.ip || 
+         req.connection.remoteAddress || 
+         req.socket.remoteAddress || 
+         req.connection.socket?.remoteAddress ||
+         'unknown';
+};
+
 // @desc    Get volunteer opportunities
 // @route   GET /api/volunteers/opportunities
 // @access  Public
 exports.getOpportunities = async (req, res) => {
   try {
-    // In a real app, you might have an Opportunity model
-    // For now, return static data that matches your frontend
     const opportunities = [
       {
         id: 1,
@@ -60,6 +67,46 @@ exports.getOpportunities = async (req, res) => {
   }
 };
 
+// @desc    Check if user has active application
+// @route   GET /api/volunteers/check-application
+// @access  Private
+exports.checkExistingApplication = async (req, res) => {
+  try {
+    // Check for any active applications (pending, approved, or interviewing)
+    const existingApplication = await Volunteer.findOne({
+      email: req.user.email,
+      status: { $in: ['pending', 'approved', 'interviewing'] }
+    });
+
+    if (existingApplication) {
+      return res.json({
+        success: true,
+        hasApplication: true,
+        application: {
+          id: existingApplication._id,
+          ministry: existingApplication.ministry,
+          status: existingApplication.status,
+          appliedAt: existingApplication.appliedAt,
+          isEditable: existingApplication.isEditable(),
+          canChangeRole: existingApplication.isEditable() // Can only change if still editable
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      hasApplication: false
+    });
+  } catch (error) {
+    console.error('Check application error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check application status',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Submit volunteer application
 // @route   POST /api/volunteers/apply
 // @access  Private
@@ -84,17 +131,48 @@ exports.apply = async (req, res) => {
       });
     }
 
-    // Check if user already applied for this ministry
-    const existingApplication = await Volunteer.findOne({
-      user: req.user.id,
-      ministry: ministry,
+    // Get client IP
+    const ipAddress = getClientIp(req);
+
+    // CHECK 1: Email-based restriction (active applications)
+    const existingApplicationByEmail = await Volunteer.findOne({
+      email: email.toLowerCase(),
       status: { $in: ['pending', 'approved', 'interviewing'] }
     });
 
-    if (existingApplication) {
+    if (existingApplicationByEmail) {
       return res.status(400).json({
         success: false,
-        message: 'You already have an active application for this ministry'
+        message: 'Application already received',
+        code: 'DUPLICATE_APPLICATION',
+        existingApplication: {
+          id: existingApplicationByEmail._id,
+          ministry: existingApplicationByEmail.ministry,
+          status: existingApplicationByEmail.status,
+          appliedAt: existingApplicationByEmail.appliedAt,
+          isEditable: existingApplicationByEmail.isEditable(),
+          canChangeRole: existingApplicationByEmail.isEditable()
+        }
+      });
+    }
+
+    // CHECK 2: IP-based restriction (security measure)
+    const existingApplicationByIP = await Volunteer.findOne({
+      ipAddress: ipAddress,
+      status: { $in: ['pending', 'approved', 'interviewing'] }
+    });
+
+    if (existingApplicationByIP) {
+      return res.status(400).json({
+        success: false,
+        message: 'An application from this network has already been submitted',
+        code: 'IP_RESTRICTION',
+        existingApplication: {
+          id: existingApplicationByIP._id,
+          ministry: existingApplicationByIP.ministry,
+          status: existingApplicationByIP.status,
+          appliedAt: existingApplicationByIP.appliedAt
+        }
       });
     }
 
@@ -102,13 +180,14 @@ exports.apply = async (req, res) => {
     const application = await Volunteer.create({
       user: req.user.id,
       fullName,
-      email,
+      email: email.toLowerCase(),
       phone,
       ministry,
       availability,
       motivation,
       previousExperience: previousExperience || '',
       skills: skills || '',
+      ipAddress: ipAddress,
       status: 'pending'
     });
 
@@ -118,7 +197,14 @@ exports.apply = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Application submitted successfully! We will review it and get back to you soon.',
-      application
+      application: {
+        id: application._id,
+        ministry: application.ministry,
+        status: application.status,
+        appliedAt: application.appliedAt,
+        isEditable: application.isEditable(),
+        editableUntil: new Date(application.appliedAt.getTime() + 3 * 60 * 60 * 1000)
+      }
     });
   } catch (error) {
     console.error('Application error:', error);
@@ -130,20 +216,86 @@ exports.apply = async (req, res) => {
   }
 };
 
+// @desc    Edit existing volunteer application (one-time within 3 hours)
+// @route   PUT /api/volunteers/:id/edit
+// @access  Private
+exports.editApplication = async (req, res) => {
+  try {
+    const { ministry, availability, motivation, previousExperience, skills } = req.body;
+
+    const application = await Volunteer.findById(req.params.id);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+
+    // Verify user owns this application
+    if (application.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to edit this application'
+      });
+    }
+
+    // Check if application is still editable
+    if (!application.isEditable()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Application can no longer be edited',
+        code: 'EDIT_WINDOW_CLOSED',
+        reason: application.editCount > 0 
+          ? 'You have already edited this application once'
+          : 'More than 3 hours have passed since application submission'
+      });
+    }
+
+    // Update application
+    application.ministry = ministry;
+    application.availability = availability;
+    application.motivation = motivation;
+    application.previousExperience = previousExperience || '';
+    application.skills = skills || '';
+
+    // Lock editing after this edit
+    await application.lockEditing();
+
+    res.json({
+      success: true,
+      message: 'Application updated successfully. No further changes allowed.',
+      application: {
+        id: application._id,
+        ministry: application.ministry,
+        status: application.status,
+        appliedAt: application.appliedAt,
+        editedAt: application.lastEditedAt,
+        isEditable: false,
+        editLockedAt: application.editLockedAt
+      }
+    });
+  } catch (error) {
+    console.error('Edit application error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to edit application',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Get volunteer profile
 // @route   GET /api/volunteers/profile
 // @access  Private
 exports.getProfile = async (req, res) => {
   try {
-    // Get all applications for this user
     const applications = await Volunteer.find({ user: req.user.id });
     
-    // Calculate stats
     const approvedApplications = applications.filter(app => app.status === 'approved');
     const totalHours = approvedApplications.reduce((sum, app) => sum + (app.hours || 0), 0);
     const activeMinistries = [...new Set(approvedApplications.map(app => app.ministry))];
 
-    // Determine volunteer level based on hours
     let level = 'Starter';
     if (totalHours > 100) {
       level = 'Legend';
@@ -180,9 +332,15 @@ exports.getMyApplications = async (req, res) => {
     const applications = await Volunteer.find({ user: req.user.id })
       .sort({ appliedAt: -1 });
 
+    const applicationsWithMetadata = applications.map(app => ({
+      ...app.toObject(),
+      isEditable: app.isEditable(),
+      editableUntil: new Date(app.appliedAt.getTime() + 3 * 60 * 60 * 1000)
+    }));
+
     res.json({
       success: true,
-      applications
+      applications: applicationsWithMetadata
     });
   } catch (error) {
     res.status(500).json({
@@ -255,7 +413,6 @@ exports.updateStatus = async (req, res) => {
       });
     }
 
-    // If approved, you might want to update the user's role
     if (status === 'approved') {
       const user = await User.findById(application.user._id);
       if (user && user.role === 'member') {
@@ -351,21 +508,18 @@ exports.getStats = async (req, res) => {
     const pendingApplications = await Volunteer.countDocuments({ status: 'pending' });
     const approvedVolunteers = await Volunteer.countDocuments({ status: 'approved' });
     
-    // Get total hours - handle empty result
     const totalHoursResult = await Volunteer.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: null, total: { $sum: '$hours' } } }
     ]);
     const totalHours = totalHoursResult.length > 0 ? totalHoursResult[0].total : 0;
 
-    // Get ministry breakdown
     const ministryBreakdown = await Volunteer.aggregate([
       { $match: { status: 'approved' } },
       { $group: { _id: '$ministry', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
-    // Log for debugging
     console.log('Volunteer Stats:', {
       totalApplications,
       pendingApplications,

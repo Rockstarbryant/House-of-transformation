@@ -13,6 +13,17 @@ export const volunteerService = {
     }
   },
 
+  // Check if user has existing application
+  async checkExistingApplication() {
+    try {
+      const response = await api.get(API_ENDPOINTS.VOLUNTEERS.CHECK_APPLICATION);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking application:', error);
+      throw error;
+    }
+  },
+
   // Submit volunteer application
   async apply(applicationData) {
     try {
@@ -20,6 +31,20 @@ export const volunteerService = {
       return response.data;
     } catch (error) {
       console.error('Error submitting application:', error);
+      throw error;
+    }
+  },
+
+  // Edit existing application (one-time within 3 hours)
+  async editApplication(applicationId, applicationData) {
+    try {
+      const response = await api.put(
+        API_ENDPOINTS.VOLUNTEERS.EDIT_APPLICATION(applicationId),
+        applicationData
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error editing application:', error);
       throw error;
     }
   },

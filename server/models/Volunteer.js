@@ -16,12 +16,20 @@ const volunteerSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    index: true  // Index for faster lookups
   },
   phone: {
     type: String,
     required: true,
     trim: true
+  },
+  
+  // IP Address for additional security
+  ipAddress: {
+    type: String,
+    required: true,
+    index: true
   },
   
   // Ministry Information
@@ -76,7 +84,8 @@ const volunteerSchema = new mongoose.Schema({
   // Tracking
   appliedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   },
   reviewedAt: {
     type: Date
@@ -84,6 +93,22 @@ const volunteerSchema = new mongoose.Schema({
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  
+  // Edit Tracking
+  editCount: {
+    type: Number,
+    default: 0
+  },
+  lastEditedAt: {
+    type: Date
+  },
+  canEdit: {
+    type: Boolean,
+    default: true
+  },
+  editLockedAt: {
+    type: Date  // Timestamp when editing was locked
   },
   
   // If approved
@@ -102,9 +127,29 @@ const volunteerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-volunteerSchema.index({ user: 1, ministry: 1 });
+// Indexes for faster queries
+volunteerSchema.index({ user: 1 });
+volunteerSchema.index({ email: 1 });
+volunteerSchema.index({ ipAddress: 1 });
 volunteerSchema.index({ status: 1 });
 volunteerSchema.index({ appliedAt: -1 });
+volunteerSchema.index({ email: 1, status: 1 });  // For checking active applications
+
+// Middleware to check if application is editable
+volunteerSchema.methods.isEditable = function() {
+  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  
+  // Can only edit if: within 3 hours AND haven't edited yet (editCount = 0)
+  return this.appliedAt > threeHoursAgo && this.editCount === 0;
+};
+
+// Middleware to lock editing after 3 hours or after edit
+volunteerSchema.methods.lockEditing = function() {
+  this.canEdit = false;
+  this.editCount += 1;
+  this.lastEditedAt = new Date();
+  this.editLockedAt = new Date();
+  return this.save();
+};
 
 module.exports = mongoose.model('Volunteer', volunteerSchema);
