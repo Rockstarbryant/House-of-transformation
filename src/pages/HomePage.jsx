@@ -155,9 +155,8 @@ const HomePage = () => {
         </div>
       </section>
 
-      
-      {/* Service Areas Section */}
-  <section className="py-16 md:py-24 bg-white">
+     {/* Service Areas Section */}
+<section className="py-16 md:py-24 bg-white">
   <div className="max-w-full mx-auto px-4 md:px-6">
     <div className="mb-12 md:mb-16">
       <span className="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-bold mb-4 uppercase tracking-widest">
@@ -172,7 +171,14 @@ const HomePage = () => {
     </div>
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
       {serviceAreasData.slice(0, 6).map((area) => (
-        <ServiceAreaCard key={area.name} {...area} />
+        <ServiceAreaCard 
+          key={area.name}
+          name={area.name}
+          description={area.description}
+          imageUrl={area.imageUrl}
+          teamCount={area.teamCount}
+          timeCommitment={area.timeCommitment}
+        />
       ))}
     </div>
     <div className="mt-12 text-center">
@@ -181,9 +187,9 @@ const HomePage = () => {
           Explore All Service Areas <ArrowRight size={20} />
         </Button>
       </Link>
-      </div>
-      </div>
-      </section>
+    </div>
+  </div>
+</section>
 
       {/* Donation Section */}
       <DonationSection />
