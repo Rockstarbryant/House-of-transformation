@@ -26,7 +26,7 @@ const AdminPage = () => {
         <Route path="/users" element={<ManageUsers />} />
         <Route path="/volunteers" element={<ManageVolunteers />} />
         <Route path="/feedback" element={<ManageFeedback />} />
-        <Route path="/admin/audit-logs" element={<AuditLogsDashboard />} />
+        <Route path="/audit-logs" element={<AuditLogsDashboard />} />
         
         {/* Donation Routes - supports nested paths */}
         <Route path="/donations/*" element={<AdminDonationDashboard />} />
