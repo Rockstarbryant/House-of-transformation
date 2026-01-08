@@ -30,13 +30,24 @@ import AdminLiveStreamPage from './pages/AdminLiveStreamPage';
 import LiveStreamPage from './pages/LiveStreamPage';
 import AdminPage from './pages/AdminPage';
 
+// Service Area Detail Pages
+import WorshipTeam from './pages/serviceArea/WorshipTeam';
+import ChildrensMinistry from './pages/serviceArea/ChildrensMinistry';
+import HospitalityTeam from './pages/serviceArea/HospitalityTeam';
+import TechnicalSupport from './pages/serviceArea/TechnicalSupport';
+import OutreachMissions from './pages/serviceArea/OutreachMissions';
+import PrayerMinistry from './pages/serviceArea/PrayerMinistry';
+import YouthMinistry from './pages/serviceArea/YouthMinistry';
+import CounselingCare from './pages/serviceArea/CounselingCare';
+import FinanceAdministration from './pages/serviceArea/FinanceAdministration';
+
 // Donation Pages
 import DonationPage from './pages/donation/DonationPage';
 import PledgePage from './pages/donation/PledgePage';
 import DonationDashboard from './pages/donation/DonationDashboard';
 import PaymentPage from './pages/donation/PaymentPage';
 
-// ===== NEW: AUTH PAGES =====
+// Auth Pages
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
 import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import VerifyEmailForm from './components/auth/VerifyEmailForm';
@@ -73,7 +84,18 @@ function App() {
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/donate" element={<DonatePage />} />
                   
+                  {/* Service Areas Routes */}
                   <Route path="/ServiceArea" element={<ServiceAreasPage/>} />
+                  <Route path="/service-areas/worship-team" element={<WorshipTeam />} />
+                  <Route path="/service-areas/children-s-ministry" element={<ChildrensMinistry />} />
+                  <Route path="/service-areas/hospitality-team" element={<HospitalityTeam />} />
+                  <Route path="/service-areas/technical-support" element={<TechnicalSupport />} />
+                  <Route path="/service-areas/outreach-&-missions" element={<OutreachMissions />} />
+                  <Route path="/service-areas/prayer-ministry" element={<PrayerMinistry />} />
+                  <Route path="/service-areas/youth-ministry" element={<YouthMinistry />} />
+                  <Route path="/service-areas/counseling-&-care" element={<CounselingCare />} />
+                  <Route path="/service-areas/finance-&-administration" element={<FinanceAdministration />} />
+                  
                   <Route path="/users" element={<UsersPortalPage />} />
                   <Route path="/profile/:userId" element={<UserProfilePage />} />
                   <Route path="/contact" element={<ContactPage />} />
@@ -81,7 +103,7 @@ function App() {
                   <Route path="/testimony/:id" element={<TestimonyDetailPage />} />
                   <Route path="/livestream" element={<LiveStreamPage />} />
                   
-                  {/* ===== NEW: EMAIL AUTHENTICATION ROUTES ===== */}
+                  {/* ===== EMAIL AUTHENTICATION ROUTES ===== */}
                   <Route path="/forgot-password" element={<ForgotPasswordForm />} />
                   <Route path="/reset-password/:token" element={<ResetPasswordForm />} />
                   <Route path="/verify-email/:token" element={<VerifyEmailForm />} />

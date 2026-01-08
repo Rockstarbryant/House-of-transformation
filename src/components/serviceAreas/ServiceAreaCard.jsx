@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 import Card from '../common/Card';
 
 const ServiceAreaCard = ({ name, description, imageUrl, teamCount, timeCommitment }) => {
+  // Convert name to URL-friendly slug
+  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/&/g, '&');
+
   return (
     <Card hover className="flex flex-col h-full group overflow-hidden">
       {/* Image Section */}
@@ -43,7 +46,7 @@ const ServiceAreaCard = ({ name, description, imageUrl, teamCount, timeCommitmen
 
       {/* Call to Action */}
       <Link
-        to={`/service-areas/${name.toLowerCase().replace(/\s+/g, '-')}`}
+        to={`/service-areas/${slug}`}
         className="text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1 transition-colors group/link"
       >
         Learn More
