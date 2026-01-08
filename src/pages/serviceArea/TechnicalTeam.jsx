@@ -2,9 +2,9 @@
 import React from 'react';
 import ServiceAreaDetailPage from './ServiceAreaDetailPage';
 
-const TechnicalSupport = () => {
+const TechnicalTeam = () => {
   const technicalData = {
-    name: 'Technical Support',
+    name: 'Technical Team',
     description: 'Manage sound systems, lighting, streaming, and audio-visual equipment during services. We ensure excellent technical execution so nothing distracts from worship.',
     imageUrl: 'https://res.cloudinary.com/dcu8uuzrs/image/upload/v1767444965/WhatsApp_Image_2026-01-03_at_15.54.45_mpogon.jpg',
     teamCount: 12,
@@ -68,4 +68,4 @@ const TechnicalSupport = () => {
   return <ServiceAreaDetailPage {...technicalData} />;
 };
 
-export default TechnicalSupport;
+export default TechnicalTeam;

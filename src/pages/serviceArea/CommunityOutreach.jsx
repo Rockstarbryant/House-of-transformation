@@ -2,9 +2,9 @@
 import React from 'react';
 import ServiceAreaDetailPage from './ServiceAreaDetailPage';
 
-const OutreachMissions = () => {
+const CommunityOutreach = () => {
   const outreachData = {
-    name: 'Outreach & Missions',
+    name: 'CommunityOutreach',
     description: 'Extend God\'s love through community service, evangelism, and local/global mission work. We are committed to transforming our community and world for Christ.',
     imageUrl: 'https://pbs.twimg.com/profile_images/700352011582251008/wrxEHL3q.jpg',
     teamCount: 18,
@@ -69,4 +69,4 @@ const OutreachMissions = () => {
   return <ServiceAreaDetailPage {...outreachData} />;
 };
 
-export default OutreachMissions;
+export default CommunityOutreach;

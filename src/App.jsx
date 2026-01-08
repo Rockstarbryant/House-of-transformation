@@ -33,9 +33,9 @@ import AdminPage from './pages/AdminPage';
 // Service Area Detail Pages
 import WorshipTeam from './pages/serviceArea/WorshipTeam';
 import ChildrensMinistry from './pages/serviceArea/ChildrensMinistry';
-import HospitalityTeam from './pages/serviceArea/HospitalityTeam';
-import TechnicalSupport from './pages/serviceArea/TechnicalSupport';
-import OutreachMissions from './pages/serviceArea/OutreachMissions';
+import UsheringTeam from './pages/serviceArea/UsheringTeam';
+import TechnicalTeam from './pages/serviceArea/TechnicalTeam';
+import CommunityOutreach from './pages/serviceArea/CommunityOutreach';
 import PrayerMinistry from './pages/serviceArea/PrayerMinistry';
 import YouthMinistry from './pages/serviceArea/YouthMinistry';
 import CounselingCare from './pages/serviceArea/CounselingCare';
@@ -87,10 +87,10 @@ function App() {
                   {/* Service Areas Routes */}
                   <Route path="/ServiceArea" element={<ServiceAreasPage/>} />
                   <Route path="/service-areas/worship-team" element={<WorshipTeam />} />
-                  <Route path="/service-areas/children-s-ministry" element={<ChildrensMinistry />} />
-                  <Route path="/service-areas/hospitality-team" element={<HospitalityTeam />} />
-                  <Route path="/service-areas/technical-support" element={<TechnicalSupport />} />
-                  <Route path="/service-areas/outreach-&-missions" element={<OutreachMissions />} />
+                  <Route path="/service-areas/children's-ministry" element={<ChildrensMinistry />} />
+                  <Route path="/service-areas/ushering-team" element={<UsheringTeam />} />
+                  <Route path="/service-areas/technical-team" element={<TechnicalTeam />} />
+                  <Route path="/service-areas/community-outreach" element={<CommunityOutreach />} />
                   <Route path="/service-areas/prayer-ministry" element={<PrayerMinistry />} />
                   <Route path="/service-areas/youth-ministry" element={<YouthMinistry />} />
                   <Route path="/service-areas/counseling-&-care" element={<CounselingCare />} />

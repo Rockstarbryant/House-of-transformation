@@ -20,21 +20,21 @@ export const serviceAreasData = [
     timeCommitment: '3 hours/week'
   },
   {
-    name: 'Hospitality Team',
+    name: 'Ushering Team',
     description: 'Welcome guests with warmth and create a welcoming atmosphere during services and events',
     imageUrl: imageUrls[2], // Image 3
     teamCount: 22,
     timeCommitment: '2-3 hours/week'
   },
   {
-    name: 'Technical Support',
+    name: 'Technical Team',
     description: 'Manage sound systems, lighting, streaming, and audio-visual equipment during services',
     imageUrl: imageUrls[0], // Image 1 (repeats)
     teamCount: 12,
     timeCommitment: '4 hours/week'
   },
   {
-    name: 'Outreach & Missions',
+    name: 'Community Outreach',
     description: 'Extend God\'s love through community service, evangelism, and local/global mission work',
     imageUrl: imageUrls[1], // Image 2 (repeats)
     teamCount: 18,

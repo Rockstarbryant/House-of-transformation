@@ -2,9 +2,9 @@
 import React from 'react';
 import ServiceAreaDetailPage from './ServiceAreaDetailPage';
 
-const HospitalityTeam = () => {
-  const hospitalityData = {
-    name: 'Hospitality Team',
+const UsheringTeam = () => {
+  const usheringData = {
+    name: 'Ushering Team',
     description: 'Welcome guests with warmth and create a welcoming atmosphere during services and events. We believe every visitor should feel the love of Christ through our hospitality.',
     imageUrl: 'https://res.cloudinary.com/dcu8uuzrs/image/upload/v1767445662/copy_of_ot_ibz2xp_6e0397.jpg',
     teamCount: 22,
@@ -65,7 +65,7 @@ const HospitalityTeam = () => {
     ]
   };
 
-  return <ServiceAreaDetailPage {...hospitalityData} />;
+  return <ServiceAreaDetailPage {...usheringData} />;
 };
 
-export default HospitalityTeam;
+export default UsheringTeam;
