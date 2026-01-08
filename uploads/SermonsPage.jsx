@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, X, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, X, Search, ChevronDown } from 'lucide-react';
 import SermonCardText from '../components/sermons/SermonCardText';
 import SermonCard from '../components/sermons/SermonCard';
 import Loader from '../components/common/Loader';
@@ -19,6 +19,8 @@ const SermonsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
 
   const categories = ['All', 'Sunday Service', 'Bible Study', 'Special Event', 'Youth Ministry', 'Prayer Meeting'];
 
@@ -29,6 +31,25 @@ const SermonsPage = () => {
   useEffect(() => {
     filterSermons();
   }, [selectedType, selectedCategory, searchTerm, allSermons]);
+
+  // Handle scroll to collapse/expand header
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Collapse header when scrolling down, expand when scrolling up
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setIsHeaderCollapsed(true);
+      } else if (currentScrollY < lastScrollY.current) {
+        setIsHeaderCollapsed(false);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const fetchSermons = async () => {
     try {
@@ -63,10 +84,10 @@ const SermonsPage = () => {
   const filterSermons = () => {
     let result = [...allSermons];
 
-    // ✅ Sort by date (most recent first)
+    // ✅ FIX: Sort by date FIRST (most recent first)
     result = result.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Apply filters
+    // Then apply filters
     if (selectedType !== 'all') {
       result = result.filter(s => detectSermonType(s) === selectedType);
     }
@@ -102,53 +123,61 @@ const SermonsPage = () => {
   if (loading) return <Loader />;
 
   return (
-    <div className="pt-20 pb-20 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Header Section - Not Fixed */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-blue-900 mb-2">Sermons</h1>
-          <p className="text-xl text-gray-600 mb-6">Messages and teachings from our community</p>
-          
-          {/* Upload Button */}
-          {canPostSermon() && (
-            <Button
-              onClick={handleAddSermon}
-              variant="primary"
-              className="flex items-center gap-2 mb-8"
+    <div className="pt-20 pb-20 bg-white-200 min-h-[150vh]">
+      {/* ✅ DYNAMIC COLLAPSIBLE HEADER */}
+      <div
+        className={`fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300 ${
+          isHeaderCollapsed ? 'opacity-0 -translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'
+        }`}
+      >
+        {/* Header Title & Controls */}
+        <div className="px-2 py-2 max-w-3xl mx-auto flex justify-between items-center">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900 text-center">Sermons</h1>
+            <p className="text-slate-600 text-xs mt-0">
+              {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
+            </p>
+          </div>
+          <div className="flex gap-1">
+            {canPostSermon() && (
+              <Button
+                onClick={handleAddSermon}
+                variant="primary"
+                size="sm"
+                icon={Plus}
+              >
+                Add
+              </Button>
+            )}
+            <button
+              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+              className={`p-2 rounded-full transition-colors ${
+                showAdvancedFilter
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Show/hide advanced filters"
             >
-              <Plus size={20} /> Add Sermon
-            </Button>
-          )}
-
-          {/* Permission Alert */}
-          {!canPostSermon() && user && (
-            <div className="mb-8">
-              <PermissionAlert
-                title="Cannot Add Sermons"
-                message="Only pastors and bishops can upload sermons."
-                requiredRole="pastor"
-                currentRole={user.role}
-                actionType="sermon upload"
-              />
-            </div>
-          )}
+              {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 bg-white rounded-lg px-4 py-3 border border-gray-200">
-            <Search size={18} className="text-gray-500" />
+        <div className="px-4 pb-4 border-t border-slate-200 max-w-3xl mx-auto">
+          <div className="flex items-center gap-3 bg-slate-100 rounded-full px-4 py-3">
+            <Search size={18} className="text-slate-500" />
             <input
               type="text"
               placeholder="Search sermons by title, pastor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder:text-gray-500"
+              className="flex-1 bg-transparent outline-none text-sm text-slate-900 placeholder:text-slate-500"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
+                className="text-slate-500 hover:text-slate-700 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -157,8 +186,8 @@ const SermonsPage = () => {
         </div>
 
         {/* Category Filter */}
-        <div className="mb-6 flex justify-center">
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="px-4 pb-4 border-t border-slate-200 max-w-3xl mx-auto">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {categories.map(cat => (
               <button
                 key={cat}
@@ -166,7 +195,7 @@ const SermonsPage = () => {
                 className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedCategory === cat
                     ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
-                    : 'bg-white text-gray-800 border border-gray-200 hover:border-gray-300'
+                    : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                 }`}
               >
                 {cat}
@@ -175,49 +204,23 @@ const SermonsPage = () => {
           </div>
         </div>
 
-        {/* Advanced Filter Toggle */}
-        <div className="mb-6 flex items-center gap-2">
-          <button
-            onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-            className={`p-2 rounded-full transition-colors ${
-              showAdvancedFilter
-                ? 'bg-blue-100 text-blue-600'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-            title="Show/hide advanced filters"
-          >
-            {showAdvancedFilter ? <X size={20} /> : <Settings size={20} />}
-          </button>
-          <span className="text-sm text-gray-600">
-            {filteredSermons.length} {filteredSermons.length === 1 ? 'sermon' : 'sermons'} found
-          </span>
-          {(selectedType !== 'all' || selectedCategory !== 'All' || searchTerm) && (
-            <button
-              onClick={resetFilters}
-              className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              Reset filters
-            </button>
-          )}
-        </div>
-
         {/* Advanced Type Filter */}
         {showAdvancedFilter && (
-          <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200">
-            <div className="flex gap-4">
+          <div className="border-t border-slate-200 bg-slate-50 max-w-3xl mx-auto">
+            <div className="flex overflow-x-auto px-4 scrollbar-hide">
               {[
                 { id: 'all', label: 'All', icon: '📚' },
-                { id: 'text', label: 'Text', icon: '📄' },
+                { id: 'text', label: 'Text', icon: '📝' },
                 { id: 'photo', label: 'Photo', icon: '📸' },
                 { id: 'video', label: 'Video', icon: '🎥' }
               ].map(type => (
                 <button
                   key={type.id}
                   onClick={() => setSelectedType(type.id)}
-                  className={`px-4 py-2 font-semibold text-sm rounded-lg transition-colors ${
+                  className={`px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
                     selectedType === type.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <span className="mr-2">{type.icon}</span>
@@ -227,26 +230,45 @@ const SermonsPage = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-3xl mx-auto px-4">
+        {!canPostSermon() && user && (
+          <div className="py-4">
+            <PermissionAlert
+              title="Cannot Add Sermons"
+              message="Only pastors and bishops can upload sermons."
+              requiredRole="pastor"
+              currentRole={user.role}
+              actionType="sermon upload"
+            />
+          </div>
+        )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-8">
+          <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 font-semibold">
             {error}
           </div>
         )}
 
         {/* Empty State */}
         {filteredSermons.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">No sermons found in this category.</p>
-            {searchTerm && (
-              <p className="text-sm mt-2">Try adjusting your search term</p>
-            )}
+          <div className="flex flex-col items-center justify-center py-24 px-4">
+            <div className="text-6xl mb-4">📖</div>
+            <p className="text-slate-900 text-lg font-bold">No sermons found</p>
+            <p className="text-slate-600 text-sm mt-2">
+              {searchTerm || selectedCategory !== 'All' || selectedType !== 'all'
+                ? 'Try adjusting your filters or search term'
+                : 'Check back soon for new sermons'}
+            </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="divide-y divide-slate-200 space-y-4">
+            {/* ✅ FIX: Mix all sermon types together, sorted by date */}
             {filteredSermons.map(sermon => (
-              <div key={sermon._id}>
+              <div key={sermon._id} className="py-4">
                 {detectSermonType(sermon) === 'text' ? (
                   <SermonCardText sermon={sermon} />
                 ) : (
@@ -258,6 +280,7 @@ const SermonsPage = () => {
         )}
       </div>
 
+      {/* Scroll to top indicator */}
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
