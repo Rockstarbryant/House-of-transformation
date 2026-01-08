@@ -20,7 +20,7 @@ import KidsZonePage from './pages/KidsZonePage';
 import VolunteerPage from './pages/VolunteerPage';
 import EventsPage from './pages/EventsPage';
 import DonatePage from './pages/DonatePage';
-import MinistriesPage from './pages/MinistriesPage';
+import ServiceAreasPage from './pages/ServiceAreasPage';
 import UserProfilePage from './pages/UserProfilePage';
 import UsersPortalPage from './pages/UsersPortalPage';
 import ContactPage from './pages/ContactPage';
@@ -72,7 +72,8 @@ function App() {
                   <Route path="/volunteer" element={<VolunteerPage />} />
                   <Route path="/events" element={<EventsPage />} />
                   <Route path="/donate" element={<DonatePage />} />
-                  <Route path="/ministries" element={<MinistriesPage />} />
+                  
+                  <Route path="/ServiceArea" element={<ServiceAreasPage/>} />
                   <Route path="/users" element={<UsersPortalPage />} />
                   <Route path="/profile/:userId" element={<UserProfilePage />} />
                   <Route path="/contact" element={<ContactPage />} />

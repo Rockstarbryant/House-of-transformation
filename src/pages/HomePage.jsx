@@ -6,7 +6,9 @@ import QuickInfoBar from '../components/home/QuickInfoBar';
 import AboutSection from '../components/about/AboutSection';
 import LiveStreamSection from '../components/home/LiveStreamSection';
 import EventList from '../components/events/EventList';
-import MinistryCard from '../components/ministries/MinistryCard';
+//import MinistryCard from '../components/ministries/MinistryCard';
+import ServiceAreaCard from '../components/serviceAreas/ServiceAreaCard';
+import { serviceAreasData } from '../data/serviceAreas';
 import DonationSection from '../components/donations/DonationSection';
 import SermonCard from '../components/sermons/SermonCard';
 import SermonCardText from '../components/sermons/SermonCardText';
@@ -153,53 +155,34 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Ministries Section */}
-      <section className="py-16 md:py-24 bg-white">
-        <div className="max-w-full mx-auto px-4 md:px-6">
-          <div className="mb-12 md:mb-16">
-            <span className="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-bold mb-4 uppercase tracking-widest">
-              Get Connected
-            </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Our <span className="text-blue-600">Ministries</span>
-            </h2>
-            <p className="text-xl text-slate-600 max-w-2xl">
-              Find your place to serve, grow, and make an impact in our community
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            <MinistryCard 
-              name="Children's Ministry" 
-              description="Nurturing young hearts in faith and building a strong foundation for spiritual growth" 
-              icon="👶" 
-            />
-            <MinistryCard 
-              name="Youth Ministry" 
-              description="Empowering the next generation to live out their faith boldly and authentically" 
-              icon="⭐" 
-            />
-            <MinistryCard 
-              name="Worship Team" 
-              description="Leading hearts in worship and creating space for divine encounter with God" 
-              icon="🎵" 
-            />
-            <MinistryCard 
-              name="Small Groups" 
-              description="Building genuine community through fellowship, prayer, and biblical study" 
-              icon="👥" 
-            />
-            <MinistryCard 
-              name="Prayer Ministry" 
-              description="Interceding for our church, community, and world with faith and compassion" 
-              icon="🙏" 
-            />
-            <MinistryCard 
-              name="Outreach" 
-              description="Serving our community and sharing the transformative love of Jesus" 
-              icon="❤️" 
-            />
-          </div>
-        </div>
+      
+      {/* Service Areas Section */}
+  <section className="py-16 md:py-24 bg-white">
+  <div className="max-w-full mx-auto px-4 md:px-6">
+    <div className="mb-12 md:mb-16">
+      <span className="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-bold mb-4 uppercase tracking-widest">
+        Get Connected
+      </span>
+      <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+        Service <span className="text-blue-600">Areas & Teams</span>
+      </h2>
+      <p className="text-xl text-slate-600 max-w-2xl">
+        Find your place to serve, grow, and make an impact in our community
+      </p>
+    </div>
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+      {serviceAreasData.slice(0, 6).map((area) => (
+        <ServiceAreaCard key={area.name} {...area} />
+      ))}
+    </div>
+    <div className="mt-12 text-center">
+      <Link to="/ServiceArea">
+        <Button variant="primary" size="lg">
+          Explore All Service Areas <ArrowRight size={20} />
+        </Button>
+      </Link>
+      </div>
+      </div>
       </section>
 
       {/* Donation Section */}
