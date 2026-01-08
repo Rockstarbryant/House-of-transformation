@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Calendar, Heart, MessageCircle, Edit, ArrowLeft, Share2 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
-import api from '../services/api/authService'; // Use axios instance
+import api from '../services/api/authService';
+import VolunteerProfile from '../components/volunteer/VolunteerProfile';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 
@@ -27,7 +28,6 @@ const UserProfilePage = () => {
       setLoading(true);
       setError('');
       
-      // Use axios instance
       const response = await api.get(`/users/${userId}`);
       const userData = response.data.user;
       
@@ -52,7 +52,6 @@ const UserProfilePage = () => {
       setSuccess('');
       setIsSaving(true);
 
-      // Use axios instance - it automatically includes auth token
       const response = await api.put(`/users/${userId}`, editData);
       
       if (response.status === 200 || response.status === 201) {
@@ -103,7 +102,6 @@ const UserProfilePage = () => {
     );
   }
 
-  // Check if user is logged in AND owns the profile or is admin
   const isOwnProfile = currentUser && (currentUser.id === userId || currentUser._id === userId);
   const canEdit = isOwnProfile || (currentUser && currentUser.role === 'admin');
 
@@ -345,9 +343,14 @@ const UserProfilePage = () => {
           )}
         </Card>
 
+        {/* Volunteer Applications Section - Only show for own profile */}
+        {isOwnProfile && (
+          <VolunteerProfile userId={userId} />
+        )}
+
         {/* Ministries Section */}
         {(profile.ministries?.length > 0 || isEditing) && (
-          <Card>
+          <Card className="mt-8">
             <h2 className="text-2xl font-bold text-blue-900 mb-6">Ministry Involvement</h2>
             <div className="flex flex-wrap gap-3">
               {profile.ministries?.length > 0 ? (
