@@ -2,6 +2,7 @@ const User = require('../models/User');
 const emailService = require('../services/emailService');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const auditService = require('../services/auditService');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -22,11 +23,17 @@ exports.signup = async (req, res) => {
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
+       await auditService.logAuth('signup', req, null, false, 
+        new Error('User already exists'));
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
     // Create user
     const user = await User.create({ name, email, password });
+
+     // Log successful signup
+    await auditService.logAuth('signup', req, user, true);
+
 
     // Generate verification token
     const verificationToken = user.generateEmailVerificationToken();
@@ -56,6 +63,7 @@ exports.signup = async (req, res) => {
       });
 
   } catch (error) {
+     await auditService.logError(req, error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -164,12 +172,18 @@ exports.login = async (req, res) => {
     // Check for user
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      // Log failed login
+      await auditService.logAuth('login', req, null, false, 
+        new Error('User not found'));
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
+       // Log failed login
+      await auditService.logAuth('login', req, user, false, 
+        new Error('Invalid password'));
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
@@ -181,6 +195,9 @@ exports.login = async (req, res) => {
     //     requiresVerification: true
     //   });
     // }
+     // Log successful login
+    await auditService.logAuth('login', req, user, true);
+
 
     res.json({
       success: true,
@@ -389,6 +406,12 @@ exports.refreshToken = async (req, res) => {
 // @desc    Logout user
 // @route   POST /api/auth/logout
 // @access  Private
-exports.logout = (req, res) => {
-  res.json({ success: true, message: 'Logged out successfully' });
+exports.logout = async (req, res) => {
+  try {
+    await auditService.logAuth('logout', req, req.user, true);
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    await auditService.logError(req, error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

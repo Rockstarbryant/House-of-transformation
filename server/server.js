@@ -11,9 +11,6 @@ require('./config/cloudinaryConfig');
 
 // Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-console.log('🔑 SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
-console.log('🔑 Key starts with SG.:', process.env.SENDGRID_API_KEY?.startsWith('SG.'));
-console.log('🔑 Key length:', process.env.SENDGRID_API_KEY?.length);
 
 // Connect to database
 connectDB();
@@ -23,9 +20,13 @@ const app = express();
 // ===== TRUST PROXY (CRITICAL FOR RENDER) =====
 app.set('trust proxy', 1);
 
+const auditMiddleware = require('./middleware/auditMiddleware');
+
 // ===== BODY PARSER =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // ===== CORS CONFIGURATION =====
 const allowedOrigins = process.env.NODE_ENV === 'development' 
@@ -41,6 +42,8 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
       'https://house-of-transformation.vercel.app',
       'https://www.yourdomain.com'
     ];
+
+app.use('/api', auditMiddleware);
 
 app.use(cors({
   origin: allowedOrigins,
@@ -107,6 +110,8 @@ app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
+
+app.use('/api/audit', require('./routes/auditRoutes'));
 
 // ============================================
 // 404 HANDLER (BEFORE ERROR HANDLER)

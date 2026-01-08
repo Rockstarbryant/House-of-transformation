@@ -11,6 +11,7 @@ import ManageUsers from '../components/admin/ManageUsers';
 import ManageVolunteers from '../components/admin/ManageVolunteers';
 import ManageFeedback from '../components/admin/ManageFeedback';
 import AdminDonationDashboard from '../components/admin/AdminDonationDashboard';
+import AuditLogsDashboard from '../components/admin/AuditLogsDashboard';
 
 const AdminPage = () => {
   return (
@@ -25,6 +26,7 @@ const AdminPage = () => {
         <Route path="/users" element={<ManageUsers />} />
         <Route path="/volunteers" element={<ManageVolunteers />} />
         <Route path="/feedback" element={<ManageFeedback />} />
+        <Route path="/admin/audit-logs" element={<AuditLogsDashboard />} />
         
         {/* Donation Routes - supports nested paths */}
         <Route path="/donations/*" element={<AdminDonationDashboard />} />

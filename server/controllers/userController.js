@@ -50,7 +50,7 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 // @access  Private (own profile or admin)
 exports.updateUser = asyncHandler(async (req, res) => {
   const { name, email, phone, bio, location, avatar } = req.body;
-
+   
   // Check if user is updating their own profile or is admin
   if (req.user.id !== req.params.id && req.user.role !== 'admin') {
     return res.status(403).json({ 
