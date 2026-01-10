@@ -12,6 +12,8 @@ require('./config/cloudinaryConfig');
 // Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+const auditMiddleware = require('./middleware/auditMiddleware');
+
 // Connect to database
 connectDB();
 
@@ -19,8 +21,6 @@ const app = express();
 
 // ===== TRUST PROXY (CRITICAL FOR RENDER) =====
 app.set('trust proxy', 1);
-
-const auditMiddleware = require('./middleware/auditMiddleware');
 
 // ===== BODY PARSER =====
 app.use(express.json());
@@ -40,7 +40,7 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
       process.env.FRONTEND_URL,
       'https://comfy-gumdrop-df8b26.netlify.app',
       'https://house-of-transformation.vercel.app',
-      'https://www.yourdomain.com'
+      'https://houseoftransformation-nextjs.vercel.app'
     ];
 
 app.use('/api', auditMiddleware);
