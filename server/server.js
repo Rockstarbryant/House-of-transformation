@@ -39,6 +39,7 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
   : [
       process.env.FRONTEND_URL,
       'https://comfy-gumdrop-df8b26.netlify.app',
+      'https://hotadmin.vercel.app',
       'https://house-of-transformation.vercel.app',
       'https://houseoftransformation-nextjs.vercel.app'
     ];

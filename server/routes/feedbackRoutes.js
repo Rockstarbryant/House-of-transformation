@@ -21,6 +21,30 @@ router.post('/', optionalAuth, submitFeedback);
 // GET public testimonies - anyone can view
 router.get('/testimonies/public', getPublicTestimonies);
 
+// ✅ NEW: Get single public testimony by ID
+router.get('/testimonies/public/:id', async (req, res) => {
+  try {
+    const testimony = await Feedback.findById(req.params.id);
+
+    if (!testimony || testimony.status !== 'published' || !testimony.isPublic) {
+      return res.status(404).json({
+        success: false,
+        message: 'Testimony not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      feedback: testimony
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      message: 'Testimony not found'
+    });
+  }
+});
+
 // ===== ADMIN ROUTES (MUST come BEFORE generic /api/feedback routes) =====
 // IMPORTANT: Put specific routes BEFORE generic ones!
 // GET /api/feedback/stats - MUST be before GET /api/feedback/:id
