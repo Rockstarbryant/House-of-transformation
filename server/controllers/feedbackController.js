@@ -181,6 +181,35 @@ exports.getPublicTestimonies = async (req, res) => {
   }
 };
 
+// @desc    Get single public testimony by ID
+// @route   GET /api/feedback/public/:id
+// @access  Public
+exports.getPublicTestimony = async (req, res) => {
+  try {
+    const testimony = await Feedback.findById(req.params.id)
+      .populate('user', 'name email role')
+      .select('-ipAddress -userAgent'); // Hide sensitive data
+
+    if (!testimony || testimony.status !== 'published' || !testimony.isPublic) {
+      return res.status(404).json({
+        success: false,
+        message: 'Testimony not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      feedback: testimony
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      message: 'Testimony not found',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Update feedback status
 // @route   PUT /api/feedback/:id/status
 // @access  Private/Admin
