@@ -2,8 +2,12 @@ module.exports = {
   PORT: process.env.PORT || 5000,
   NODE_ENV: process.env.NODE_ENV || 'development',
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/church_db',
-  JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret_key',
-  JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',
+  // Supabase Config
+SUPABASE_URL: process.env.SUPABASE_URL,
+SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY, // For server-side ops
+  //JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret_key',
+  //JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',
   
   // Email Config
   EMAIL_HOST: process.env.EMAIL_HOST || 'smtp.gmail.com',

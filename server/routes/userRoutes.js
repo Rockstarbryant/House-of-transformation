@@ -13,7 +13,7 @@ const {
   sendBulkNotification,        // NEW
   getUserStats                 // NEW
 } = require('../controllers/userController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 

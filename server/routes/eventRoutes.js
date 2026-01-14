@@ -7,7 +7,7 @@ const {
   deleteEvent,
   registerForEvent
 } = require('../controllers/eventController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 

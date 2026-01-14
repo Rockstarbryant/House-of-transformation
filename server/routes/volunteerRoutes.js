@@ -12,7 +12,7 @@ const {
   deleteApplication,
   getStats
 } = require('../controllers/volunteerController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 

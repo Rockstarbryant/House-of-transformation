@@ -13,7 +13,7 @@ const {
   deleteFeedback,
   getStats
 } = require('../controllers/feedbackController');
-const { protect, authorize, optionalAuth } = require('../middleware/auth');
+const { protect, authorize, optionalAuth } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 

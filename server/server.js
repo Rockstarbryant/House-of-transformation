@@ -12,6 +12,19 @@ require('./config/cloudinaryConfig');
 // Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+// Add this code RIGHT AFTER the dotenv.config() line in server.js
+// Around line 13, after: dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// ===== DEBUG: Check Supabase Configuration =====
+const config = require('./config/env');
+console.log('\n🔐 Supabase Configuration Check:');
+console.log('   SUPABASE_URL:', config.SUPABASE_URL ? '✓ Loaded' : '❌ MISSING');
+console.log('   SUPABASE_ANON_KEY:', config.SUPABASE_ANON_KEY ? '✓ Loaded' : '❌ MISSING');
+console.log('   SUPABASE_SERVICE_KEY:', config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '❌ MISSING');
+console.log('   MONGODB_URI:', config.MONGODB_URI ? '✓ Loaded' : '❌ MISSING');
+console.log('   NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('');
+
 const auditMiddleware = require('./middleware/auditMiddleware');
 
 // Connect to database
@@ -32,7 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 const allowedOrigins = process.env.NODE_ENV === 'development' 
   ? [
       'http://localhost:3000',
-      'http://localhost:3001',
+      'https://yobra194-1035364.postman.co',
       'http://localhost:5001',
       'http://127.0.0.1:3000'   
     ]
@@ -90,9 +103,7 @@ app.get('/api/health', (req, res) => {
 // Apply general API rate limiter to all /api routes
 app.use('/api/', apiLimiter);
 
-// Auth routes (MUST be first)
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', signupLimiter);
+// Auth routes (MUST be first) - SIMPLE VERSION
 app.use('/api/auth', require('./routes/authRoutes'));
 
 // Content routes

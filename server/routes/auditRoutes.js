@@ -11,7 +11,7 @@ const {
   cleanOldLogs,
   getLogById
 } = require('../controllers/auditController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 

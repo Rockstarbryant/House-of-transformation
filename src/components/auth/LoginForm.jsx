@@ -24,31 +24,28 @@ const LoginForm = ({ onSuccess, onSwitchToSignup }) => {
     setIsSubmitting(true);
 
     try {
+      console.log('[LOGIN] Attempting login for:', formData.email);
+      
       const result = await login(formData.email, formData.password);
 
       if (result.success) {
+        console.log('[LOGIN] Success! User:', result.user.email);
         onSuccess();
       } else {
+        console.error('[LOGIN] Failed:', result.error);
         setError(result.error || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[LOGIN] Error:', error);
       
-      // Handle rate limiting (429 status)
+      // Handle different error types
       if (error.response?.status === 429) {
         setIsRateLimited(true);
         setError('Too many login attempts. Please try again in 15 minutes.');
-      } else if (error.response?.status === 400) {
-        // Handle validation errors
-        const data = error.response.data;
-        if (data.errors && Array.isArray(data.errors)) {
-          const errorMessages = data.errors.map(e => e.message).join(', ');
-          setError(errorMessages);
-        } else {
-          setError(data.message || 'Login failed');
-        }
+      } else if (error.message?.includes('Invalid login credentials')) {
+        setError('Invalid email or password');
       } else {
-        setError('An unexpected error occurred');
+        setError(error.message || 'An unexpected error occurred');
       }
     } finally {
       setIsSubmitting(false);
@@ -88,7 +85,7 @@ const LoginForm = ({ onSuccess, onSwitchToSignup }) => {
           disabled={isRateLimited || isSubmitting}
         />
 
-        {/* Forgot Password Link - Professional placement */}
+        {/* Forgot Password Link */}
         <div className="flex justify-end">
           <Link
             to="/forgot-password"
