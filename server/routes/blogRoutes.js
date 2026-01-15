@@ -10,8 +10,9 @@ const {
   getPendingBlogs
 } = require('../controllers/blogController');
 //const { protect } = require('../middleware/auth');
-const { protect } = require('../middleware/supabaseAuth');
-const authorize = require('../middleware/roleAuth');
+//const { protect } = require('../middleware/supabaseAuth');
+//const authorize = require('../middleware/roleAuth');
+const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 
