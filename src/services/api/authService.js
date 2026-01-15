@@ -38,6 +38,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+api.interceptors.response.use(
+  (response) => {
+    console.log('[API-RESPONSE]', response.config.url, response.status);
+    return response;
+  },
+  (error) => {
+    console.error('[API-ERROR]', error.config?.url, error.response?.status);
+    return Promise.reject(error);
+  }
+);
+
 // Handle responses
 api.interceptors.response.use(
   (response) => response,
