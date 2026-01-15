@@ -82,13 +82,65 @@ exports.getBlog = asyncHandler(async (req, res) => {
 });
 
 // @desc    Create blog
-// @route   POST /api/blogs
+// @route   POST /api/blog
 // @access  Private
 exports.createBlog = asyncHandler(async (req, res) => {
+  console.log('\n========================================');
+  console.log('📝 CREATE BLOG REQUEST');
+  console.log('========================================');
+  console.log('Request Body:', JSON.stringify(req.body, null, 2));
+  console.log('User Object Keys:', Object.keys(req.user));
+  console.log('User Role:', req.user?.role);
+  console.log('========================================\n');
+  
   const { title, content, category, description, image } = req.body;
 
+  // Check for required fields
+  if (!title || !content || !category) {
+    console.log('❌ Missing required fields:', { 
+      title: !!title, 
+      content: !!content, 
+      category: !!category 
+    });
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide title, content, and category',
+      missing: {
+        title: !title,
+        content: !content,
+        category: !category
+      }
+    });
+  }
+
+  // Get user ID (MongoDB uses _id, not id)
+  const userId = req.user._id || req.user.id;
+  if (!userId) {
+    console.log('❌ User ID missing from req.user');
+    console.log('Available keys:', Object.keys(req.user));
+    return res.status(400).json({
+      success: false,
+      message: 'User ID not found in request'
+    });
+  }
+  console.log('✅ User ID:', userId);
+
+  // Check if user has role
+  if (!req.user.role) {
+    console.log('❌ User role missing from req.user');
+    return res.status(400).json({
+      success: false,
+      message: 'User role not found in request'
+    });
+  }
+
   // Check if user can post in this category
+  console.log('🔍 Checking category permission...');
+  console.log('   User Role:', req.user.role);
+  console.log('   Category:', category);
+  
   if (!canPostInCategory(req.user.role, category)) {
+    console.log('❌ User cannot post in category:', category);
     return res.status(403).json({
       success: false,
       message: `Your role (${req.user.role}) cannot post in ${category} category`,
@@ -98,26 +150,40 @@ exports.createBlog = asyncHandler(async (req, res) => {
     });
   }
 
-  const blog = await Blog.create({
-    title,
-    content,
-    category,
-    description,
-    image,
-    author: req.user.id,
-    authorRole: req.user.role,
-    approved: req.user.role === 'admin' ? true : false
-  });
+  console.log('✅ Permission check passed');
+  console.log('📤 Creating blog document...');
 
-  const populatedBlog = await blog.populate('author', 'name username role');
+  try {
+    const blog = await Blog.create({
+      title,
+      content,
+      category,
+      description,
+      image,
+      author: userId,  // ✅ Fixed: using userId which handles both _id and id
+      authorRole: req.user.role,
+      approved: req.user.role === 'admin' ? true : false
+    });
 
-  res.status(201).json({
-    success: true,
-    message: req.user.role === 'admin' 
-      ? 'Blog created and approved' 
-      : 'Blog submitted for approval',
-    blog: populatedBlog
-  });
+    console.log('✅ Blog created with ID:', blog._id);
+
+    const populatedBlog = await blog.populate('author', 'name username role');
+
+    console.log('✅ Blog created successfully!');
+    console.log('========================================\n');
+
+    res.status(201).json({
+      success: true,
+      message: req.user.role === 'admin' 
+        ? 'Blog created and approved' 
+        : 'Blog submitted for approval',
+      blog: populatedBlog
+    });
+  } catch (error) {
+    console.error('❌ Error creating blog:', error.message);
+    console.log('========================================\n');
+    throw error;
+  }
 });
 
 // @desc    Update blog (author or admin only)
@@ -133,8 +199,11 @@ exports.updateBlog = asyncHandler(async (req, res) => {
     });
   }
 
+  // ✅ Fixed: Use _id for comparison
+  const userId = req.user._id?.toString() || req.user.id?.toString();
+  
   // Check authorization
-  if (blog.author.toString() !== req.user.id && req.user.role !== 'admin') {
+  if (blog.author.toString() !== userId && req.user.role !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to update this blog' 
@@ -176,8 +245,11 @@ exports.deleteBlog = asyncHandler(async (req, res) => {
     });
   }
 
+  // ✅ Fixed: Use _id for comparison
+  const userId = req.user._id?.toString() || req.user.id?.toString();
+
   // Check authorization
-  if (blog.author.toString() !== req.user.id && req.user.role !== 'admin') {
+  if (blog.author.toString() !== userId && req.user.role !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to delete this blog' 
@@ -196,11 +268,14 @@ exports.deleteBlog = asyncHandler(async (req, res) => {
 // @route   PUT /api/blogs/:id/approve
 // @access  Private/Admin
 exports.approveBlog = asyncHandler(async (req, res) => {
+  // ✅ Fixed: Use _id
+  const userId = req.user._id || req.user.id;
+  
   const blog = await Blog.findByIdAndUpdate(
     req.params.id,
     { 
       approved: true,
-      approvedBy: req.user.id
+      approvedBy: userId
     },
     { new: true }
   ).populate('author', 'name username role');
