@@ -7,7 +7,7 @@ const roleSchema = new mongoose.Schema({
     required: [true, 'Please provide a role name'],
     lowercase: true,
     trim: true,
-    enum: ['admin', 'bishop', 'pastor', 'volunteer', 'usher', 'worship_team', 'member'],
+    // REMOVED enum restriction to allow custom roles
     index: true
   },
   

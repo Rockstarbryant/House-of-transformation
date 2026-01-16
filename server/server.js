@@ -116,6 +116,8 @@ app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 // User + Role management
 app.use('/api/roles', require('./routes/roleRoutes'));  // ADD THIS LINE
+app.use('/api/settings', require('./routes/settingsRoutes'));
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 // Volunteer routes
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
