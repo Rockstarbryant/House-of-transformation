@@ -114,7 +114,7 @@ exports.createBlog = asyncHandler(async (req, res) => {
   }
 
   // Get user ID (MongoDB uses _id, not id)
-  const userId = req.user._id || req.user.id;
+  const userId = req.user._id;
   if (!userId) {
     console.log('❌ User ID missing from req.user');
     console.log('Available keys:', Object.keys(req.user));
@@ -139,12 +139,14 @@ exports.createBlog = asyncHandler(async (req, res) => {
   console.log('   User Role:', req.user.role);
   console.log('   Category:', category);
   
-  if (!canPostInCategory(req.user.role, category)) {
-    console.log('❌ User cannot post in category:', category);
+  // Get role name from populated role object
+  const roleName = req.user.role?.name || req.user.role;
+  if (!canPostInCategory(roleName, category)) {
+    console.log('âŒ User cannot post in category:', category);
     return res.status(403).json({
       success: false,
-      message: `Your role (${req.user.role}) cannot post in ${category} category`,
-      allowedCategories: ['member', 'volunteer', 'usher', 'worship_team'].includes(req.user.role) 
+      message: `Your role (${roleName}) cannot post in ${category} category`,
+      allowedCategories: ['member', 'volunteer', 'usher', 'worship_team'].includes(roleName) 
         ? ['testimonies'] 
         : ['testimonies', 'events', 'teaching', 'news']
     });
@@ -269,7 +271,7 @@ exports.deleteBlog = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 exports.approveBlog = asyncHandler(async (req, res) => {
   // ✅ Fixed: Use _id
-  const userId = req.user._id || req.user.id;
+  const userId = req.user._id;
   
   const blog = await Blog.findByIdAndUpdate(
     req.params.id,

@@ -59,7 +59,7 @@ const auditMiddleware = (req, res, next) => {
         userId: user?._id || user?.id,
         userEmail: user?.email || req.body?.email,
         userName: user?.name,
-        userRole: user?.role,
+        userRole: user?.role?.name || user?.role,
         action,
         resourceType,
         resourceId: req.params?.id || null,

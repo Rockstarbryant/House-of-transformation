@@ -52,7 +52,7 @@ exports.updateUser = asyncHandler(async (req, res) => {
   const { name, email, phone, bio, location, avatar } = req.body;
    
   // Check if user is updating their own profile or is admin
-  if (req.user.id !== req.params.id && req.user.role !== 'admin') {
+  if (req.user.role?.name !== 'admin' && req.user._id !== req.params.id) {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to update this profile' 
@@ -86,39 +86,54 @@ exports.updateUser = asyncHandler(async (req, res) => {
 // @route   PUT /api/users/:id/role
 // @access  Private/Admin
 exports.updateUserRole = asyncHandler(async (req, res) => {
-  const { role } = req.body;
+  const { roleId } = req.body;
 
   // Verify requester is admin
-  if (req.user.role !== 'admin') {
+  if (req.user.role?.name !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to update roles' 
     });
   }
 
-  const validRoles = ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'];
-  if (!validRoles.includes(role)) {
+  if (!roleId) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Invalid role' 
+      message: 'roleId is required' 
     });
   }
 
-  const user = await User.findByIdAndUpdate(
-    req.params.id,
-    { role },
-    { new: true, runValidators: true }
-  ).select('-password');
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role: roleId },
+      { new: true, runValidators: true }
+    ).populate('role');
 
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: `User role updated to ${user.role.name}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: {
+          id: user.role._id,
+          name: user.role.name,
+          permissions: user.role.permissions
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
-
-  res.json({
-    success: true,
-    user,
-    message: `User role updated to ${role}`
-  });
 });
 
 // @desc    Search users by name or email
@@ -164,8 +179,21 @@ exports.getUsersByRole = asyncHandler(async (req, res) => {
     });
   }
 
-  const users = await User.find({ role })
+  // Get the role object from DB first
+  const Role = require('../models/Role');
+  const roleObj = await Role.findOne({ name: role.toLowerCase() });
+  
+  if (!roleObj) {
+    return res.status(404).json({
+      success: false,
+      message: 'Role not found'
+    });
+  }
+
+  // Query users by role ObjectId
+  const users = await User.find({ role: roleObj._id })
     .select('-password')
+    .populate('role', 'name')
     .sort({ name: 1 });
 
   res.json({
@@ -179,7 +207,7 @@ exports.getUsersByRole = asyncHandler(async (req, res) => {
 // @route   DELETE /api/users/:id
 // @access  Private/Admin
 exports.deleteUser = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role?.name !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized' 
@@ -265,10 +293,10 @@ exports.getAllUsersWithPagination = asyncHandler(async (req, res) => {
 // @route   POST /api/users/bulk/role-update
 // @access  Private/Admin
 exports.bulkUpdateRoles = asyncHandler(async (req, res) => {
-  const { userIds, role } = req.body;
+  const { userIds, roleId } = req.body;
 
   // Verify requester is admin
-  if (req.user.role !== 'admin') {
+  if (req.user.role?.name !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized' 
@@ -282,17 +310,27 @@ exports.bulkUpdateRoles = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!role) {
+  if (!roleId) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Role required' 
+      message: 'roleId required' 
     });
   }
 
   try {
+    // Verify role exists
+    const Role = require('../models/Role');
+    const roleExists = await Role.findById(roleId);
+    if (!roleExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Role not found'
+      });
+    }
+
     const result = await User.updateMany(
       { _id: { $in: userIds } },
-      { role },
+      { role: roleId },
       { runValidators: true }
     );
 
@@ -316,7 +354,7 @@ exports.sendBulkNotification = asyncHandler(async (req, res) => {
   const { role, message } = req.body;
 
   // Verify requester is admin
-  if (req.user.role !== 'admin') {
+  if (req.user.role?.name !== 'admin') {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized' 
@@ -331,13 +369,26 @@ exports.sendBulkNotification = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Find users by role (or all if role is 'all')
-    const filter = role && role !== 'all' ? { role } : {};
+    let filter = {};
+    
+    if (role && role !== 'all') {
+      // Get role object by name
+      const Role = require('../models/Role');
+      const roleObj = await Role.findOne({ name: role.toLowerCase() });
+      
+      if (!roleObj) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
+        });
+      }
+      
+      filter.role = roleObj._id;
+    }
     
     const users = await User.find(filter).select('_id email');
 
-    // TODO: Integrate with your notification system (email, SMS, push notifications)
-    // For now, just return the count
+    // TODO: Integrate with your notification system
     
     res.json({
       success: true,
@@ -361,12 +412,14 @@ exports.getUserStats = asyncHandler(async (req, res) => {
     const active = await User.countDocuments({ isActive: true });
     const inactive = await User.countDocuments({ isActive: false });
 
-    // Count by role
+    // Get all roles
+    const Role = require('../models/Role');
+    const roles = await Role.find({}, 'name');
+
+    // Count users by role
     const byRole = {};
-    const roles = ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'];
-    
-    for (const r of roles) {
-      byRole[r] = await User.countDocuments({ role: r });
+    for (const role of roles) {
+      byRole[role.name] = await User.countDocuments({ role: role._id });
     }
 
     res.json({

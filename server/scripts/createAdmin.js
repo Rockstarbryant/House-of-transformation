@@ -1,3 +1,217 @@
+// server/scripts/createAdmin.js
+const mongoose = require('mongoose');
+const path = require('path');
+const dotenv = require('dotenv');
+const readline = require('readline');
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+const User = require('../models/User');
+const Role = require('../models/Role');
+const connectDB = require('../config/database');
+const { createClient } = require('@supabase/supabase-js');
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const getArg = (flag) => {
+  const index = args.indexOf(flag);
+  return index > -1 ? args[index + 1] : null;
+};
+
+const email = getArg('--email');
+const password = getArg('--password');
+const name = getArg('--name');
+
+if (!email || !password || !name) {
+  console.error('❌ Missing required arguments');
+  console.log('Usage: node server/scripts/createAdmin.js --email <email> --password <password> --name <name>');
+  console.log('Example: node server/scripts/createAdmin.js --email admin@church.com --password Admin123! --name "Admin User"');
+  process.exit(1);
+}
+
+// Initialize Supabase Admin Client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY // Use service key for admin operations
+);
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const askQuestion = (question) => {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
+  });
+};
+
+const createAdmin = async () => {
+  try {
+    console.log('🔐 CREATE ADMIN USER');
+    console.log('================================================');
+    
+    // Connect to MongoDB
+    console.log('📦 Connecting to MongoDB...');
+    await connectDB();
+    console.log('   ✓ MongoDB connected');
+
+    console.log('📝 Admin Details:');
+    console.log(`   Email: ${email}`);
+    console.log(`   Name: ${name}`);
+    console.log(`   Role: admin\n`);
+
+    // Get the admin role from MongoDB
+    console.log('🔍 Fetching admin role...');
+    const adminRole = await Role.findOne({ name: 'admin' });
+    
+    if (!adminRole) {
+      console.error('❌ Admin role not found in database!');
+      console.log('   Run: node server/scripts/seedRoles.js first');
+      process.exit(1);
+    }
+    
+    console.log(`   ✓ Found admin role (ID: ${adminRole._id})\n`);
+
+    // Check if user exists in Supabase
+    console.log('🔍 Checking if user already exists in Supabase...');
+    const { data: existingSupabaseUsers, error: listError } = await supabase.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('❌ Error checking Supabase users:', listError.message);
+      process.exit(1);
+    }
+
+    const existingSupabaseUser = existingSupabaseUsers.users.find(u => u.email === email);
+    
+    let supabaseUserId;
+
+    if (existingSupabaseUser) {
+      console.log('   ⚠️  User already exists in Supabase Auth');
+      console.log(`   Supabase UID: ${existingSupabaseUser.id}\n`);
+      supabaseUserId = existingSupabaseUser.id;
+
+      // Check if user exists in MongoDB
+      const existingMongoUser = await User.findOne({ supabase_uid: supabaseUserId });
+      
+      if (existingMongoUser) {
+        console.log('✓ User already exists in both systems');
+        
+        // Check if already admin
+        if (existingMongoUser.role.toString() === adminRole._id.toString()) {
+          console.log('✓ User is already an admin!');
+          process.exit(0);
+        }
+
+        // Ask if they want to update role
+        console.log('Would you like to:');
+        console.log('  1. Update role to admin');
+        console.log('  2. Cancel');
+        
+        const choice = await askQuestion('Enter choice (1 or 2): ');
+        
+        if (choice === '1') {
+          console.log('Updating role to admin...');
+          existingMongoUser.role = adminRole._id; // ✅ Use ObjectId, not string
+          existingMongoUser.name = name; // Update name if provided
+          await existingMongoUser.save();
+          
+          console.log('\n✅ SUCCESS!');
+          console.log('================================================');
+          console.log('✓ User updated to admin role');
+          console.log(`📧 Email: ${existingMongoUser.email}`);
+          console.log(`👤 Name: ${existingMongoUser.name}`);
+          console.log(`🔑 Role: admin`);
+          console.log(`🆔 Supabase UID: ${existingMongoUser.supabase_uid}`);
+          console.log('================================================\n');
+        } else {
+          console.log('❌ Operation cancelled');
+        }
+        
+        rl.close();
+        process.exit(0);
+      }
+
+      // User exists in Supabase but not MongoDB - create MongoDB profile
+      console.log('📝 Creating MongoDB profile for existing Supabase user...');
+      
+    } else {
+      // Create new user in Supabase
+      console.log('📝 Creating new user in Supabase Auth...');
+      
+      const { data: newSupabaseUser, error: signUpError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          name
+        }
+      });
+
+      if (signUpError) {
+        console.error('❌ Error creating Supabase user:', signUpError.message);
+        process.exit(1);
+      }
+
+      console.log('   ✓ Supabase user created');
+      console.log(`   Supabase UID: ${newSupabaseUser.user.id}\n`);
+      supabaseUserId = newSupabaseUser.user.id;
+    }
+
+    // Create MongoDB user profile
+    console.log('📝 Creating MongoDB user profile...');
+    
+    const newUser = await User.create({
+      supabase_uid: supabaseUserId,
+      email,
+      name,
+      role: adminRole._id, // ✅ Use ObjectId reference, not string
+      username: email.split('@')[0]
+    });
+
+    console.log('   ✓ MongoDB user created\n');
+
+    // Populate role for display
+    await newUser.populate('role');
+
+    console.log('\n✅ SUCCESS!');
+    console.log('================================================');
+    console.log('✓ Admin user created successfully!');
+    console.log(`📧 Email: ${newUser.email}`);
+    console.log(`👤 Name: ${newUser.name}`);
+    console.log(`🔑 Role: ${newUser.role.name}`);
+    console.log(`🆔 Supabase UID: ${newUser.supabase_uid}`);
+    console.log(`🔐 Password: ${password}`);
+    console.log('\n📋 Permissions:');
+    newUser.role.permissions.forEach(perm => {
+      console.log(`   ✓ ${perm}`);
+    });
+    console.log('================================================\n');
+    console.log('🎉 You can now login with these credentials!');
+    console.log(`   URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/login\n`);
+
+    rl.close();
+    process.exit(0);
+
+  } catch (error) {
+    console.error('❌ Error creating admin:');
+    console.error('  ', error.message);
+    
+    if (error.errors) {
+      Object.keys(error.errors).forEach(key => {
+        console.error(`   ${key}: ${error.errors[key].message}`);
+      });
+    }
+    
+    rl.close();
+    process.exit(1);
+  }
+};
+
+createAdmin();
+
 /**
  * CREATE ADMIN USER FROM TERMINAL
  * File: server/scripts/createAdmin.js
@@ -7,7 +221,7 @@
  * 
  * Or interactive:
  *   node server/scripts/createAdmin.js
- */
+ 
 
 const { createClient } = require('@supabase/supabase-js');
 const mongoose = require('mongoose');
@@ -207,9 +421,9 @@ async function createAdmin() {
   }
 }
 
-/**
+
  * Simple prompting function for interactive mode
- */
+ 
 function question(prompt) {
   return new Promise((resolve) => {
     process.stdout.write(prompt);
@@ -222,3 +436,4 @@ function question(prompt) {
 
 // Run the script
 createAdmin();
+*/

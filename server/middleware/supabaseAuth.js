@@ -57,10 +57,11 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    // Attach to request
-    req.user = mongoUser.toObject();
-    req.user.supabase_uid = supabaseUser.id;
-    req.user.email = supabaseUser.email;
+    // Attach to request - POPULATE ROLE
+      const userWithRole = await User.findById(mongoUser._id).populate('role');
+      req.user = userWithRole.toObject();
+      req.user.supabase_uid = supabaseUser.id;
+      req.user.email = supabaseUser.email;
 
     console.log('[AUTH-MIDDLEWARE] User authenticated:', req.user.email);
     next();
@@ -126,26 +127,54 @@ exports.optionalAuth = async (req, res, next) => {
  * Must be used AFTER protect middleware
  * Usage: router.post('/admin', protect, authorize('admin'), controller)
  */
-exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    // protect middleware should have set req.user
-    if (!req.user) {
-      return res.status(401).json({ 
+exports.authorize = (...roleNames) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not authenticated' 
+        });
+      }
+
+      // Check if roleNames includes the string 'admin' or other legacy names
+      // If so, do simple string check on user object
+      if (roleNames.includes('admin') || roleNames.includes('pastor') || roleNames.includes('bishop')) {
+        // NEW: Populate role and check role.name
+        const User = require('../models/User');
+        const fullUser = await User.findById(req.user._id).populate('role');
+        
+        if (!fullUser || !fullUser.role) {
+          return res.status(403).json({ 
+            success: false,
+            message: 'User has no role assigned',
+            requiredRoles: roleNames
+          });
+        }
+
+        // Check if user's role name matches any of the required role names
+        if (!roleNames.includes(fullUser.role.name)) {
+          return res.status(403).json({ 
+            success: false,
+            message: `This action requires one of these roles: ${roleNames.join(', ')}`,
+            requiredRoles: roleNames,
+            userRole: fullUser.role.name
+          });
+        }
+
+        // Attach populated role to request
+        req.user = fullUser.toObject();
+        next();
+      } else {
+        // If checking permissions instead, pass to requirePermission
+        next();
+      }
+    } catch (error) {
+      console.error('[AUTH] authorize() error:', error);
+      res.status(500).json({
         success: false,
-        message: 'User not authenticated' 
+        message: 'Authorization check failed'
       });
     }
-
-    // Check if user's role is in allowed roles
-    if (!req.user.role || !roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false,
-        message: `This action requires one of these roles: ${roles.join(', ')}`,
-        requiredRoles: roles,
-        userRole: req.user.role || 'none'
-      });
-    }
-
-    next();
   };
 };

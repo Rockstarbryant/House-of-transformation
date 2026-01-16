@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const User = require('../models/User');
+const Role = require('../models/Role');
 const config = require('../config/env');
 const auditService = require('../services/auditService');
 const { protect } = require('../middleware/supabaseAuth');
@@ -78,28 +79,50 @@ router.post('/signup', signupLimiter, async (req, res) => {
     const supabaseUid = authData.user.id;
     console.log('[AUTH-SIGNUP] User created in Supabase:', supabaseUid);
 
-    // Create MongoDB user profile
+    // FIX: Get the 'member' role ObjectId
+    console.log('[AUTH-SIGNUP] Fetching member role...');
+    const memberRole = await Role.findOne({ name: 'member' });
+    
+    if (!memberRole) {
+      console.error('[AUTH-SIGNUP] Member role not found in database');
+      await auditService.logAuth('signup', req, null, false, new Error('Member role not found'));
+      return res.status(500).json({ 
+        success: false, 
+        message: 'System error: Default role not configured' 
+      });
+    }
+
+    console.log('[AUTH-SIGNUP] Found member role:', memberRole._id);
+
+    // Create MongoDB user profile with role ObjectId
     console.log('[AUTH-SIGNUP] Creating MongoDB profile...');
     const user = await User.create({
       supabase_uid: supabaseUid,
       name,
       email,
-      role: 'member', // Default role
+      role: memberRole._id, // FIX: Pass ObjectId, not string
       isActive: true
     });
 
     console.log('[AUTH-SIGNUP] User profile created:', user._id);
     await auditService.logAuth('signup', req, user, true);
 
+    // Populate role for response
+    const populatedUser = await User.findById(user._id).populate('role');
+
     res.status(201).json({
       success: true,
       message: 'Account created successfully!',
       user: {
-        id: user._id,
+        id: populatedUser._id,
         supabase_uid: supabaseUid,
-        name: user.name,
-        email: user.email,
-        role: user.role
+        name: populatedUser.name,
+        email: populatedUser.email,
+        role: {
+          id: populatedUser.role._id,
+          name: populatedUser.role.name,
+          permissions: populatedUser.role.permissions || []
+        }
       }
     });
 
@@ -144,9 +167,9 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Get MongoDB user profile
+    // Get MongoDB user profile with role populated
     console.log('[AUTH-LOGIN] Fetching MongoDB profile...');
-    const user = await User.findOne({ supabase_uid: authData.user.id });
+    const user = await User.findOne({ supabase_uid: authData.user.id }).populate('role');
 
     if (!user) {
       console.error('[AUTH-LOGIN] User profile not found:', authData.user.id);
@@ -169,7 +192,11 @@ router.post('/login', authLimiter, async (req, res) => {
         supabase_uid: user.supabase_uid,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role ? {
+          id: user.role._id,
+          name: user.role.name,
+          permissions: user.role.permissions || []
+        } : null
       }
     });
 
@@ -262,6 +289,49 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 /**
+ * GET /api/auth/me
+ * Get current authenticated user with role + permissions
+ * Used by frontend to load portal
+ */
+router.get('/me', protect, async (req, res) => {
+  try {
+    console.log('[AUTH-ME] Fetching user profile:', req.user.email);
+
+    const user = await User.findById(req.user._id).populate('role');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        supabase_uid: user.supabase_uid,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        role: user.role ? {
+          id: user.role._id,
+          name: user.role.name,
+          description: user.role.description,
+          permissions: user.role.permissions || []
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH-ME] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user profile'
+    });
+  }
+});
+
+/**
  * GET /api/auth/verify
  * Get current authenticated user (protected route)
  */
@@ -270,7 +340,7 @@ router.get('/verify', protect, async (req, res) => {
     console.log('[AUTH-VERIFY] Token verification for:', req.user.email);
 
     // protect middleware already attached req.user
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).populate('role');
 
     if (!user) {
       return res.status(404).json({ 
@@ -286,7 +356,11 @@ router.get('/verify', protect, async (req, res) => {
         supabase_uid: user.supabase_uid,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role ? {
+          id: user.role._id,
+          name: user.role.name,
+          permissions: user.role.permissions || []
+        } : null,
         avatar: user.avatar
       }
     });

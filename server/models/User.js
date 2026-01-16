@@ -34,11 +34,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  
+  // ===== CHANGED FROM STRING ENUM TO ROLE REFERENCE =====
   role: {
-    type: String,
-    enum: ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'],
-    default: 'member'
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    sparse: true,
+    // Default will be set to 'member' role ID in pre-save hook or on signup
   },
+  
   ministries: [{
     type: String
   }],
@@ -66,21 +70,32 @@ const userSchema = new mongoose.Schema({
 });
 
 // Generate username from email if not provided
-userSchema.pre('save', function(next) {
+userSchema.pre('save', async function(next) {
   if (!this.username && this.email) {
     this.username = this.email.split('@')[0] + Math.random().toString(36).substr(2, 9);
   }
   this.updatedAt = Date.now();
+  
+  // Set default role to 'member' if not assigned
+  if (!this.role) {
+    try {
+      const Role = require('./Role');
+      const memberRole = await Role.findOne({ name: 'member' });
+      if (memberRole) {
+        this.role = memberRole._id;
+      }
+    } catch (error) {
+      console.warn('[USER-MODEL] Could not set default member role:', error.message);
+    }
+  }
+  
   next();
 });
-
-// Match password method NO LONGER NEEDED - DELETE
-// Supabase handles password validation
 
 // Hide sensitive fields
 userSchema.methods.toJSON = function() {
   const obj = this.toObject();
-  delete obj.password; // Keep for legacy, but won't exist
+  delete obj.password;
   return obj;
 };
 

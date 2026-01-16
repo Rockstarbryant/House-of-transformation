@@ -28,6 +28,7 @@ router.post(
   authorize('member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'),
   createBlog
 );
+// authorize() now handles role name checking correctly
 
 router.put('/:id', protect, updateBlog);
 router.delete('/:id', protect, deleteBlog);

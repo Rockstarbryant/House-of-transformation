@@ -414,10 +414,15 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (status === 'approved') {
-      const user = await User.findById(application.user._id);
-      if (user && user.role === 'member') {
-        user.role = 'volunteer';
-        await user.save();
+      const Role = require('../models/Role');
+      const user = await User.findById(application.user._id).populate('role');
+      
+      if (user) {
+        const volunteerRole = await Role.findOne({ name: 'volunteer' });
+        if (volunteerRole && user.role.name !== 'volunteer') {
+          user.role = volunteerRole._id;
+          await user.save();
+        }
       }
     }
 

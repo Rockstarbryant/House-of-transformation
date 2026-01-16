@@ -230,7 +230,7 @@ exports.updateStream = asyncHandler(async (req, res) => {
     }
 
     // ✅ SECURITY: Check if user is creator or admin
-    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
       return res.status(403).json({ 
         success: false, 
         message: 'Not authorized to update this stream' 
@@ -304,7 +304,7 @@ exports.archiveStream = asyncHandler(async (req, res) => {
     }
 
     // ✅ SECURITY: Check authorization
-    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
       return res.status(403).json({ 
         success: false, 
         message: 'Not authorized' 
@@ -410,7 +410,7 @@ exports.deleteStream = asyncHandler(async (req, res) => {
     }
 
     // ✅ SECURITY: Check authorization
-    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
       return res.status(403).json({ 
         success: false, 
         message: 'Not authorized to delete' 
