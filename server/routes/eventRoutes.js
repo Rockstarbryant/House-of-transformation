@@ -20,6 +20,7 @@ router.route('/:id')
   .put(protect, authorize('admin'), updateEvent)
   .delete(protect, authorize('admin'), deleteEvent);
 
-router.post('/:id/register', protect, registerForEvent);
+//router.post('/:id/register', protect, registerForEvent);
+router.post('/:id/register', registerForEvent);
 
 module.exports = router;

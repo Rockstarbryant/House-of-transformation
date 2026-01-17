@@ -46,29 +46,80 @@ exports.createEvent = async (req, res) => {
 
 // @desc    Register for event
 // @route   POST /api/events/:id/register
-// @access  Private
+// @access  Public (now accepts both authenticated and visitor registrations)
+
 exports.registerForEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) {
-      return res.status(404).json({ message: 'Event not found' });
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+
+    // Check capacity if exists
+    if (event.capacity && event.registrations.length >= event.capacity) {
+      return res.status(400).json({ success: false, message: 'Event is full' });
+    }
+
+    // Handle visitor registration (no authentication required)
+    if (req.body.visitorDetails) {
+      const { name, email, phone, attendanceTime } = req.body.visitorDetails;
+      
+      // Check if visitor already registered (by email)
+      const alreadyRegistered = event.registrations.some(
+        reg => reg.visitorEmail === email
+      );
+
+      if (alreadyRegistered) {
+        return res.status(400).json({ success: false, message: 'You are already registered for this event' });
+      }
+
+      event.registrations.push({
+        isVisitor: true,
+        visitorName: name,
+        visitorEmail: email,
+        visitorPhone: phone || '',
+        attendanceTime: attendanceTime,
+        registeredAt: new Date()
+      });
+
+      await event.save();
+
+      return res.json({ 
+        success: true, 
+        message: 'Successfully registered as visitor',
+        registration: {
+          name,
+          email,
+          attendanceTime
+        }
+      });
+    }
+
+    // Handle authenticated user registration
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     // Check if already registered
     const alreadyRegistered = event.registrations.some(
-      reg => reg.user.toString() === req.user.id
+      reg => reg.user && reg.user.toString() === req.user.id
     );
 
     if (alreadyRegistered) {
-      return res.status(400).json({ message: 'Already registered for this event' });
+      return res.status(400).json({ success: false, message: 'Already registered for this event' });
     }
 
-    event.registrations.push({ user: req.user.id });
+    event.registrations.push({ 
+      user: req.user.id,
+      isVisitor: false,
+      registeredAt: new Date()
+    });
+    
     await event.save();
 
     res.json({ success: true, message: 'Successfully registered for event' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
