@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  BarChart, 
-  Edit, 
+  BarChart3, 
   Users, 
-  BookOpen, 
-  Calendar, 
-  Newspaper, 
-  Image, 
-  Play, 
   TrendingUp, 
+  Clock,
   ArrowRight,
+  AlertCircle,
+  Activity,
+  BookOpen,
+  Calendar,
+  Newspaper,
   UserPlus,
-  Clock
+  MessageSquare,
+  CheckCircle,
+  ArrowUpRight
 } from 'lucide-react';
 import Card from '../common/Card';
 import { sermonService } from '../../services/api/sermonService';
@@ -20,7 +22,6 @@ import { eventService } from '../../services/api/eventService';
 import { volunteerService } from '../../services/api/volunteerService';
 import { feedbackService } from '../../services/api/feedbackService';
 import api from '../../services/api/authService';
-import { MessageSquare } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [realStats, setRealStats] = useState({
@@ -45,34 +46,24 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
 
-      // ✅ FIXED: Make ALL requests in parallel using Promise.all()
-      // This loads everything at the same time instead of one after another
+      // Make ALL requests in parallel using Promise.all()
       const [sermonsData, eventsData, usersResponse, volStatsData, feedbackData] = await Promise.all([
-        // Get sermons
         sermonService.getSermons().catch(err => {
           console.error('Error fetching sermons:', err);
           return { sermons: [] };
         }),
-
-        // Get events
         eventService.getEvents().catch(err => {
           console.error('Error fetching events:', err);
           return { events: [] };
         }),
-
-        // Get users
         api.get('/users').catch(err => {
           console.error('Error fetching users:', err);
           return { data: { users: [] } };
         }),
-
-        // Get volunteer stats
         volunteerService.getStats().catch(err => {
           console.error('Error fetching volunteer stats:', err);
           return { success: false, stats: {} };
         }),
-
-        // Get feedback stats
         feedbackService.getAllFeedback().catch(err => {
           console.error('Error fetching feedback:', err);
           return { feedback: [] };
@@ -83,10 +74,19 @@ const AdminDashboard = () => {
       const users = usersResponse.data?.users || [];
       const activeCount = users.filter(u => u.isActive).length;
       const inactiveCount = users.filter(u => !u.isActive).length;
-      const adminCount = users.filter(u => u.role === 'admin').length;
       const recentUsersData = users
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, 5);
+      // Helper to safely get role name
+      const getRoleName = (role) => {
+      if (!role) return null;
+      if (typeof role === 'string') return role;
+      if (typeof role === 'object' && role.name) return role.name;
+      return null;
+      };
+
+      const adminCount = users.filter(u => getRoleName(u.role) === 'admin').length;
+      
 
       // Process volunteer stats
       const volunteerStats = volStatsData.success && volStatsData.stats ? {
@@ -150,22 +150,73 @@ const AdminDashboard = () => {
     });
   };
 
+  // Calculate engagement rate
+  const engagementRate = realStats.totalMembers > 0 
+    ? Math.round((realStats.activeMembers / realStats.totalMembers) * 100) 
+    : 0;
+
+   // Add these utility functions at the TOP of AdminDashboard.jsx, BEFORE the component definition
+
+const getRoleDisplayName = (role) => {
+  if (!role) return 'Unknown';
+  
+  // If role is an object with a 'name' property
+  if (typeof role === 'object' && role.name) {
+    return role.name.replace(/_/g, ' ').toUpperCase();
+  }
+  
+  // If role is a string
+  if (typeof role === 'string') {
+    return role.replace(/_/g, ' ').toUpperCase();
+  }
+  
+  return 'Unknown';
+};
+
+const getRoleColor = (role) => {
+  // Extract role name from object or string
+  let roleName = '';
+  
+  if (typeof role === 'object' && role.name) {
+    roleName = role.name;
+  } else if (typeof role === 'string') {
+    roleName = role;
+  }
+  
+  const colors = {
+    'admin': 'bg-purple-100 text-purple-800',
+    'pastor': 'bg-red-100 text-red-800',
+    'bishop': 'bg-orange-100 text-orange-800',
+    'volunteer': 'bg-indigo-100 text-indigo-800',
+    'usher': 'bg-blue-100 text-blue-800',
+    'worship_team': 'bg-pink-100 text-pink-800',
+    'member': 'bg-gray-100 text-gray-800'
+  };
+  
+  return colors[roleName] || 'bg-gray-100 text-gray-800';
+};
+
   return (
-    <div className="w-full mx-auto px-4 py-8">
+    <div className="w-full mx-auto px-4 py-6 max-w-7xl">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-blue-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage your church community and content</p>
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+            <p className="text-gray-600">Overview of your church operations</p>
+          </div>
+          <Link 
+            to="/" 
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition"
+          >
+            ← Back to Site
+          </Link>
         </div>
-        <Link to="/" className="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 font-semibold transition">
-          ← Back to Site
-        </Link>
       </div>
 
-      {/* Loading Skeleton */}
+      {/* Loading State */}
       {loading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map(i => (
             <Card key={i} className="animate-pulse">
               <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
@@ -175,50 +226,75 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Key Metrics */}
+      {/* Main Content */}
       {!loading && (
         <>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-              <BarChart size={28} /> Key Metrics
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="border-l-4 border-blue-900">
-                <p className="text-gray-600 text-sm mb-2">Total Members</p>
-                <p className="text-3xl font-bold text-blue-900">{realStats.totalMembers}</p>
-                <p className="text-xs text-green-600 mt-2">+{realStats.newMembers} this month</p>
-              </Card>
+          {/* Key Metrics - Top Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Total Members */}
+            <Card className="border-l-4 border-blue-600 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Users className="text-blue-600" size={20} />
+                </div>
+                <div className="flex items-center gap-1 text-green-600">
+                  <ArrowUpRight size={16} />
+                  <span className="text-xs font-bold">+{realStats.newMembers}</span>
+                </div>
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-1">{realStats.totalMembers}</h3>
+              <p className="text-sm font-medium text-gray-600">Total Members</p>
+              <p className="text-xs text-gray-500 mt-1">This month</p>
+            </Card>
 
-              <Card className="border-l-4 border-green-600">
-                <p className="text-gray-600 text-sm mb-2">Active Members</p>
-                <p className="text-3xl font-bold text-green-600">{realStats.activeMembers}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {realStats.totalMembers > 0 ? Math.round((realStats.activeMembers / realStats.totalMembers) * 100) : 0}% active
-                </p>
-              </Card>
+            {/* Active Members */}
+            <Card className="border-l-4 border-green-600 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 bg-green-50 rounded-lg">
+                  <Activity className="text-green-600" size={20} />
+                </div>
+                <div className="flex items-center gap-1 text-green-600">
+                  <span className="text-xs font-bold">{engagementRate}%</span>
+                </div>
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-1">{realStats.activeMembers}</h3>
+              <p className="text-sm font-medium text-gray-600">Active Members</p>
+              <p className="text-xs text-gray-500 mt-1">Engagement rate</p>
+            </Card>
 
-              <Card className="border-l-4 border-purple-600">
-                <p className="text-gray-600 text-sm mb-2">Active Volunteers</p>
-                <p className="text-3xl font-bold text-purple-600">{realStats.approvedVolunteers}</p>
-                <p className="text-xs text-gray-500 mt-2">{realStats.totalVolunteerHours} hours served</p>
-              </Card>
+            {/* Active Volunteers */}
+            <Card className="border-l-4 border-purple-600 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <UserPlus className="text-purple-600" size={20} />
+                </div>
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-1">{realStats.approvedVolunteers}</h3>
+              <p className="text-sm font-medium text-gray-600">Active Volunteers</p>
+              <p className="text-xs text-gray-500 mt-1">{realStats.totalVolunteerHours} hours served</p>
+            </Card>
 
-              <Card className="border-l-4 border-orange-600">
-                <p className="text-gray-600 text-sm mb-2">Pending Applications</p>
-                <p className="text-3xl font-bold text-orange-600">{realStats.pendingApplications}</p>
-                <p className="text-xs text-gray-500 mt-2">Need review</p>
-              </Card>
-            </div>
+            {/* Pending Applications */}
+            <Card className="border-l-4 border-orange-600 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Clock className="text-orange-600" size={20} />
+                </div>
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-1">{realStats.pendingApplications}</h3>
+              <p className="text-sm font-medium text-gray-600">Pending Tasks</p>
+              <p className="text-xs text-gray-500 mt-1">Awaiting review</p>
+            </Card>
           </div>
 
-          {/* Volunteer Alert */}
+          {/* Alert for Pending Applications */}
           {realStats.pendingApplications > 0 && (
-            <div className="mb-8">
-              <div className="bg-orange-50 border-l-4 border-orange-400 p-6 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Clock className="text-orange-600" size={32} />
+            <div className="mb-6 bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="text-orange-600 flex-shrink-0" size={24} />
                   <div>
-                    <h3 className="text-lg font-bold text-orange-900 mb-1">
+                    <h3 className="font-bold text-orange-900">
                       {realStats.pendingApplications} Volunteer Application{realStats.pendingApplications !== 1 ? 's' : ''} Awaiting Review
                     </h3>
                     <p className="text-sm text-orange-700">
@@ -227,206 +303,238 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <Link 
-                  to="/admin/volunteers"
-                  className="bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-2 whitespace-nowrap"
+                  to="/volunteers"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition flex items-center gap-2 whitespace-nowrap"
                 >
                   Review Now
-                  <ArrowRight size={20} />
+                  <ArrowRight size={16} />
                 </Link>
               </div>
             </div>
           )}
 
-          {/* Content Stats */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-blue-900 mb-4">Content Library</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Card className="text-center">
-                <BookOpen className="mx-auto text-blue-900 mb-2" size={28} />
-                <p className="text-gray-600 text-sm mb-1">Sermons</p>
-                <p className="text-2xl font-bold text-blue-900">{realStats.totalSermons}</p>
-              </Card>
+          {/* No Pending Alert */}
+          {realStats.pendingApplications === 0 && (
+            <div className="mb-6 bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="text-green-600" size={20} />
+                <div>
+                  <h3 className="font-bold text-green-900">All Clear!</h3>
+                  <p className="text-sm text-green-700">No pending volunteer applications. All applications have been reviewed.</p>
+                </div>
+              </div>
+            </div>
+          )}
 
-              <Card className="text-center">
-                <Calendar className="mx-auto text-blue-900 mb-2" size={28} />
-                <p className="text-gray-600 text-sm mb-1">Events</p>
-                <p className="text-2xl font-bold text-blue-900">{realStats.totalEvents}</p>
-              </Card>
+          {/* Content Overview */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Content Overview</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link to="/sermons" className="group">
+                <Card className="text-center hover:shadow-lg hover:border-blue-300 transition-all">
+                  <div className="inline-flex p-3 bg-blue-50 rounded-lg mb-3">
+                    <BookOpen className="text-blue-600" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">{realStats.totalSermons}</p>
+                  <p className="text-sm font-medium text-gray-600">Sermons</p>
+                  <p className="text-xs text-blue-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">View all →</p>
+                </Card>
+              </Link>
 
-              <Card className="text-center">
-                <Newspaper className="mx-auto text-blue-900 mb-2" size={28} />
-                <p className="text-gray-600 text-sm mb-1">Blog Posts</p>
-                <p className="text-2xl font-bold text-blue-900">-</p>
-              </Card>
+              <Link to="/events" className="group">
+                <Card className="text-center hover:shadow-lg hover:border-green-300 transition-all">
+                  <div className="inline-flex p-3 bg-green-50 rounded-lg mb-3">
+                    <Calendar className="text-green-600" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">{realStats.totalEvents}</p>
+                  <p className="text-sm font-medium text-gray-600">Events</p>
+                  <p className="text-xs text-green-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">View all →</p>
+                </Card>
+              </Link>
+
+              <Link to="/blog" className="group">
+                <Card className="text-center hover:shadow-lg hover:border-purple-300 transition-all">
+                  <div className="inline-flex p-3 bg-purple-50 rounded-lg mb-3">
+                    <Newspaper className="text-purple-600" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">-</p>
+                  <p className="text-sm font-medium text-gray-600">Blog Posts</p>
+                  <p className="text-xs text-purple-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Start writing →</p>
+                </Card>
+              </Link>
+
+              <Link to="/feedback" className="group">
+                <Card className="text-center hover:shadow-lg hover:border-pink-300 transition-all">
+                  <div className="inline-flex p-3 bg-pink-50 rounded-lg mb-3">
+                    <MessageSquare className="text-pink-600" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900 mb-1">{feedbackStats.total}</p>
+                  <p className="text-sm font-medium text-gray-600">Feedback</p>
+                  <p className="text-xs text-pink-600 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">View all →</p>
+                </Card>
+              </Link>
             </div>
           </div>
 
-          {/* Main Management Sections */}
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
-            {/* User Management */}
-            <Card className="md:col-span-1">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                  <Users size={24} /> Member Management
-                </h3>
-                <Users className="text-blue-900" size={24} />
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Member Management */}
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="text-blue-600" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">Member Management</h3>
               </div>
 
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                  <span className="font-semibold text-gray-700">Total Members</span>
-                  <span className="font-bold text-blue-900 text-lg">{realStats.totalMembers}</span>
+              <div className="space-y-3 mb-4">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Total Members</span>
+                  <span className="text-lg font-bold text-blue-600">{realStats.totalMembers}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="font-semibold text-gray-700">Active</span>
-                  <span className="font-bold text-green-600 text-lg">{realStats.activeMembers}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Active</span>
+                  <span className="text-lg font-bold text-green-600">{realStats.activeMembers}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                  <span className="font-semibold text-gray-700">Leadership</span>
-                  <span className="font-bold text-purple-600 text-lg">{realStats.adminCount}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Leadership</span>
+                  <span className="text-lg font-bold text-purple-600">{realStats.adminCount}</span>
                 </div>
                 {realStats.inactiveMembers > 0 && (
                   <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-                    <span className="font-semibold text-gray-700">Inactive</span>
-                    <span className="font-bold text-orange-600 text-lg">{realStats.inactiveMembers}</span>
+                    <span className="text-sm font-medium text-gray-700">Inactive</span>
+                    <span className="text-lg font-bold text-orange-600">{realStats.inactiveMembers}</span>
                   </div>
                 )}
               </div>
 
-              <Link to="/admin/users" className="w-full bg-blue-900 text-white py-3 rounded-lg font-bold hover:bg-blue-800 transition-colors block text-center flex items-center justify-center gap-2 group">
+              <Link 
+                to="/users" 
+                className="w-full block text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+              >
                 Manage All Members
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </Card>
 
-            {/* Content Management */}
-            <Card className="md:col-span-1">
-              <h3 className="text-xl font-bold text-blue-900 mb-6 flex items-center gap-2">
-                <Edit size={24} /> Content Management
-              </h3>
-              <div className="space-y-2">
-                <Link 
-                  to="/admin/sermons" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-blue-50 to-transparent hover:from-blue-100 transition-colors flex items-center gap-3 group"
-                >
-                  <BookOpen size={20} className="text-blue-900 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Manage Sermons</span>
-                  <span className="text-sm font-bold text-blue-900 bg-white px-2 py-1 rounded">{realStats.totalSermons}</span>
-                </Link>
+            {/* Performance Insights */}
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="text-green-600" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">Performance Insights</h3>
+              </div>
 
-                <Link 
-                  to="/admin/events" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-green-50 to-transparent hover:from-green-100 transition-colors flex items-center gap-3 group"
-                >
-                  <Calendar size={20} className="text-green-600 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Manage Events</span>
-                  <span className="text-sm font-bold text-green-600 bg-white px-2 py-1 rounded">{realStats.totalEvents}</span>
-                </Link>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Member Engagement</span>
+                    <span className="text-sm font-bold text-green-600">{engagementRate}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 rounded-full transition-all duration-500" 
+                      style={{ width: `${engagementRate}%` }} 
+                    />
+                  </div>
+                </div>
 
-                <Link 
-                  to="/admin/blog" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-50 to-transparent hover:from-purple-100 transition-colors flex items-center gap-3 group"
-                >
-                  <Newspaper size={20} className="text-purple-600 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Manage Blog Posts</span>
-                  <span className="text-sm font-bold text-purple-600 bg-white px-2 py-1 rounded">-</span>
-                </Link>
-
-                <Link 
-                  to="/admin/gallery" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-yellow-50 to-transparent hover:from-yellow-100 transition-colors flex items-center gap-3 group"
-                >
-                  <Image size={20} className="text-yellow-600 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Manage Gallery</span>
-                  <span className="text-sm font-bold text-yellow-600 bg-white px-2 py-1 rounded">-</span>
-                </Link>
-
-                <Link 
-                  to="/admin/livestream" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-red-50 to-transparent hover:from-red-100 transition-colors flex items-center gap-3 group"
-                >
-                  <Play size={20} className="text-red-600 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Manage Live Stream</span>
-                  <span className="text-sm font-bold text-red-600 bg-white px-2 py-1 rounded">Live</span>
-                </Link>
-
-                <Link 
-                  to="/admin/volunteers" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-50 to-transparent hover:from-indigo-100 transition-colors flex items-center gap-3 group relative"
-                >
-                  <UserPlus size={20} className="text-indigo-600 group-hover:scale-110 transition-transform" />
-                  <span className="flex-grow font-semibold text-gray-800">Volunteer Applications</span>
-                  <span className="text-sm font-bold text-indigo-600 bg-white px-2 py-1 rounded">{realStats.totalVolunteerApplications}</span>
-                  {realStats.pendingApplications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse">
-                      {realStats.pendingApplications}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Volunteer Participation</span>
+                    <span className="text-sm font-bold text-purple-600">
+                      {realStats.totalMembers > 0 
+                        ? Math.round((realStats.approvedVolunteers / realStats.totalMembers) * 100) 
+                        : 0}%
                     </span>
-                  )}
-                </Link>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-purple-500 rounded-full transition-all duration-500" 
+                      style={{ 
+                        width: `${realStats.totalMembers > 0 
+                          ? Math.round((realStats.approvedVolunteers / realStats.totalMembers) * 100) 
+                          : 0}%` 
+                      }} 
+                    />
+                  </div>
+                </div>
 
-                <Link 
-                  to="/admin/feedback" 
-                  className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-pink-50 to-transparent hover:from-pink-100 transition-colors flex items-center gap-3 group"
-                >
-                  <MessageSquare size={20} className="text-pink-600" />
-                  <span className="flex-grow font-semibold text-gray-800">Feedback & Testimonies</span>
-                  <span className="text-sm font-bold text-pink-600 bg-white px-2 py-1 rounded">
-                    {feedbackStats.total}
-                  </span>  
-                </Link>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Feedback Satisfaction</span>
+                    <span className="text-sm font-bold text-blue-600">
+                      {feedbackStats.total > 0 
+                        ? Math.round((feedbackStats.positive / feedbackStats.total) * 100) 
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                      style={{ 
+                        width: `${feedbackStats.total > 0 
+                          ? Math.round((feedbackStats.positive / feedbackStats.total) * 100) 
+                          : 0}%` 
+                      }} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-900 font-medium">
+                  📊 {engagementRate >= 80 
+                    ? 'Excellent engagement! Keep up the great work.' 
+                    : engagementRate >= 50
+                    ? 'Good engagement. Consider ways to increase member participation.'
+                    : 'Focus on engagement strategies to connect with more members.'}
+                </p>
               </div>
             </Card>
           </div>
 
-          {/* Recent Members */}
-          {recentUsers.length > 0 && (
-            <Card>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                  <TrendingUp size={24} /> Recently Joined Members
-                </h3>
-                <Link to="/admin/users" className="text-blue-900 hover:underline font-semibold text-sm">
-                  View All →
-                </Link>
-              </div>
+          {/* Recently Joined Members */}
+          {/* Recently Joined Members */}
+{recentUsers.length > 0 && (
+  <Card>
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <TrendingUp size={24} className="text-blue-600" />
+        Recently Joined Members
+      </h3>
+      <Link to="/users" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+        View All →
+      </Link>
+    </div>
 
-              <div className="space-y-3">
-                {recentUsers.map((user) => (
-                  <div key={user._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-4 flex-grow">
-                      <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-600">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                          user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                          user.role === 'pastor' ? 'bg-red-100 text-red-800' :
-                          user.role === 'volunteer' ? 'bg-indigo-100 text-indigo-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {user.role.replace('_', ' ').toUpperCase()}
-                        </span>
-                        <p className="text-xs text-gray-500 mt-1">Joined {formatDate(user.createdAt)}</p>
-                      </div>
-                      <Link
-                        to={`/profile/${user._id}`}
-                        className="p-2 text-blue-900 hover:bg-blue-100 rounded-lg transition"
-                        title="View profile"
-                      >
-                        <Users size={20} />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+    <div className="space-y-3">
+      {recentUsers.map((user) => {
+        // Safely extract role display info
+        const roleDisplay = getRoleDisplayName(user.role);
+        const roleColor = getRoleColor(user.role);
+        
+        return (
+          <div key={user._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                {user.name.charAt(0).toUpperCase()}
               </div>
-            </Card>
-          )}
+              <div>
+                <p className="font-semibold text-gray-900">{user.name}</p>
+                <p className="text-sm text-gray-600">{user.email}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${roleColor}`}>
+                {roleDisplay}
+              </span>
+              <p className="text-xs text-gray-500 mt-1">Joined {formatDate(user.createdAt)}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </Card>
+)}
         </>
       )}
     </div>
