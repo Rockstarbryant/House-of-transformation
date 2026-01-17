@@ -4,6 +4,7 @@ const Role = require('../models/Role');
 /**
  * Middleware to check if user has required permission(s)
  * Must be used AFTER protect middleware (which sets req.user)
+ * Admin role bypasses all permission checks
  * 
  * Usage:
  * router.post('/events', protect, requirePermission('manage:events'), eventController.create)
@@ -40,6 +41,13 @@ exports.requirePermission = (...requiredPermissions) => {
           requiredPermissions,
           userPermissions: []
         });
+      }
+
+      // ADMIN BYPASS - Admins have all permissions
+      if (user.role.name === 'admin') {
+        console.log('[PERMISSION] Admin bypass granted for user:', req.user.email);
+        req.user = user.toObject();
+        return next();
       }
 
       // Get user's permissions from role

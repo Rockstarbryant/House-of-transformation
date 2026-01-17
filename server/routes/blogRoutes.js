@@ -1,4 +1,6 @@
 const express = require('express');
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission, requireAdmin } = require('../middleware/requirePermission');
 const {
   getBlogs,
   getBlogsByCategory,
@@ -9,32 +11,21 @@ const {
   approveBlog,
   getPendingBlogs
 } = require('../controllers/blogController');
-//const { protect } = require('../middleware/auth');
-//const { protect } = require('../middleware/supabaseAuth');
-//const authorize = require('../middleware/roleAuth');
-const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 
-// Public routes
+// ===== PUBLIC ROUTES =====
 router.get('/', getBlogs);
 router.get('/category/:category', getBlogsByCategory);
 router.get('/:id', getBlog);
 
-// Protected routes
-router.post(
-  '/',
-  protect,
-  authorize('member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'),
-  createBlog
-);
-// authorize() now handles role name checking correctly
+// ===== PROTECTED ROUTES (Auth + manage:blog permission) =====
+router.post('/', protect, requirePermission('manage:blog'), createBlog);
+router.put('/:id', protect, requirePermission('manage:blog'), updateBlog);
+router.delete('/:id', protect, requirePermission('manage:blog'), deleteBlog);
 
-router.put('/:id', protect, updateBlog);
-router.delete('/:id', protect, deleteBlog);
-
-// Admin routes
-router.get('/pending', protect, authorize('admin'), getPendingBlogs);
-router.put('/:id/approve', protect, authorize('admin'), approveBlog);
+// ===== ADMIN ONLY ROUTES =====
+router.get('/pending', protect, requireAdmin, getPendingBlogs);
+router.put('/:id/approve', protect, requireAdmin, approveBlog);
 
 module.exports = router;

@@ -7,20 +7,20 @@ const {
   deleteEvent,
   registerForEvent
 } = require('../controllers/eventController');
-const { protect, authorize } = require('../middleware/supabaseAuth');
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission } = require('../middleware/requirePermission');
 
 const router = express.Router();
 
 router.route('/')
   .get(getEvents)
-  .post(protect, authorize('admin'), createEvent);
+  .post(protect, requirePermission('manage:events'), createEvent);
 
 router.route('/:id')
   .get(getEvent)
-  .put(protect, authorize('admin'), updateEvent)
-  .delete(protect, authorize('admin'), deleteEvent);
+  .put(protect, requirePermission('manage:events'), updateEvent)
+  .delete(protect, requirePermission('manage:events'), deleteEvent);
 
-//router.post('/:id/register', protect, registerForEvent);
 router.post('/:id/register', registerForEvent);
 
 module.exports = router;

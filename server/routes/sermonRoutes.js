@@ -1,5 +1,6 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/supabaseAuth');
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission } = require('../middleware/requirePermission');
 const {
   getSermons,
   getSermon,
@@ -16,12 +17,12 @@ const router = express.Router();
 router.get('/', getSermons);
 router.get('/:id', getSermon);
 
-// ===== PROTECTED & AUTHORIZED ROUTES (Admin/Pastor/Bishop only) =====
+// ===== PROTECTED & PERMISSION-BASED ROUTES =====
 // Create sermon (with optional thumbnail + multiple images)
 router.post(
   '/',
   protect,
-  authorize('pastor', 'bishop', 'admin'),
+  requirePermission('manage:sermons'),
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'images', maxCount: 4 }
@@ -33,7 +34,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('pastor', 'bishop', 'admin'),
+  requirePermission('manage:sermons'),
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'images', maxCount: 4 }
@@ -45,7 +46,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('pastor', 'bishop', 'admin'),
+  requirePermission('manage:sermons'),
   deleteSermon
 );
 

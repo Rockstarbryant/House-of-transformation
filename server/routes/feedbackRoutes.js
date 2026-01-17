@@ -1,6 +1,7 @@
-// feedbackRoutes.js
-
 const express = require('express');
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission, requireAdmin } = require('../middleware/requirePermission');
+const { optionalAuth } = require('../middleware/supabaseAuth');
 const {
   submitFeedback,
   getAllFeedback,
@@ -13,29 +14,28 @@ const {
   deleteFeedback,
   getStats
 } = require('../controllers/feedbackController');
-const { protect, authorize, optionalAuth } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 
-// ===== PUBLIC ROUTES (NO authentication required) =====
+// ===== PUBLIC ROUTES (NO AUTHENTICATION REQUIRED) =====
 // POST submit feedback - supports anonymous
 router.post('/', optionalAuth, submitFeedback);
 
 // GET public testimonies list
 router.get('/testimonies/public', getPublicTestimonies);
 
-// ✅ GET SINGLE PUBLIC TESTIMONY - MUST BE BEFORE generic /:id route
-router.get('/public/:id', getPublicTestimony); // Use controller to get single
+// GET SINGLE PUBLIC TESTIMONY (MUST BE BEFORE generic /:id route)
+router.get('/public/:id', getPublicTestimony);
 
-// ===== ADMIN ROUTES (MUST come BEFORE generic routes) =====
-router.get('/stats', protect, authorize('admin', 'pastor', 'bishop'), getStats);
+// ===== PROTECTED ROUTES (AUTH + manage:feedback PERMISSION REQUIRED) =====
+router.get('/stats', protect, requirePermission('manage:feedback'), getStats);
+router.get('/', protect, requirePermission('manage:feedback'), getAllFeedback);
+router.get('/:id', protect, requirePermission('manage:feedback'), getFeedback);
+router.put('/:id/status', protect, requirePermission('manage:feedback'), updateStatus);
+router.post('/:id/respond', protect, requirePermission('manage:feedback'), respondToFeedback);
+router.put('/:id/publish', protect, requirePermission('manage:feedback'), publishTestimony);
 
-// ===== ADMIN ROUTES (Generic - catches all other feedback endpoints) =====
-router.get('/', protect, authorize('admin', 'pastor', 'bishop'), getAllFeedback);
-router.get('/:id', protect, authorize('admin', 'pastor', 'bishop'), getFeedback);
-router.put('/:id/status', protect, authorize('admin', 'pastor', 'bishop'), updateStatus);
-router.post('/:id/respond', protect, authorize('admin', 'pastor', 'bishop'), respondToFeedback);
-router.put('/:id/publish', protect, authorize('admin', 'pastor', 'bishop'), publishTestimony);
-router.delete('/:id', protect, authorize('admin'), deleteFeedback);
+// ===== ADMIN ONLY ROUTE =====
+router.delete('/:id', protect, requireAdmin, deleteFeedback);
 
 module.exports = router;

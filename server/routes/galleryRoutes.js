@@ -1,11 +1,6 @@
-// ============================================
-// FILE 3: backend/routes/galleryRoutes.js
-// PATH: REPLACE entire file: backend/routes/galleryRoutes.js
-// DELETE the old one and paste this completely
-// ============================================
-
 const express = require('express');
-const { protect, authorize } = require('../middleware/supabaseAuth');
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission } = require('../middleware/requirePermission');
 const {
   getPhotos,
   uploadPhoto,
@@ -21,7 +16,7 @@ router.get('/', getPhotos);
 router.post(
   '/',
   protect,
-  authorize('pastor', 'bishop', 'admin'),
+  requirePermission('manage:gallery'),
   upload.single('photo'),
   uploadPhoto
 );
@@ -29,7 +24,7 @@ router.post(
 router.delete(
   '/:id',
   protect,
-  authorize('pastor', 'bishop', 'admin'),
+  requirePermission('manage:gallery'),
   deletePhoto
 );
 
