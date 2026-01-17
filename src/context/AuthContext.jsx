@@ -6,232 +6,223 @@ import api from '../services/api/authService';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(undefined); // undefined = we don't know yet, null = confirmed no user
+  const router = useRouter();
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Check authentication on mount - client-side only
   useEffect(() => {
     checkAuth();
   }, []);
 
-  /**
- * Normalize user data - convert role to consistent object format
- * Handles: string roles ('admin'), object roles ({_id, name, permissions}), etc.
- */
-const normalizeUser = (userData) => {
-  if (!userData) {
-    console.log('[AUTH-CONTEXT] normalizeUser: userData is null/undefined');
-    return null;
-  }
-
-  console.log('[AUTH-CONTEXT] normalizeUser: Input userData:', JSON.stringify(userData, null, 2));
-
-  let role = null;
-
-  // Extract role information
-  if (userData.role) {
-    if (typeof userData.role === 'string') {
-      // Old format: role is just a string
-      console.log('[AUTH-CONTEXT] normalizeUser: Role is string:', userData.role);
-      role = {
-        name: userData.role,
-        permissions: []
-      };
-    } else if (typeof userData.role === 'object' && userData.role !== null) {
-      // New format: role is an object
-      console.log('[AUTH-CONTEXT] normalizeUser: Role is object:', userData.role);
-      role = {
-        id: userData.role.id || userData.role._id,
-        name: userData.role.name || 'member',
-        permissions: Array.isArray(userData.role.permissions) 
-          ? userData.role.permissions 
-          : []
-      };
+  const checkAuth = async () => {
+    // Only run in browser
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return false;
     }
-  } else {
-    console.warn('[AUTH-CONTEXT] normalizeUser: No role found, defaulting to member');
-    role = { name: 'member', permissions: [] };
-  }
 
-  const normalized = {
-    id: userData.id || userData._id,
-    _id: userData._id || userData.id,
-    name: userData.name,
-    email: userData.email,
-    avatar: userData.avatar || null,
-    role: role
+    try {
+      console.log('[AUTH-CONTEXT] Checking authentication...');
+
+      const token = tokenService.getToken();
+
+      if (token) {
+        console.log('[AUTH-CONTEXT] Token found, verifying...');
+
+        try {
+          const response = await api.get('/auth/me');
+          if (response.data.success && response.data.user) {
+            console.log('[AUTH-CONTEXT] User verified:', response.data.user.email);
+            
+            // Ensure role.permissions is always an array
+            const userData = {
+              ...response.data.user,
+              role: {
+                ...response.data.user.role,
+                permissions: Array.isArray(response.data.user.role?.permissions) 
+                  ? response.data.user.role.permissions 
+                  : []
+              }
+            };
+            
+            setUser(userData);
+            return true;
+          } else {
+            console.log('[AUTH-CONTEXT] Token verification failed');
+            tokenService.removeToken();
+            setUser(null);
+            return false;
+          }
+        } catch (err) {
+          console.error('[AUTH-CONTEXT] Verification error:', err);
+          
+          // Try to refresh token
+          try {
+            const refreshToken = tokenService.getRefreshToken();
+            if (refreshToken) {
+              console.log('[AUTH-CONTEXT] Attempting token refresh...');
+              const refreshResponse = await api.post('/auth/refresh', { refreshToken });
+
+              if (refreshResponse.data.token) {
+                tokenService.setToken(refreshResponse.data.token);
+                if (refreshResponse.data.refreshToken) {
+                  tokenService.setRefreshToken(refreshResponse.data.refreshToken);
+                }
+
+                const retryResponse = await api.get('/auth/me');
+                if (retryResponse.data.user) {
+                  const userData = {
+                    ...retryResponse.data.user,
+                    role: {
+                      ...retryResponse.data.user.role,
+                      permissions: Array.isArray(retryResponse.data.user.role?.permissions) 
+                        ? retryResponse.data.user.role.permissions 
+                        : []
+                    }
+                  };
+                  setUser(userData);
+                  console.log('[AUTH-CONTEXT] Token refreshed and user verified');
+                  return true;
+                }
+              }
+            }
+            
+            tokenService.removeToken();
+            setUser(null);
+            return false;
+          } catch (refreshErr) {
+            console.error('[AUTH-CONTEXT] Token refresh failed:', refreshErr);
+            tokenService.removeToken();
+            setUser(null);
+            return false;
+          }
+        }
+      } else {
+        console.log('[AUTH-CONTEXT] No token found');
+        setUser(null);
+        return false;
+      }
+    } catch (err) {
+      console.error('[AUTH-CONTEXT] Auth check error:', err);
+      setUser(null);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  console.log('[AUTH-CONTEXT] normalizeUser: Output normalized user:', JSON.stringify(normalized, null, 2));
-  
-  return normalized;
-};
-
-  /**
-   * Check authentication status
-   */
-
-  const checkAuth = async () => {
-  try {
-    console.log('[AUTH-CONTEXT] ========== Starting Auth Check ==========');
-    
-    const token = tokenService.getToken();
-    
-    if (token) {
-      console.log('[AUTH-CONTEXT] Token found, verifying...');
-      console.log('[AUTH-CONTEXT] Token (first 20 chars):', token.substring(0, 20) + '...');
-      
-      try {
-        console.log('[AUTH-CONTEXT] Calling /auth/verify endpoint...');
-        const response = await api.get('/auth/verify');
-        
-        console.log('[AUTH-CONTEXT] Verify response received');
-        console.log('[AUTH-CONTEXT] Response status:', response.status);
-        console.log('[AUTH-CONTEXT] Response data:', JSON.stringify(response.data, null, 2));
-        
-        if (response.data.success && response.data.user) {
-          console.log('[AUTH-CONTEXT] User verified:', response.data.user.email);
-          console.log('[AUTH-CONTEXT] Raw user data from API:', response.data.user);
-          
-          const userData = normalizeUser(response.data.user);
-          
-          console.log('[AUTH-CONTEXT] Normalized user data:', userData);
-          console.log('[AUTH-CONTEXT] User role after normalization:', userData?.role);
-          
-          setUser(userData);
-          console.log('[AUTH-CONTEXT] ✅ User state updated successfully');
-        } else {
-          console.log('[AUTH-CONTEXT] Token verification failed - invalid response');
-          console.log('[AUTH-CONTEXT] Response:', response.data);
-          tokenService.removeToken();
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('[AUTH-CONTEXT] ❌ Verification error:', err);
-        console.error('[AUTH-CONTEXT] Error details:', {
-          message: err.message,
-          status: err.response?.status,
-          data: err.response?.data
-        });
-        tokenService.removeToken();
-        setUser(null);
-      }
-    } else {
-      console.log('[AUTH-CONTEXT] No token found in storage');
-      setUser(null);
-    }
-  } catch (err) {
-    console.error('[AUTH-CONTEXT] ❌ Auth check error:', err);
-    setUser(null);
-  } finally {
-    setIsLoading(false);
-    console.log('[AUTH-CONTEXT] ========== Auth Check Complete ==========');
-    console.log('[AUTH-CONTEXT] isLoading set to false');
-  }
-};
-
   const login = async (email, password) => {
-  setError(null);
-  try {
-    console.log('[AUTH-CONTEXT] ========== Login Attempt ==========');
-    console.log('[AUTH-CONTEXT] Login attempt for:', email);
+    setError(null);
+    try {
+      console.log('[AUTH-CONTEXT] Login attempt for:', email);
 
-    const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
 
-    console.log('[AUTH-CONTEXT] Login response received');
-    console.log('[AUTH-CONTEXT] Response data:', JSON.stringify(response.data, null, 2));
+      if (response.data.success && response.data.token) {
+        console.log('[AUTH-CONTEXT] Login successful');
 
-    if (response.data.success && response.data.token) {
-      console.log('[AUTH-CONTEXT] Login successful');
-      
-      tokenService.setToken(response.data.token);
-      console.log('[AUTH-CONTEXT] Token saved to storage');
-      
-      const userData = normalizeUser(response.data.user);
-      console.log('[AUTH-CONTEXT] User logged in:', userData.email, 'Role:', userData.role);
-      
-      setUser(userData);
-      console.log('[AUTH-CONTEXT] ✅ User state updated');
-      
-      return { success: true, user: userData };
-    }
-    
-    return { success: false, error: response.data.message || 'Login failed' };
-  } catch (error) {
-    console.error('[AUTH-CONTEXT] ❌ Login error:', error);
-    
-    if (error.response?.status === 429) {
-      const errorMsg = 'Too many login attempts. Please try again in 15 minutes.';
-      setError(errorMsg);
-      return { success: false, error: errorMsg, rateLimited: true };
-    }
-    
-    if (error.response?.status === 401) {
-      const errorMsg = 'Invalid email or password';
+        tokenService.setToken(response.data.token);
+        if (response.data.refreshToken) {
+          tokenService.setRefreshToken(response.data.refreshToken);
+        }
+
+        const userData = {
+          ...response.data.user,
+          role: {
+            ...response.data.user.role,
+            permissions: Array.isArray(response.data.user.role?.permissions) 
+              ? response.data.user.role.permissions 
+              : []
+          }
+        };
+
+        setUser(userData);
+        return { success: true, user: userData };
+      }
+
+      return { success: false, error: response.data.message || 'Login failed' };
+    } catch (error) {
+      console.error('[AUTH-CONTEXT] Login error:', error);
+
+      if (error.response?.status === 429) {
+        const errorMsg = 'Too many login attempts. Please try again in 15 minutes.';
+        setError(errorMsg);
+        return { success: false, error: errorMsg, rateLimited: true };
+      }
+
+      if (error.response?.status === 401) {
+        const errorMsg = 'Invalid email or password';
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      if (error.response?.status === 400) {
+        const data = error.response.data;
+        if (data.errors && Array.isArray(data.errors)) {
+          const fieldErrors = data.errors.map(e => ({
+            field: e.param,
+            message: e.msg
+          }));
+          return { success: false, validationErrors: fieldErrors };
+        }
+        return { success: false, error: data.message || 'Login failed' };
+      }
+
+      const errorMsg = error.response?.data?.message || error.message || 'Login failed';
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
-    
-    if (error.response?.status === 400) {
-      const data = error.response.data;
-      if (data.errors && Array.isArray(data.errors)) {
-        const fieldErrors = data.errors.map(e => ({ 
-          field: e.param, 
-          message: e.msg 
-        }));
-        return { success: false, validationErrors: fieldErrors };
-      }
-      return { success: false, error: data.message || 'Login failed' };
-    }
-    
-    const errorMsg = error.response?.data?.message || error.message || 'Login failed';
-    setError(errorMsg);
-    return { success: false, error: errorMsg };
-  }
-};
+  };
 
   const signup = async (userData) => {
     setError(null);
     try {
       const { name, email, password } = userData;
+
       console.log('[AUTH-CONTEXT] Signup attempt for:', email);
 
-      const response = await api.post('/auth/signup', { name, email, password });
+      const response = await api.post('/auth/signup', {
+        name,
+        email,
+        password
+      });
 
       if (response.data.success && response.data.user) {
-        console.log('[AUTH-CONTEXT] Signup successful');
+        console.log('[AUTH-CONTEXT] Signup successful, user created');
         return { success: true, user: response.data.user };
       }
-      
+
       return { success: false, error: response.data.message || 'Signup failed' };
     } catch (error) {
       console.error('[AUTH-CONTEXT] Signup error:', error);
-      
+
       if (error.response?.status === 429) {
         const errorMsg = 'Too many signup attempts. Please try again later.';
         setError(errorMsg);
         return { success: false, error: errorMsg, rateLimited: true };
       }
-      
+
       if (error.response?.status === 400) {
         const data = error.response.data;
-        
+
         if (data.message?.includes('already') || data.message?.includes('Email')) {
           const errorMsg = 'Email already registered. Please login instead.';
           setError(errorMsg);
           return { success: false, error: errorMsg };
         }
-        
+
         if (data.errors && Array.isArray(data.errors)) {
-          const fieldErrors = data.errors.map(e => ({ 
-            field: e.param, 
-            message: e.msg 
+          const fieldErrors = data.errors.map(e => ({
+            field: e.param,
+            message: e.msg
           }));
           return { success: false, validationErrors: fieldErrors };
         }
         return { success: false, error: data.message || 'Signup failed' };
       }
-      
+
       const errorMsg = error.response?.data?.message || error.message || 'Signup failed';
       setError(errorMsg);
       return { success: false, error: errorMsg };
@@ -241,30 +232,25 @@ const normalizeUser = (userData) => {
   const logout = async () => {
     try {
       console.log('[AUTH-CONTEXT] Logout initiated');
-      
+
       try {
         await api.post('/auth/logout');
       } catch (err) {
-        console.warn('[AUTH-CONTEXT] Backend logout failed');
+        console.warn('[AUTH-CONTEXT] Backend logout failed, clearing local state anyway');
       }
+    } catch (err) {
+      console.error('[AUTH-CONTEXT] Logout error:', err);
     } finally {
       tokenService.removeToken();
+      tokenService.removeRefreshToken();
       setUser(null);
       setError(null);
       console.log('[AUTH-CONTEXT] User logged out');
+      router.push('/login');
     }
   };
 
-  // ===== PERMISSION HELPERS =====
-
-  /**
-   * Get role name - handles both string and object formats
-   */
-  const getRoleName = () => {
-    if (!user || !user.role) return null;
-    return typeof user.role === 'string' ? user.role : user.role.name;
-  };
-
+  // Permission helpers
   const hasPermission = (permission) => {
     if (!user || !user.role || !Array.isArray(user.role.permissions)) {
       return false;
@@ -287,81 +273,46 @@ const normalizeUser = (userData) => {
   };
 
   const isAdmin = () => {
-    const roleName = getRoleName();
-    return roleName === 'admin';
+    return user?.role?.name === 'admin';
   };
 
   const canManage = (feature) => {
     return hasPermission(`manage:${feature}`);
   };
 
-  const canViewAnalytics = () => hasPermission('view:analytics');
-  const canManageUsers = () => hasPermission('manage:users');
-  const canManageRoles = () => hasPermission('manage:roles');
-  const canViewAuditLogs = () => hasPermission('view:audit_logs');
-  const canManageSettings = () => hasPermission('manage:settings');
-
-  // Blog helpers
+  // Blog-specific helpers
   const canPostBlog = () => {
+    if (!user) return false;
     const allowedRoles = ['member', 'volunteer', 'usher', 'worship_team', 'pastor', 'bishop', 'admin'];
-    return allowedRoles.includes(getRoleName());
-  };
-
-  const canPostBlogCategory = (category) => {
-    if (!user || !user.role) return false;
-
-    const permissions = {
-      member: ['testimonies'],
-      volunteer: ['testimonies', 'events'],
-      usher: ['testimonies', 'events'],
-      worship_team: ['testimonies', 'events'],
-      pastor: ['testimonies', 'events', 'teaching', 'news'],
-      bishop: ['testimonies', 'events', 'teaching', 'news'],
-      admin: ['testimonies', 'events', 'teaching', 'news']
-    };
-
-    const roleName = getRoleName();
-    const allowedCategories = permissions[roleName] || [];
-    return allowedCategories.includes(category);
-  };
-
-  const getAllowedBlogCategories = () => {
-    if (!user || !user.role) return [];
-
-    const permissions = {
-      member: ['testimonies'],
-      volunteer: ['testimonies', 'events'],
-      usher: ['testimonies', 'events'],
-      worship_team: ['testimonies', 'events'],
-      pastor: ['testimonies', 'events', 'teaching', 'news'],
-      bishop: ['testimonies', 'events', 'teaching', 'news'],
-      admin: ['testimonies', 'events', 'teaching', 'news']
-    };
-
-    const roleName = getRoleName();
-    return permissions[roleName] || [];
-  };
-
-  const canPostSermon = () => {
-    const roleName = getRoleName();
-    return roleName && ['pastor', 'bishop', 'admin'].includes(roleName);
-  };
-
-  const canUploadPhoto = () => {
-    const roleName = getRoleName();
-    return roleName && ['pastor', 'bishop', 'admin'].includes(roleName);
+    return allowedRoles.includes(user.role?.name);
   };
 
   const canEditBlog = (authorId) => {
     if (!user) return false;
-    if (isAdmin()) return true;
-    return user.id === authorId || user._id === authorId;
+    // Can edit if: you're the author OR you're an admin
+    return user._id === authorId || isAdmin();
   };
 
   const canDeleteBlog = (authorId) => {
     if (!user) return false;
-    if (isAdmin()) return true;
-    return user.id === authorId || user._id === authorId;
+    // Can delete if: you're the author OR you're an admin
+    return user._id === authorId || isAdmin();
+  };
+
+  const getAllowedBlogCategories = () => {
+    if (!user) return [];
+    
+    const categoryPermissions = {
+      'member': ['testimonies'],
+      'volunteer': ['testimonies', 'events'],
+      'usher': ['testimonies', 'events'],
+      'worship_team': ['testimonies', 'events'],
+      'pastor': ['testimonies', 'events', 'teaching', 'news'],
+      'bishop': ['testimonies', 'events', 'teaching', 'news'],
+      'admin': ['testimonies', 'events', 'teaching', 'news']
+    };
+    
+    return categoryPermissions[user.role?.name] || [];
   };
 
   const value = {
@@ -372,42 +323,34 @@ const normalizeUser = (userData) => {
     signup,
     logout,
     checkAuth,
-    getRoleName,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
     getPermissions,
     isAdmin,
     canManage,
-    canViewAnalytics,
-    canManageUsers,
-    canManageRoles,
-    canViewAuditLogs,
-    canManageSettings,
+    canViewAnalytics: () => hasPermission('view:analytics'),
+    canManageEvents: () => hasPermission('manage:events'),
+    canManageSermons: () => hasPermission('manage:sermons'),
+    canManageUsers: () => hasPermission('manage:users'),
+    canManageRoles: () => hasPermission('manage:roles'),
     canPostBlog,
-    canPostBlogCategory,
-    getAllowedBlogCategories,
-    canPostSermon,
-    canUploadPhoto,
+    canPostSermon: () => hasPermission('manage:sermons'),
+    canUploadPhoto: () => hasPermission('manage:gallery'),
     canEditBlog,
-    canDeleteBlog
+    canDeleteBlog,
+    getAllowedBlogCategories
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuthContext = () => {
   const context = useContext(AuthContext);
-  
+
   if (!context) {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
-  
+
   return context;
 };
-
-export default AuthContext;
