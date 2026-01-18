@@ -112,20 +112,65 @@ const feedbackSchema = new mongoose.Schema({
     message: String
   },
   
-  // Admin & Review
+  // Workflow Status
   status: {
     type: String,
     enum: ['pending', 'reviewed', 'published', 'archived', 'responded'],
     default: 'pending'
   },
+  
+  // ===== AUDIT TRAIL FIELDS =====
+  // Review tracking
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    default: null
   },
-  reviewedAt: Date,
+  reviewedAt: {
+    type: Date,
+    default: null
+  },
   adminNotes: String,
+  
+  // Response tracking
   response: String,
+  respondedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  respondedAt: {
+    type: Date,
+    default: null
+  },
   responseSentAt: Date,
+  
+  // Archive tracking
+  archivedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  archivedAt: {
+    type: Date,
+    default: null
+  },
+  
+  // Soft delete tracking (recycle bin)
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   
   // Submission metadata
   submittedAt: {
@@ -143,11 +188,12 @@ feedbackSchema.index({ category: 1, status: 1 });
 feedbackSchema.index({ submittedAt: -1 });
 feedbackSchema.index({ user: 1 });
 feedbackSchema.index({ isAnonymous: 1 });
+feedbackSchema.index({ isDeleted: 1, deletedAt: 1 });
 
 // Virtual for response time
 feedbackSchema.virtual('responseTime').get(function() {
-  if (this.responseSentAt && this.submittedAt) {
-    return Math.floor((this.responseSentAt - this.submittedAt) / (1000 * 60 * 60)); // hours
+  if (this.respondedAt && this.submittedAt) {
+    return Math.floor((this.respondedAt - this.submittedAt) / (1000 * 60 * 60)); // hours
   }
   return null;
 });
@@ -162,6 +208,7 @@ feedbackSchema.methods.canPublish = function() {
 // Static method to get statistics
 feedbackSchema.statics.getStats = async function() {
   const stats = await this.aggregate([
+    { $match: { isDeleted: false } },
     {
       $facet: {
         total: [{ $count: 'count' }],

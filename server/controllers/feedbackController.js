@@ -18,7 +18,6 @@ exports.submitFeedback = async (req, res) => {
       feedbackData
     } = req.body;
 
-    // Validation
     if (!category) {
       return res.status(400).json({
         success: false,
@@ -26,7 +25,6 @@ exports.submitFeedback = async (req, res) => {
       });
     }
 
-    // Create feedback object
     const feedbackObj = {
       category,
       feedbackData,
@@ -37,31 +35,19 @@ exports.submitFeedback = async (req, res) => {
       shareOnPrayerList: shareOnPrayerList || false
     };
 
-    // Add user reference if authenticated
     if (req.user) {
-      feedbackObj.user = req.user.id;
+      feedbackObj.user = req.user._id;
     }
 
-    // Add contact info only if not anonymous
     if (!isAnonymous) {
       if (name) feedbackObj.name = name;
       if (email) feedbackObj.email = email;
       if (phone) feedbackObj.phone = phone;
-    }
-
-    // Add IP for spam prevention (not stored if anonymous)
-    if (!isAnonymous) {
       feedbackObj.ipAddress = req.ip;
       feedbackObj.userAgent = req.get('user-agent');
     }
 
-    // Create feedback
     const feedback = await Feedback.create(feedbackObj);
-
-    // Send email notification to admin (if not anonymous or if prayer urgent)
-    if (category === 'prayer' && feedbackData.urgency === 'Urgent') {
-      // TODO: Send urgent prayer notification
-    }
 
     res.status(201).json({
       success: true,
@@ -85,15 +71,17 @@ exports.submitFeedback = async (req, res) => {
   }
 };
 
-// @desc    Get all feedback (Admin)
+// @desc    Get all feedback (non-deleted, non-archived)
 // @route   GET /api/feedback
-// @access  Private/Admin
+// @access  Private - requires granular read permissions
 exports.getAllFeedback = async (req, res) => {
   try {
     const { category, status, anonymous, startDate, endDate } = req.query;
     
-    // Build filter
-    let filter = {};
+    // Filter to include docs with isDeleted: false OR missing isDeleted field
+    const baseFilter = { $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }] };
+    
+    let filter = { ...baseFilter };
     if (category) filter.category = category;
     if (status) filter.status = status;
     if (anonymous === 'true') filter.isAnonymous = true;
@@ -106,6 +94,7 @@ exports.getAllFeedback = async (req, res) => {
     const feedback = await Feedback.find(filter)
       .populate('user', 'name email')
       .populate('reviewedBy', 'name')
+      .populate('respondedBy', 'name')
       .sort({ submittedAt: -1 })
       .limit(100);
 
@@ -126,14 +115,25 @@ exports.getAllFeedback = async (req, res) => {
 
 // @desc    Get single feedback
 // @route   GET /api/feedback/:id
-// @access  Private/Admin
+// @access  Private - requires granular read permission for category
 exports.getFeedback = async (req, res) => {
   try {
     const feedback = await Feedback.findById(req.params.id)
       .populate('user', 'name email role')
-      .populate('reviewedBy', 'name');
+      .populate('reviewedBy', 'name')
+      .populate('respondedBy', 'name')
+      .populate('archivedBy', 'name')
+      .populate('deletedBy', 'name');
 
     if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feedback not found'
+      });
+    }
+
+    // Hide archived/deleted from non-admin unless they have permission
+    if ((feedback.isDeleted || feedback.status === 'archived') && !req.user.role?.name === 'admin') {
       return res.status(404).json({
         success: false,
         message: 'Feedback not found'
@@ -161,7 +161,8 @@ exports.getPublicTestimonies = async (req, res) => {
     const testimonies = await Feedback.find({
       category: 'testimony',
       status: 'published',
-      isPublic: true
+      isPublic: true,
+      isDeleted: false
     })
       .select('feedbackData.title feedbackData.story feedbackData.testimonyDate feedbackData.testimonyType name isAnonymous submittedAt')
       .sort({ 'feedbackData.testimonyDate': -1 })
@@ -188,9 +189,9 @@ exports.getPublicTestimony = async (req, res) => {
   try {
     const testimony = await Feedback.findById(req.params.id)
       .populate('user', 'name email role')
-      .select('-ipAddress -userAgent'); // Hide sensitive data
+      .select('-ipAddress -userAgent');
 
-    if (!testimony || testimony.status !== 'published' || !testimony.isPublic) {
+    if (!testimony || testimony.status !== 'published' || !testimony.isPublic || testimony.isDeleted) {
       return res.status(404).json({
         success: false,
         message: 'Testimony not found'
@@ -212,7 +213,7 @@ exports.getPublicTestimony = async (req, res) => {
 
 // @desc    Update feedback status
 // @route   PUT /api/feedback/:id/status
-// @access  Private/Admin
+// @access  Private - requires read permission for category
 exports.updateStatus = async (req, res) => {
   try {
     const { status, adminNotes } = req.body;
@@ -222,11 +223,11 @@ exports.updateStatus = async (req, res) => {
       {
         status,
         adminNotes,
-        reviewedBy: req.user.id,
+        reviewedBy: req.user._id,
         reviewedAt: Date.now()
       },
       { new: true, runValidators: true }
-    );
+    ).populate('reviewedBy', 'name');
 
     if (!feedback) {
       return res.status(404).json({
@@ -237,7 +238,7 @@ exports.updateStatus = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Feedback ${status} successfully`,
+      message: `Feedback marked as ${status}`,
       feedback
     });
   } catch (error) {
@@ -251,7 +252,7 @@ exports.updateStatus = async (req, res) => {
 
 // @desc    Respond to feedback
 // @route   POST /api/feedback/:id/respond
-// @access  Private/Admin
+// @access  Private - requires respond permission for category
 exports.respondToFeedback = async (req, res) => {
   try {
     const { response } = req.body;
@@ -265,7 +266,6 @@ exports.respondToFeedback = async (req, res) => {
       });
     }
 
-    // Check if feedback allows follow-up or has contact info
     if (!feedback.allowFollowUp && !feedback.email) {
       return res.status(400).json({
         success: false,
@@ -274,22 +274,22 @@ exports.respondToFeedback = async (req, res) => {
     }
 
     feedback.response = response;
-    feedback.responseSentAt = Date.now();
+    feedback.respondedBy = req.user._id;
+    feedback.respondedAt = Date.now();
     feedback.status = 'responded';
-    feedback.reviewedBy = req.user.id;
+    feedback.reviewedBy = req.user._id;
     feedback.reviewedAt = Date.now();
 
     await feedback.save();
 
-    // TODO: Send email response if email exists
-    if (feedback.email) {
-      // Send email here
-    }
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('respondedBy', 'name')
+      .populate('reviewedBy', 'name');
 
     res.json({
       success: true,
       message: 'Response sent successfully',
-      feedback
+      feedback: populatedFeedback
     });
   } catch (error) {
     res.status(500).json({
@@ -302,7 +302,7 @@ exports.respondToFeedback = async (req, res) => {
 
 // @desc    Publish testimony
 // @route   PUT /api/feedback/:id/publish
-// @access  Private/Admin
+// @access  Private - requires publish permission (testimony only)
 exports.publishTestimony = async (req, res) => {
   try {
     const feedback = await Feedback.findById(req.params.id);
@@ -323,15 +323,18 @@ exports.publishTestimony = async (req, res) => {
 
     feedback.status = 'published';
     feedback.isPublic = true;
-    feedback.reviewedBy = req.user.id;
+    feedback.reviewedBy = req.user._id;
     feedback.reviewedAt = Date.now();
 
     await feedback.save();
 
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('reviewedBy', 'name');
+
     res.json({
       success: true,
       message: 'Testimony published successfully',
-      feedback
+      feedback: populatedFeedback
     });
   } catch (error) {
     res.status(500).json({
@@ -342,7 +345,191 @@ exports.publishTestimony = async (req, res) => {
   }
 };
 
-// @desc    Delete feedback
+// @desc    Archive feedback
+// @route   PUT /api/feedback/:id/archive
+// @access  Private - requires archive permission for category
+exports.archiveFeedback = async (req, res) => {
+  try {
+    const feedback = await Feedback.findById(req.params.id);
+
+    if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feedback not found'
+      });
+    }
+
+    if (feedback.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot archive deleted feedback'
+      });
+    }
+
+    feedback.status = 'archived';
+    feedback.archivedBy = req.user._id;
+    feedback.archivedAt = Date.now();
+
+    await feedback.save();
+
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('archivedBy', 'name');
+
+    res.json({
+      success: true,
+      message: 'Feedback archived successfully',
+      feedback: populatedFeedback
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to archive feedback',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Unarchive feedback
+// @route   PUT /api/feedback/:id/unarchive
+// @access  Private - requires archive permission for category
+exports.unarchiveFeedback = async (req, res) => {
+  try {
+    const feedback = await Feedback.findById(req.params.id);
+
+    if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feedback not found'
+      });
+    }
+
+    if (feedback.status !== 'archived') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only archived feedback can be unarchived'
+      });
+    }
+
+    feedback.status = 'pending';
+    feedback.archivedBy = null;
+    feedback.archivedAt = null;
+
+    await feedback.save();
+
+    res.json({
+      success: true,
+      message: 'Feedback unarchived successfully',
+      feedback
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unarchive feedback',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Soft delete feedback (move to recycle bin)
+// @route   PUT /api/feedback/:id/soft-delete
+// @access  Private - requires archive permission for category
+exports.softDeleteFeedback = async (req, res) => {
+  try {
+    const feedback = await Feedback.findById(req.params.id);
+
+    if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feedback not found'
+      });
+    }
+
+    feedback.isDeleted = true;
+    feedback.deletedBy = req.user._id;
+    feedback.deletedAt = Date.now();
+
+    await feedback.save();
+
+    res.json({
+      success: true,
+      message: 'Feedback moved to recycle bin. Will be permanently deleted after 30 days.',
+      feedback
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete feedback',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get recycled feedback (soft deleted)
+// @route   GET /api/feedback/recycled
+// @access  Private/Admin
+exports.getRecycledFeedback = async (req, res) => {
+  try {
+    const recycled = await Feedback.find({ isDeleted: true })
+      .populate('user', 'name email')
+      .populate('deletedBy', 'name')
+      .sort({ deletedAt: -1 });
+
+    res.json({
+      success: true,
+      count: recycled.length,
+      recycled
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recycled feedback',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Restore feedback from recycle bin
+// @route   PUT /api/feedback/:id/restore
+// @access  Private/Admin
+exports.restoreFromRecycle = async (req, res) => {
+  try {
+    const feedback = await Feedback.findById(req.params.id);
+
+    if (!feedback) {
+      return res.status(404).json({
+        success: false,
+        message: 'Feedback not found'
+      });
+    }
+
+    if (!feedback.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only deleted feedback can be restored'
+      });
+    }
+
+    feedback.isDeleted = false;
+    feedback.deletedBy = null;
+    feedback.deletedAt = null;
+
+    await feedback.save();
+
+    res.json({
+      success: true,
+      message: 'Feedback restored successfully',
+      feedback
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to restore feedback',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Permanently delete feedback (admin only - after 30 days or manually)
 // @route   DELETE /api/feedback/:id
 // @access  Private/Admin
 exports.deleteFeedback = async (req, res) => {
@@ -360,7 +547,7 @@ exports.deleteFeedback = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Feedback deleted successfully'
+      message: 'Feedback permanently deleted'
     });
   } catch (error) {
     res.status(500).json({
@@ -372,53 +559,102 @@ exports.deleteFeedback = async (req, res) => {
 };
 
 // @desc    Get feedback statistics
-// @route   GET /api/feedback/stats
-// @access  Private/Admin
+// @route   GET /api/feedback/stats/overview
+// @access  Private - requires view:feedback:stats permission
 exports.getStats = async (req, res) => {
   try {
-    const stats = await Feedback.getStats();
+    console.log('[STATS] Fetching feedback statistics...');
+    
+    // Filter: exclude soft deleted OR include docs where isDeleted is not true
+    const filter = { $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }] };
 
-    // Get average ratings for sermons and services
+    // Get pending count
+    const pending = await Feedback.countDocuments({ 
+      status: 'pending', 
+      ...filter 
+    });
+    
+    // Get urgent prayers count
+    const urgentPrayers = await Feedback.countDocuments({ 
+      category: 'prayer', 
+      'feedbackData.urgency': 'Urgent', 
+      status: { $in: ['pending', 'reviewed'] }, 
+      ...filter
+    });
+    
+    // Get testimonies to review
+    const testimoniesToReview = await Feedback.countDocuments({ 
+      category: 'testimony', 
+      status: 'pending', 
+      ...filter
+    });
+    
+    // Get items in recycle
+    const inRecycle = await Feedback.countDocuments({ isDeleted: true });
+
+    // Get total feedback
+    const total = await Feedback.countDocuments(filter);
+
+    // Get this week
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const thisWeek = await Feedback.countDocuments({ 
+      submittedAt: { $gte: oneWeekAgo },
+      ...filter
+    });
+
+    // Get anonymous count
+    const anonymous = await Feedback.countDocuments({ 
+      isAnonymous: true,
+      ...filter
+    });
+
+    // Get by category
+    const byCategory = await Feedback.aggregate([
+      { $match: filter },
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+
+    // Get by status
+    const byStatus = await Feedback.aggregate([
+      { $match: filter },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    // Get average ratings
     const sermonRatings = await Feedback.aggregate([
-      { $match: { category: 'sermon', 'feedbackData.rating': { $exists: true } } },
+      { $match: { category: 'sermon', 'feedbackData.rating': { $exists: true }, ...filter } },
       { $group: { _id: null, avgRating: { $avg: '$feedbackData.rating' }, count: { $sum: 1 } } }
     ]);
 
     const serviceRatings = await Feedback.aggregate([
-      { $match: { category: 'service', 'feedbackData.ratings.overall': { $exists: true } } },
+      { $match: { category: 'service', 'feedbackData.ratings.overall': { $exists: true }, ...filter } },
       { $group: { _id: null, avgRating: { $avg: '$feedbackData.ratings.overall' }, count: { $sum: 1 } } }
     ]);
 
-    // Get pending count (needs review)
-    const pending = await Feedback.countDocuments({ status: 'pending' });
+    const stats = {
+      total,
+      thisWeek,
+      anonymous,
+      byCategory,
+      byStatus,
+      pending,
+      testimoniesToReview,
+      urgentPrayers,
+      inRecycle,
+      averageSermonRating: sermonRatings[0]?.avgRating || 0,
+      sermonRatingsCount: sermonRatings[0]?.count || 0,
+      averageServiceRating: serviceRatings[0]?.avgRating || 0,
+      serviceRatingsCount: serviceRatings[0]?.count || 0
+    };
 
-    // Get testimonies awaiting publication
-    const testimoniesToReview = await Feedback.countDocuments({
-      category: 'testimony',
-      status: 'pending'
-    });
-
-    // Get urgent prayers
-    const urgentPrayers = await Feedback.countDocuments({
-      category: 'prayer',
-      'feedbackData.urgency': 'Urgent',
-      status: { $in: ['pending', 'reviewed'] }
-    });
+    console.log('[STATS] Final stats:', stats);
 
     res.json({
       success: true,
-      stats: {
-        ...stats,
-        averageSermonRating: sermonRatings[0]?.avgRating || 0,
-        sermonRatingsCount: sermonRatings[0]?.count || 0,
-        averageServiceRating: serviceRatings[0]?.avgRating || 0,
-        serviceRatingsCount: serviceRatings[0]?.count || 0,
-        pending,
-        testimoniesToReview,
-        urgentPrayers
-      }
+      stats
     });
   } catch (error) {
+    console.error('[STATS] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch statistics',

@@ -51,10 +51,29 @@ exports.requirePermission = (...requiredPermissions) => {
       }
 
       // Get user's permissions from role
-      const userPermissions = user.role.permissions || [];
+      let userPermissions = user.role.permissions || [];
 
       console.log('[PERMISSION] User permissions:', userPermissions);
       console.log('[PERMISSION] Required permissions:', requiredPermissions);
+
+      // BROAD PERMISSION EXPANSION
+      // If user has manage:X, they automatically have all granular X permissions
+      const expandedPermissions = [...userPermissions];
+      
+      if (userPermissions.includes('manage:feedback')) {
+        expandedPermissions.push(
+          'read:feedback:sermon', 'respond:feedback:sermon',
+          'read:feedback:service', 'respond:feedback:service',
+          'read:feedback:testimony', 'respond:feedback:testimony', 'publish:feedback:testimony', 'archive:feedback:testimony',
+          'read:feedback:suggestion', 'respond:feedback:suggestion', 'archive:feedback:suggestion',
+          'read:feedback:prayer', 'respond:feedback:prayer', 'archive:feedback:prayer',
+          'read:feedback:general', 'respond:feedback:general', 'archive:feedback:general',
+          'view:feedback:stats'
+        );
+      }
+
+      userPermissions = expandedPermissions;
+      console.log('[PERMISSION] Expanded permissions:', userPermissions);
 
       // Check if user has at least one of the required permissions
       const hasPermission = requiredPermissions.some(permission => 

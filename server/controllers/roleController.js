@@ -90,8 +90,9 @@ exports.createRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Validate permissions array
+    // Validate permissions array - MATCH Role model enum exactly
     const validPermissions = [
+      // ===== BROAD PERMISSIONS =====
       'manage:events',
       'manage:sermons',
       'manage:gallery',
@@ -102,9 +103,41 @@ exports.createRole = asyncHandler(async (req, res) => {
       'manage:livestream',
       'manage:feedback',
       'manage:volunteers',
+      'manage:settings',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (READ) =====
+      'read:feedback:sermon',
+      'read:feedback:service',
+      'read:feedback:testimony',
+      'read:feedback:suggestion',
+      'read:feedback:prayer',
+      'read:feedback:general',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (RESPOND) =====
+      'respond:feedback:sermon',
+      'respond:feedback:service',
+      'respond:feedback:testimony',
+      'respond:feedback:suggestion',
+      'respond:feedback:prayer',
+      'respond:feedback:general',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (PUBLISH) =====
+      'publish:feedback:testimony',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (ARCHIVE) =====
+      'archive:feedback:sermon',
+      'archive:feedback:service',
+      'archive:feedback:testimony',
+      'archive:feedback:suggestion',
+      'archive:feedback:prayer',
+      'archive:feedback:general',
+      
+      // ===== FEEDBACK STATS =====
+      'view:feedback:stats',
+      
+      // ===== OTHER =====
       'view:analytics',
-      'view:audit_logs',
-      'manage:settings'
+      'view:audit_logs'
     ];
 
     if (permissions && Array.isArray(permissions)) {
@@ -171,8 +204,9 @@ exports.updateRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Validate permissions if provided
+    // Validate permissions if provided - MATCH Role model enum exactly
     const validPermissions = [
+      // ===== BROAD PERMISSIONS =====
       'manage:events',
       'manage:sermons',
       'manage:gallery',
@@ -183,9 +217,41 @@ exports.updateRole = asyncHandler(async (req, res) => {
       'manage:livestream',
       'manage:feedback',
       'manage:volunteers',
+      'manage:settings',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (READ) =====
+      'read:feedback:sermon',
+      'read:feedback:service',
+      'read:feedback:testimony',
+      'read:feedback:suggestion',
+      'read:feedback:prayer',
+      'read:feedback:general',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (RESPOND) =====
+      'respond:feedback:sermon',
+      'respond:feedback:service',
+      'respond:feedback:testimony',
+      'respond:feedback:suggestion',
+      'respond:feedback:prayer',
+      'respond:feedback:general',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (PUBLISH) =====
+      'publish:feedback:testimony',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS (ARCHIVE) =====
+      'archive:feedback:sermon',
+      'archive:feedback:service',
+      'archive:feedback:testimony',
+      'archive:feedback:suggestion',
+      'archive:feedback:prayer',
+      'archive:feedback:general',
+      
+      // ===== FEEDBACK STATS =====
+      'view:feedback:stats',
+      
+      // ===== OTHER =====
       'view:analytics',
-      'view:audit_logs',
-      'manage:settings'
+      'view:audit_logs'
     ];
 
     if (permissions && Array.isArray(permissions)) {
@@ -531,20 +597,73 @@ exports.bulkAssignRole = asyncHandler(async (req, res) => {
 exports.getAvailablePermissions = asyncHandler(async (req, res) => {
   try {
     const permissionsList = [
-      { key: 'manage:events', label: 'Manage Events', category: 'Events' },
-      { key: 'manage:sermons', label: 'Manage Sermons', category: 'Content' },
-      { key: 'manage:gallery', label: 'Manage Gallery', category: 'Content' },
-      { key: 'manage:donations', label: 'Manage Donations', category: 'Finance' },
-      { key: 'manage:users', label: 'Manage Users', category: 'Administration' },
-      { key: 'manage:roles', label: 'Manage Roles', category: 'Administration' },
-      { key: 'manage:blog', label: 'Manage Blog', category: 'Content' },
-      { key: 'manage:livestream', label: 'Manage Livestream', category: 'Content' },
-      { key: 'manage:feedback', label: 'Manage Feedback', category: 'Moderation' },
-      { key: 'manage:volunteers', label: 'Manage Volunteers', category: 'Volunteers' },
-      { key: 'view:analytics', label: 'View Analytics', category: 'Reporting' },
-      { key: 'view:audit_logs', label: 'View Audit Logs', category: 'Security' },
-      { key: 'manage:settings', label: 'Manage Settings', category: 'Administration' }
-    ];
+  // ===== EVENTS =====
+  { key: 'manage:events', label: 'Manage Events', category: 'Events' },
+  
+  // ===== SERMONS =====
+  { key: 'manage:sermons', label: 'Manage Sermons', category: 'Content' },
+  
+  // ===== GALLERY =====
+  { key: 'manage:gallery', label: 'Manage Gallery', category: 'Content' },
+  
+  // ===== BLOG =====
+  { key: 'manage:blog', label: 'Manage Blog', category: 'Content' },
+  
+  // ===== LIVESTREAM =====
+  { key: 'manage:livestream', label: 'Manage Livestream', category: 'Content' },
+  
+  // ===== DONATIONS =====
+  { key: 'manage:donations', label: 'Manage Donations', category: 'Finance' },
+  
+  // ===== VOLUNTEERS =====
+  { key: 'manage:volunteers', label: 'Manage Volunteers', category: 'Volunteers' },
+  
+  // ===== USERS =====
+  { key: 'manage:users', label: 'Manage Users', category: 'Administration' },
+  
+  // ===== ROLES =====
+  { key: 'manage:roles', label: 'Manage Roles', category: 'Administration' },
+  
+  // ===== SETTINGS =====
+  { key: 'manage:settings', label: 'Manage Settings', category: 'Administration' },
+  
+  // ===== FEEDBACK (BROAD) =====
+  { key: 'manage:feedback', label: 'Manage All Feedback', category: 'Feedback' },
+  
+  // ===== FEEDBACK GRANULAR (READ) =====
+  { key: 'read:feedback:sermon', label: 'Read Sermon Feedback', category: 'Feedback' },
+  { key: 'read:feedback:service', label: 'Read Service Feedback', category: 'Feedback' },
+  { key: 'read:feedback:testimony', label: 'Read Testimony Feedback', category: 'Feedback' },
+  { key: 'read:feedback:suggestion', label: 'Read Suggestion Feedback', category: 'Feedback' },
+  { key: 'read:feedback:prayer', label: 'Read Prayer Feedback', category: 'Feedback' },
+  { key: 'read:feedback:general', label: 'Read General Feedback', category: 'Feedback' },
+  
+  // ===== FEEDBACK GRANULAR (RESPOND) =====
+  { key: 'respond:feedback:sermon', label: 'Respond to Sermon Feedback', category: 'Feedback' },
+  { key: 'respond:feedback:service', label: 'Respond to Service Feedback', category: 'Feedback' },
+  { key: 'respond:feedback:testimony', label: 'Respond to Testimony Feedback', category: 'Feedback' },
+  { key: 'respond:feedback:suggestion', label: 'Respond to Suggestion Feedback', category: 'Feedback' },
+  { key: 'respond:feedback:prayer', label: 'Respond to Prayer Feedback', category: 'Feedback' },
+  { key: 'respond:feedback:general', label: 'Respond to General Feedback', category: 'Feedback' },
+  
+  // ===== FEEDBACK GRANULAR (PUBLISH) =====
+  { key: 'publish:feedback:testimony', label: 'Publish Testimonies', category: 'Feedback' },
+  
+  // ===== FEEDBACK GRANULAR (ARCHIVE) =====
+  { key: 'archive:feedback:sermon', label: 'Archive Sermon Feedback', category: 'Feedback' },
+  { key: 'archive:feedback:service', label: 'Archive Service Feedback', category: 'Feedback' },
+  { key: 'archive:feedback:testimony', label: 'Archive Testimony Feedback', category: 'Feedback' },
+  { key: 'archive:feedback:suggestion', label: 'Archive Suggestion Feedback', category: 'Feedback' },
+  { key: 'archive:feedback:prayer', label: 'Archive Prayer Feedback', category: 'Feedback' },
+  { key: 'archive:feedback:general', label: 'Archive General Feedback', category: 'Feedback' },
+  
+  // ===== FEEDBACK GRANULAR (STATS) =====
+  { key: 'view:feedback:stats', label: 'View Feedback Stats', category: 'Feedback' },
+  
+  // ===== ANALYTICS =====
+  { key: 'view:analytics', label: 'View Analytics', category: 'Reporting' },
+  { key: 'view:audit_logs', label: 'View Audit Logs', category: 'Security' }
+  ];
 
     res.json({
       success: true,

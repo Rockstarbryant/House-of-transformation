@@ -7,7 +7,6 @@ const roleSchema = new mongoose.Schema({
     required: [true, 'Please provide a role name'],
     lowercase: true,
     trim: true,
-    // REMOVED enum restriction to allow custom roles
     index: true
   },
   
@@ -19,6 +18,7 @@ const roleSchema = new mongoose.Schema({
   permissions: [{
     type: String,
     enum: [
+      // ===== BROAD PERMISSIONS (backward compatibility) =====
       'manage:events',
       'manage:sermons',
       'manage:gallery',
@@ -29,9 +29,42 @@ const roleSchema = new mongoose.Schema({
       'manage:livestream',
       'manage:feedback',
       'manage:volunteers',
+      'manage:settings',
+      
+      // ===== GRANULAR FEEDBACK PERMISSIONS =====
+      // Read permissions (by category)
+      'read:feedback:sermon',
+      'read:feedback:service',
+      'read:feedback:testimony',
+      'read:feedback:suggestion',
+      'read:feedback:prayer',
+      'read:feedback:general',
+      
+      // Respond permissions (by category)
+      'respond:feedback:sermon',
+      'respond:feedback:service',
+      'respond:feedback:testimony',
+      'respond:feedback:suggestion',
+      'respond:feedback:prayer',
+      'respond:feedback:general',
+      
+      // Publish permission (testimony only)
+      'publish:feedback:testimony',
+      
+      // Archive permissions (by category)
+      'archive:feedback:sermon',
+      'archive:feedback:service',
+      'archive:feedback:testimony',
+      'archive:feedback:suggestion',
+      'archive:feedback:prayer',
+      'archive:feedback:general',
+      
+      // Stats permission
+      'view:feedback:stats',
+      
+      // ===== OTHER PERMISSIONS =====
       'view:analytics',
-      'view:audit_logs',
-      'manage:settings'
+      'view:audit_logs'
     ]
   }],
 
@@ -56,7 +89,6 @@ const roleSchema = new mongoose.Schema({
 roleSchema.pre('findByIdAndUpdate', function(next) {
   const update = this.getUpdate();
   if (update && update.$set) {
-    // Check if trying to modify system role
     if (update.$set.name) {
       next(new Error('Cannot modify system role name'));
     }
