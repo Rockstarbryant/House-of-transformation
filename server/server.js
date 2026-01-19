@@ -23,7 +23,7 @@ console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
 const { protect } = require('./middleware/supabaseAuth');
-const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
+//const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
 
 connectDB();
 
