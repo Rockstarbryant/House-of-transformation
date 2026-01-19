@@ -23,7 +23,7 @@ console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
 const { protect } = require('./middleware/supabaseAuth');
-const maintenanceMiddleware = require('./middleware/maintenanceMiddleware');
+const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
 
 connectDB();
 
@@ -98,19 +98,19 @@ app.get('/api/health', (req, res) => {
 // Apply general API rate limiter to all /api routes
 app.use('/api/', apiLimiter);
 
-// ⚠️ STEP 1: Auth routes MUST be first
+//  STEP 1: Auth routes MUST be first
 app.use('/api/auth', require('./routes/authRoutes'));
 
-// ⚠️ STEP 2: Public settings endpoint - NO auth needed, NO maintenance check
+//  STEP 2: Public settings endpoint - NO auth needed, NO maintenance check
 app.use('/api/settings/public', require('./routes/settingsRoutes'));
 
-// ⚠️ STEP 3: Apply authentication to all remaining routes
+//  STEP 3: Apply authentication to all remaining routes
 app.use('/api/', protect);
 
 // ⚠️ STEP 4: NOW apply maintenance middleware (req.user is populated!)
-app.use('/api/', maintenanceMiddleware);
+//app.use('/api/', maintenanceMiddleware);
 
-// ⚠️ STEP 5: Now all protected routes can use maintenance middleware
+//  STEP 5: Now all protected routes can use maintenance middleware
 app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
