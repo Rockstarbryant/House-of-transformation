@@ -23,14 +23,14 @@ const router = express.Router();
 console.log('[SETTINGS-ROUTES] Initializing settings routes...');
 
 // ============================================
-// PUBLIC ROUTES
+// PUBLIC ROUTES - NO AUTH REQUIRED
 // ============================================
 
-// Get public settings (safe to expose)
+// ⚠️ CRITICAL: This must work WITHOUT any auth middleware
 router.get('/public', getPublicSettings);
 
 // ============================================
-// PROTECTED ADMIN ROUTES
+// PROTECTED ADMIN ROUTES - AUTH REQUIRED
 // ============================================
 
 // Get all settings (admin only)

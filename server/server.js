@@ -1,3 +1,5 @@
+// ===== IN server.js - CORRECT MIDDLEWARE ORDER =====
+
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -6,40 +8,33 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
 
-// ✅ ADD THIS LINE - Initialize Cloudinary config at startup
 require('./config/cloudinaryConfig');
 
-// Load env vars
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Add this code RIGHT AFTER the dotenv.config() line in server.js
-// Around line 13, after: dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-// ===== DEBUG: Check Supabase Configuration =====
 const config = require('./config/env');
 console.log('\n🔐 Supabase Configuration Check:');
-console.log('   SUPABASE_URL:', config.SUPABASE_URL ? '✓ Loaded' : '❌ MISSING');
-console.log('   SUPABASE_ANON_KEY:', config.SUPABASE_ANON_KEY ? '✓ Loaded' : '❌ MISSING');
-console.log('   SUPABASE_SERVICE_KEY:', config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '❌ MISSING');
-console.log('   MONGODB_URI:', config.MONGODB_URI ? '✓ Loaded' : '❌ MISSING');
+console.log('   SUPABASE_URL:', config.SUPABASE_URL ? '✓ Loaded' : '✗ MISSING');
+console.log('   SUPABASE_ANON_KEY:', config.SUPABASE_ANON_KEY ? '✓ Loaded' : '✗ MISSING');
+console.log('   SUPABASE_SERVICE_KEY:', config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '✗ MISSING');
+console.log('   MONGODB_URI:', config.MONGODB_URI ? '✓ Loaded' : '✗ MISSING');
 console.log('   NODE_ENV:', process.env.NODE_ENV || 'development');
 console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
+const { protect } = require('./middleware/supabaseAuth');
+const maintenanceMiddleware = require('./middleware/maintenanceMiddleware');
 
-// Connect to database
 connectDB();
 
 const app = express();
 
-// ===== TRUST PROXY (CRITICAL FOR RENDER) =====
+// ===== TRUST PROXY =====
 app.set('trust proxy', 1);
 
 // ===== BODY PARSER =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-
 
 // ===== CORS CONFIGURATION =====
 const allowedOrigins = process.env.NODE_ENV === 'development' 
@@ -103,10 +98,19 @@ app.get('/api/health', (req, res) => {
 // Apply general API rate limiter to all /api routes
 app.use('/api/', apiLimiter);
 
-// Auth routes (MUST be first) - SIMPLE VERSION
+// ⚠️ STEP 1: Auth routes MUST be first
 app.use('/api/auth', require('./routes/authRoutes'));
 
-// Content routes
+// ⚠️ STEP 2: Public settings endpoint - NO auth needed, NO maintenance check
+app.use('/api/settings/public', require('./routes/settingsRoutes'));
+
+// ⚠️ STEP 3: Apply authentication to all remaining routes
+app.use('/api/', protect);
+
+// ⚠️ STEP 4: NOW apply maintenance middleware (req.user is populated!)
+app.use('/api/', maintenanceMiddleware);
+
+// ⚠️ STEP 5: Now all protected routes can use maintenance middleware
 app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
@@ -114,8 +118,7 @@ app.use('/api/gallery', require('./routes/galleryRoutes'));
 
 // User routes
 app.use('/api/users', require('./routes/userRoutes'));
-// User + Role management
-app.use('/api/roles', require('./routes/roleRoutes'));  // ADD THIS LINE
+app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
@@ -128,6 +131,11 @@ app.use('/api/feedback', require('./routes/feedbackRoutes'));
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 
 app.use('/api/audit', require('./routes/auditRoutes'));
+
+app.use('/api/email-notifications', require('./routes/emailNotificationRoutes'));
+
+// In server.js, add after other routes:
+app.use('/api/email', require('./routes/emailTestRoutes'));
 
 // ============================================
 // 404 HANDLER (BEFORE ERROR HANDLER)
