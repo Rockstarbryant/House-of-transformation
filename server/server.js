@@ -23,7 +23,7 @@ console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
 const { protect } = require('./middleware/supabaseAuth');
-const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
+//const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
 
 connectDB();
 
@@ -105,7 +105,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/settings/public', require('./routes/settingsRoutes'));
 
 //  STEP 3: Apply authentication to all remaining routes
-app.use('/api/', protect);
+
 
 // ⚠️ STEP 4: NOW apply maintenance middleware (req.user is populated!)
 //app.use('/api/', maintenanceMiddleware);
@@ -115,6 +115,8 @@ app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
+
+app.use('/api/', protect);
 
 // User routes
 app.use('/api/users', require('./routes/userRoutes'));
