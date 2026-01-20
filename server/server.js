@@ -115,6 +115,7 @@ app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
+app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 
 app.use('/api/', protect);
 
@@ -130,7 +131,7 @@ app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 // Feedback routes
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 
-app.use('/api/livestreams', require('./routes/livestreamRoutes'));
+
 
 app.use('/api/audit', require('./routes/auditRoutes'));
 
