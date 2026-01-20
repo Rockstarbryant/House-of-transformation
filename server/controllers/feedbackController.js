@@ -257,6 +257,13 @@ exports.respondToFeedback = async (req, res) => {
   try {
     const { response } = req.body;
 
+    if (!response || !response.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Response text is required'
+      });
+    }
+
     const feedback = await Feedback.findById(req.params.id);
 
     if (!feedback) {
@@ -266,13 +273,29 @@ exports.respondToFeedback = async (req, res) => {
       });
     }
 
-    if (!feedback.allowFollowUp && !feedback.email) {
+    // Check if feedback is anonymous or has no email
+    if (feedback.isAnonymous) {
       return res.status(400).json({
         success: false,
-        message: 'This feedback does not allow follow-up or has no contact information'
+        message: 'Cannot respond to anonymous feedback - no email available'
       });
     }
 
+    if (!feedback.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot respond - feedback has no email address'
+      });
+    }
+
+    if (!feedback.allowFollowUp) {
+      return res.status(400).json({
+        success: false,
+        message: 'User has not allowed follow-up contact'
+      });
+    }
+
+    // Update feedback in database (save first before sending email)
     feedback.response = response;
     feedback.respondedBy = req.user._id;
     feedback.respondedAt = Date.now();
@@ -282,16 +305,170 @@ exports.respondToFeedback = async (req, res) => {
 
     await feedback.save();
 
-    const populatedFeedback = await Feedback.findById(feedback._id)
-      .populate('respondedBy', 'name')
-      .populate('reviewedBy', 'name');
+    // Prepare email content based on category
+    const emailService = require('../services/emailService');
+    
+    let feedbackContent = '';
+    if (feedback.feedbackData) {
+      if (feedback.feedbackData.message) {
+        feedbackContent = feedback.feedbackData.message;
+      } else if (feedback.feedbackData.testimony) {
+        feedbackContent = feedback.feedbackData.testimony;
+      } else if (feedback.feedbackData.story) {
+        feedbackContent = feedback.feedbackData.story;
+      } else if (feedback.feedbackData.suggestion) {
+        feedbackContent = feedback.feedbackData.suggestion;
+      } else if (feedback.feedbackData.request) {
+        feedbackContent = feedback.feedbackData.request;
+      } else if (feedback.feedbackData.description) {
+        feedbackContent = feedback.feedbackData.description;
+      } else {
+        feedbackContent = 'Your feedback';
+      }
+    }
 
-    res.json({
-      success: true,
-      message: 'Response sent successfully',
-      feedback: populatedFeedback
+    const categoryNames = {
+      sermon: 'Sermon Feedback',
+      service: 'Service Experience',
+      testimony: 'Testimony',
+      suggestion: 'Suggestion',
+      prayer: 'Prayer Request',
+      general: 'General Feedback'
+    };
+
+    const categoryName = categoryNames[feedback.category] || 'Feedback';
+    const emailSubject = `Response to Your ${categoryName}`;
+    
+    const emailHtml = `
+      <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f7f9;">
+        <div style="width: 100%; overflow: hidden;">
+          <img src="https://res.cloudinary.com/dcu8uuzrs/image/upload/v1768895135/church-gallery/jy2zygpn8zqqddq7aqjv.jpg" alt="House of Transformation" style="width: 100%; height: 150px; display: block; object-fit: cover;">
+        </div>
+        
+        <div style="background: #ffffff; padding: 40px 25px; border-radius: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <p style="font-size: 18px; color: #1a1a1a; margin-bottom: 20px;">Dear <strong>${feedback.name || 'Friend'}</strong>,</p>
+          
+          <p style="font-size: 16px; color: #4a4a4a; line-height: 1.6;">
+            Thank you for connecting with us and sharing your ${categoryName.toLowerCase()}. 
+            Your engagement helps us grow and serve our community better in Mombasa and beyond.
+          </p>
+          
+          <div style="background: #fafafa; padding: 20px; border-left: 4px solid #8B1A1A; margin: 30px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; color: #8B1A1A; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">
+              Your ${categoryName}
+            </p>
+            <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.6; font-style: italic; white-space: pre-wrap;">
+              "${feedbackContent.substring(0, 300)}${feedbackContent.length > 300 ? '...' : ''}"
+            </p>
+          </div>
+          
+          <div style="background: #fff; padding: 25px; border: 1px solid #eee; border-radius: 12px; margin: 30px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+               <span style="font-size: 14px; color: #8B1A1A; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Our Response</span>
+            </div>
+            <p style="margin: 0; color: #2d3436; font-size: 16px; line-height: 1.8; white-space: pre-wrap;">
+              ${response}
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #636e72; line-height: 1.6; margin-top: 30px; text-align: center;">
+            Need to talk more? Just reply to this email. We are here for you.
+          </p>
+          
+          <div style="text-align: center; margin-top: 40px; border-top: 1px solid #f0f0f0; padding-top: 25px;">
+            <p style="font-size: 16px; color: #1a1a1a; margin-bottom: 5px; font-weight: 600;">
+              Blessings,
+            </p>
+            <p style="font-size: 16px; color: #8B1A1A; margin: 0; font-weight: 700;">
+              House of Transformation Team
+            </p>
+          </div>
+        </div>
+        
+        <div style="padding: 30px 20px; text-align: center;">
+          <p style="color: #a0a0a0; font-size: 12px; margin: 0; line-height: 1.5;">
+            House of Transformation Church<br>
+            Mombasa, Kenya<br>
+            <a href="mailto:info@houseoftransformation.org" style="color: #8B1A1A; text-decoration: none; font-weight: bold;">info@houseoftransformation.org</a>
+          </p>
+          <p style="color: #cbd5e0; font-size: 11px; margin: 20px 0 0 0;">
+            This is a follow-up to your recent ${categoryName.toLowerCase()} submission.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const emailText = `
+Dear ${feedback.name || 'Friend'},
+
+Thank you for your ${categoryName.toLowerCase()}. We appreciate you taking the time to share with us.
+
+YOUR ${categoryName.toUpperCase()}:
+${feedbackContent}
+
+OUR RESPONSE:
+${response}
+
+If you have any questions, feel free to contact us directly.
+
+May God bless you abundantly!
+
+In Christ,
+House of Transformation Team
+
+---
+House of Transformation Church
+Mombasa, Kenya
+info@houseoftransformation.org
+    `.trim();
+
+    // Send email
+    console.log('[FEEDBACK-RESPOND] Sending email to:', feedback.email);
+    
+    const emailResult = await emailService.sendEmail({
+      to: feedback.email,
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml
     });
+
+    if (emailResult.success) {
+      // Email sent successfully - update responseSentAt
+      feedback.responseSentAt = Date.now();
+      await feedback.save();
+      
+      console.log('[FEEDBACK-RESPOND] ✅ Response sent and email delivered to:', feedback.email);
+
+      const populatedFeedback = await Feedback.findById(feedback._id)
+        .populate('respondedBy', 'name')
+        .populate('reviewedBy', 'name');
+
+      return res.json({
+        success: true,
+        message: 'Response sent successfully and email delivered! ✉️',
+        feedback: populatedFeedback,
+        emailSent: true,
+        emailMessageId: emailResult.messageId
+      });
+    } else {
+      // Email failed - don't set responseSentAt
+      console.error('[FEEDBACK-RESPOND] ❌ Email failed:', emailResult.error);
+      
+      const populatedFeedback = await Feedback.findById(feedback._id)
+        .populate('respondedBy', 'name')
+        .populate('reviewedBy', 'name');
+
+      return res.json({
+        success: true,
+        message: 'Response saved in database, but email delivery failed. Please contact the user directly.',
+        feedback: populatedFeedback,
+        emailSent: false,
+        emailError: emailResult.error
+      });
+    }
+
   } catch (error) {
+    console.error('[FEEDBACK-RESPOND] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to send response',

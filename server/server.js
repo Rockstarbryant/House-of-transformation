@@ -118,6 +118,8 @@ app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 // Feedback routes
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
+// Volunteer routes
+app.use('/api/volunteers', require('./routes/volunteerRoutes'));
 
 app.use('/api/', protect);
 
@@ -126,13 +128,6 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
-
-// Volunteer routes
-app.use('/api/volunteers', require('./routes/volunteerRoutes'));
-
-
-
-
 
 app.use('/api/audit', require('./routes/auditRoutes'));
 
