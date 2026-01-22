@@ -1,6 +1,14 @@
 // server/controllers/campaignController.js
 const Campaign = require('../models/Campaign');
 const asyncHandler = require('../middleware/asyncHandler');
+const { createClient } = require('@supabase/supabase-js');
+const config = require('../config/env');
+
+// Initialize Supabase client
+const supabase = createClient(
+  config.SUPABASE_URL,
+  config.SUPABASE_SERVICE_KEY
+);
 
 // ============================================
 // CREATE CAMPAIGN (Admin only)
@@ -28,33 +36,70 @@ exports.createCampaign = asyncHandler(async (req, res) => {
     }
 
     // Auto-determine status based on dates
-const now = new Date();
-const start = new Date(startDate);
-const end = new Date(endDate);
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-let initialStatus = 'draft';
-if (start <= now && end > now) {
-  initialStatus = 'active'; // ✅ Starts now or in past, ends in future
-} else if (end <= now) {
-  initialStatus = 'completed'; // Already ended
-}
+    let initialStatus = 'draft';
+    if (start <= now && end > now) {
+      initialStatus = 'active';
+    } else if (end <= now) {
+      initialStatus = 'completed';
+    }
 
-const campaign = await Campaign.create({
-  title,
-  description,
-  goalAmount,
-  campaignType,
-  startDate,
-  endDate,
-  visibility: visibility || 'public',
-  allowPledges: allowPledges !== undefined ? allowPledges : true,
-  imageUrl: imageUrl || null,
-  impactStatement: impactStatement || null,
-  createdBy: req.user._id,
-  status: initialStatus  // ✅ AUTO-DETERMINED
-});
+    // Create in MongoDB first
+    const campaign = await Campaign.create({
+      title,
+      description,
+      goalAmount,
+      campaignType,
+      startDate,
+      endDate,
+      visibility: visibility || 'public',
+      allowPledges: allowPledges !== undefined ? allowPledges : true,
+      imageUrl: imageUrl || null,
+      impactStatement: impactStatement || null,
+      createdBy: req.user._id,
+      status: initialStatus
+    });
 
-    console.log('[CAMPAIGN-CREATE] Campaign created:', campaign._id);
+    // ✅ CREATE IN SUPABASE AND GET UUID
+    const { data: supabaseCampaign, error: supabaseError } = await supabase
+      .from('campaigns')
+      .insert([{
+        mongodb_id: campaign._id.toString(),
+        title,
+        description,
+        goal_amount: goalAmount,
+        current_amount: 0,
+        campaign_type: campaignType,
+        start_date: startDate,
+        end_date: endDate,
+        status: initialStatus,
+        visibility: visibility || 'public',
+        allow_pledges: allowPledges !== undefined ? allowPledges : true,
+        image_url: imageUrl || null,
+        created_by_id: req.user._id.toString()
+      }])
+      .select('id')
+      .single();
+
+    if (supabaseError) {
+      console.error('[CAMPAIGN-CREATE] Supabase error:', supabaseError);
+      // Rollback MongoDB if Supabase fails
+      await Campaign.findByIdAndDelete(campaign._id);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to sync campaign to Supabase',
+        error: supabaseError.message
+      });
+    }
+
+    // ✅ SAVE SUPABASE UUID TO MONGODB
+    campaign.supabaseId = supabaseCampaign.id;
+    await campaign.save();
+
+    console.log('[CAMPAIGN-CREATE] Campaign created:', campaign._id, 'Supabase ID:', supabaseCampaign.id);
 
     res.status(201).json({
       success: true,
@@ -149,24 +194,23 @@ exports.getCampaign = asyncHandler(async (req, res) => {
     }
 
     // Check visibility for non-admin users
-   // Allow public/active campaigns for everyone
-// Draft campaigns only for admin/creator
-if (campaign.status === 'draft') {
-  if (!req.user || (req.user.role?.name !== 'admin' && req.user._id.toString() !== campaign.createdBy._id.toString())) {
-    return res.status(404).json({
-      success: false,
-      message: 'Campaign not found'
-    });
-  }
-}
+    if (campaign.status === 'draft') {
+      if (!req.user || (req.user.role?.name !== 'admin' && req.user._id.toString() !== campaign.createdBy._id.toString())) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+    }
 
-// Members-only require login
-if (campaign.visibility === 'members-only' && !req.user) {
-  return res.status(401).json({
-    success: false,
-    message: 'Login required'
-  });
-}
+    // Members-only require login
+    if (campaign.visibility === 'members-only' && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Login required'
+      });
+    }
+
     res.json({
       success: true,
       campaign
@@ -222,6 +266,31 @@ exports.updateCampaign = asyncHandler(async (req, res) => {
 
     await campaign.save();
 
+    // ✅ SYNC TO SUPABASE
+    if (campaign.supabaseId) {
+      const supabaseUpdates = {};
+      if (updates.title !== undefined) supabaseUpdates.title = updates.title;
+      if (updates.description !== undefined) supabaseUpdates.description = updates.description;
+      if (updates.goalAmount !== undefined) supabaseUpdates.goal_amount = updates.goalAmount;
+      if (updates.campaignType !== undefined) supabaseUpdates.campaign_type = updates.campaignType;
+      if (updates.startDate !== undefined) supabaseUpdates.start_date = updates.startDate;
+      if (updates.endDate !== undefined) supabaseUpdates.end_date = updates.endDate;
+      if (updates.status !== undefined) supabaseUpdates.status = updates.status;
+      if (updates.visibility !== undefined) supabaseUpdates.visibility = updates.visibility;
+      if (updates.allowPledges !== undefined) supabaseUpdates.allow_pledges = updates.allowPledges;
+      if (updates.isFeatured !== undefined) supabaseUpdates.is_featured = updates.isFeatured;
+      if (updates.imageUrl !== undefined) supabaseUpdates.image_url = updates.imageUrl;
+
+      const { error: supabaseError } = await supabase
+        .from('campaigns')
+        .update(supabaseUpdates)
+        .eq('id', campaign.supabaseId);
+
+      if (supabaseError) {
+        console.error('[CAMPAIGN-UPDATE] Supabase sync error:', supabaseError);
+      }
+    }
+
     console.log('[CAMPAIGN-UPDATE] Campaign updated:', campaign._id);
 
     res.json({
@@ -267,6 +336,14 @@ exports.activateCampaign = asyncHandler(async (req, res) => {
 
     campaign.status = 'active';
     await campaign.save();
+
+    // ✅ SYNC TO SUPABASE
+    if (campaign.supabaseId) {
+      await supabase
+        .from('campaigns')
+        .update({ status: 'active' })
+        .eq('id', campaign.supabaseId);
+    }
 
     console.log('[CAMPAIGN-ACTIVATE] Campaign activated:', campaign._id);
 
@@ -314,6 +391,14 @@ exports.completeCampaign = asyncHandler(async (req, res) => {
     campaign.status = 'completed';
     await campaign.save();
 
+    // ✅ SYNC TO SUPABASE
+    if (campaign.supabaseId) {
+      await supabase
+        .from('campaigns')
+        .update({ status: 'completed' })
+        .eq('id', campaign.supabaseId);
+    }
+
     console.log('[CAMPAIGN-COMPLETE] Campaign completed:', campaign._id);
 
     res.json({
@@ -353,6 +438,14 @@ exports.archiveCampaign = asyncHandler(async (req, res) => {
     campaign.status = 'archived';
     await campaign.save();
 
+    // ✅ SYNC TO SUPABASE
+    if (campaign.supabaseId) {
+      await supabase
+        .from('campaigns')
+        .update({ status: 'archived' })
+        .eq('id', campaign.supabaseId);
+    }
+
     console.log('[CAMPAIGN-ARCHIVE] Campaign archived:', campaign._id);
 
     res.json({
@@ -387,6 +480,14 @@ exports.deleteCampaign = asyncHandler(async (req, res) => {
         success: false,
         message: 'Campaign not found'
       });
+    }
+
+    // ✅ DELETE FROM SUPABASE FIRST (CASCADE will delete pledges/payments)
+    if (campaign.supabaseId) {
+      await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', campaign.supabaseId);
     }
 
     await Campaign.findByIdAndDelete(id);

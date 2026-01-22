@@ -69,7 +69,8 @@ router.patch('/mpesa', protect, requireAdmin, updateMpesaSettings);
 router.post('/mpesa/test', protect, requireAdmin, testMpesaConnection);
 
 // Payment gateway settings (admin only)
-router.patch('/payment-gateway', protect, requireAdmin, updatePaymentGateway);
+//router.patch('/payment-gateway', protect, requireAdmin, updatePaymentGateway);
+router.patch('/payment', protect, requireAdmin, updatePaymentGateway);
 
 // Donation settings (admin only)
 router.get('/donations', protect, requireAdmin, getDonationSettings);

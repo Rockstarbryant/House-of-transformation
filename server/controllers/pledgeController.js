@@ -1,4 +1,5 @@
 // server/controllers/pledgeController.js
+
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 const asyncHandler = require('../middleware/asyncHandler');
@@ -11,7 +12,7 @@ const supabase = createClient(
 );
 
 // ============================================
-// CREATE PLEDGE
+// CREATE PLEDGE - FIXED
 // ============================================
 exports.createPledge = asyncHandler(async (req, res) => {
   try {
@@ -57,18 +58,26 @@ exports.createPledge = asyncHandler(async (req, res) => {
       });
     }
 
-    // Create pledge in Supabase
+    // ✅ Check if campaign has Supabase ID
+    if (!campaign.supabaseId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Campaign not synced to Supabase'
+      });
+    }
+
+    // ✅ FIX: DO NOT send remaining_amount - it's a GENERATED column
     const { data, error } = await supabase
       .from('pledges')
       .insert([{
-        campaign_id: campaignId,
+        campaign_id: campaign.supabaseId,
         user_id: req.user._id,
         member_name: req.user.name,
         member_phone: req.user.phone || '',
         member_email: req.user.email,
         pledged_amount: pledgedAmount,
         paid_amount: 0,
-        remaining_amount: pledgedAmount,
+        // ❌ REMOVED: remaining_amount - Supabase calculates this automatically
         status: 'pending',
         installment_plan: installmentPlan || 'lump-sum',
         due_date: campaign.endDate,
@@ -106,8 +115,10 @@ exports.createPledge = asyncHandler(async (req, res) => {
 });
 
 // ============================================
-// GET USER'S PLEDGES
+// REST OF THE FILE STAYS THE SAME
 // ============================================
+
+// GET USER'S PLEDGES
 exports.getUserPledges = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -172,9 +183,7 @@ exports.getUserPledges = asyncHandler(async (req, res) => {
   }
 });
 
-// ============================================
 // GET CAMPAIGN PLEDGES (Admin only)
-// ============================================
 exports.getCampaignPledges = asyncHandler(async (req, res) => {
   try {
     const { campaignId } = req.params;
@@ -247,9 +256,7 @@ exports.getCampaignPledges = asyncHandler(async (req, res) => {
   }
 });
 
-// ============================================
 // GET SINGLE PLEDGE
-// ============================================
 exports.getPledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;
@@ -299,9 +306,7 @@ exports.getPledge = asyncHandler(async (req, res) => {
   }
 });
 
-// ============================================
 // UPDATE PLEDGE (Admin only)
-// ============================================
 exports.updatePledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;
@@ -353,9 +358,7 @@ exports.updatePledge = asyncHandler(async (req, res) => {
   }
 });
 
-// ============================================
 // CANCEL PLEDGE (User/Admin)
-// ============================================
 exports.cancelPledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;

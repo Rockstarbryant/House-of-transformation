@@ -85,6 +85,13 @@ const campaignSchema = new mongoose.Schema({
     default: null
   },
 
+  // In campaignSchema, add after imageUrl:
+supabaseId: {
+  type: String,
+  unique: true,
+  sparse: true // Allows null values while maintaining uniqueness
+},
+
   impactStatement: {
     type: String,
     trim: true
