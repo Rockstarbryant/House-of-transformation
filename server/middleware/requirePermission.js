@@ -72,6 +72,34 @@ exports.requirePermission = (...requiredPermissions) => {
         );
       }
 
+      // Donation permission expansion
+if (userPermissions.includes('manage:donations')) {
+  expandedPermissions.push(
+    // Campaign permissions
+    'view:campaigns',
+    'create:campaigns',
+    'edit:campaigns',
+    'delete:campaigns',
+    'activate:campaigns',
+    'feature:campaigns',
+    
+    // Pledge permissions
+    'view:pledges',
+    'view:pledges:all',
+    'approve:pledges',
+    'edit:pledges',
+    
+    // Payment permissions
+    'view:payments',
+    'view:payments:all',
+    'process:payments',
+    'verify:payments',
+    
+    // Reports
+    'view:donation:reports'
+  );
+}
+
       userPermissions = expandedPermissions;
       console.log('[PERMISSION] Expanded permissions:', userPermissions);
 

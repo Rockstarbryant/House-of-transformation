@@ -418,7 +418,7 @@ House of Transformation Team
 
 ---
 House of Transformation Church
-Mombasa, Kenya
+Busia, Kenya
 info@houseoftransformation.org
     `.trim();
 

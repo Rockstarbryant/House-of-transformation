@@ -30,6 +30,30 @@ const roleSchema = new mongoose.Schema({
       'manage:feedback',
       'manage:volunteers',
       'manage:settings',
+
+      // ===== GRANULAR DONATION PERMISSIONS =====
+// Campaign permissions
+'view:campaigns',
+'create:campaigns',
+'edit:campaigns',
+'delete:campaigns',
+'activate:campaigns',
+'feature:campaigns',
+
+// Pledge permissions
+'view:pledges',
+'view:pledges:all',      // Admin - see all user pledges
+'approve:pledges',
+'edit:pledges',
+
+// Payment permissions
+'view:payments',
+'view:payments:all',     // Admin - see all payments
+'process:payments',      // Manual payment recording
+'verify:payments',
+
+// Reports
+'view:donation:reports',
       
       // ===== GRANULAR FEEDBACK PERMISSIONS =====
       // Read permissions (by category)

@@ -64,21 +64,108 @@ const settingsSchema = new mongoose.Schema({
     lockoutDuration: { type: Number, default: 15 } // minutes
   },
 
-  // Payment/Donation Settings
-  paymentSettings: {
-    enablePayments: { type: Boolean, default: true },
-    paymentGateway: { 
-      type: String, 
-      enum: ['mpesa', 'stripe', 'paypal', 'flutterwave'], 
-      default: 'mpesa' 
-    },
-    mpesaShortcode: { type: String, default: '' },
-    mpesaPasskey: { type: String, default: '' },
-    stripePublicKey: { type: String, default: '' },
-    stripeSecretKey: { type: String, default: '' },
-    minimumDonation: { type: Number, default: 100 },
-    currency: { type: String, default: 'KES' }
+// Payment/Donation Settings
+paymentSettings: {
+  enablePayments: { type: Boolean, default: true },
+  paymentGateway: { 
+    type: String, 
+    enum: ['mpesa', 'stripe', 'paypal', 'flutterwave'], 
+    default: 'mpesa' 
   },
+  minimumDonation: { type: Number, default: 100 },
+  currency: { type: String, default: 'KES' },
+  
+  // M-Pesa Configuration
+  mpesa: {
+    enabled: { type: Boolean, default: true },
+    consumerKey: { type: String, default: '' },
+    consumerSecret: { type: String, default: '' },
+    shortcode: { type: String, default: '' },
+    passkey: { type: String, default: '' },
+    environment: { 
+      type: String, 
+      enum: ['sandbox', 'production'],
+      default: 'sandbox'
+    },
+    callbackUrl: { type: String, default: '' },
+    timeout: { type: Number, default: 1000 }
+  },
+  
+  // Stripe Configuration
+  stripe: {
+    enabled: { type: Boolean, default: false },
+    publicKey: { type: String, default: '' },
+    secretKey: { type: String, default: '' }
+  },
+  
+  // PayPal Configuration
+  paypal: {
+    enabled: { type: Boolean, default: false },
+    clientId: { type: String, default: '' },
+    clientSecret: { type: String, default: '' },
+    mode: {
+      type: String,
+      enum: ['sandbox', 'live'],
+      default: 'sandbox'
+    }
+  },
+  
+  // Flutterwave Configuration
+  flutterwave: {
+    enabled: { type: Boolean, default: false },
+    publicKey: { type: String, default: '' },
+    secretKey: { type: String, default: '' },
+    encryptionKey: { type: String, default: '' }
+  }
+},
+
+// Donation Feature Settings
+donationSettings: {
+  enableDonations: { type: Boolean, default: true },
+  enableCampaigns: { type: Boolean, default: true },
+  enablePledges: { type: Boolean, default: true },
+  enableOfferings: { type: Boolean, default: true },
+  
+  // Offering Types (as nested objects)
+  offeringTypes: {
+    tithe: {
+      enabled: { type: Boolean, default: true },
+      label: { type: String, default: 'Tithe' }
+    },
+    thanksgiving: {
+      enabled: { type: Boolean, default: true },
+      label: { type: String, default: 'Thanksgiving' }
+    },
+    firstFruit: {
+      enabled: { type: Boolean, default: true },
+      label: { type: String, default: 'First Fruit' }
+    },
+    seed: {
+      enabled: { type: Boolean, default: true },
+      label: { type: String, default: 'Seed Offering' }
+    },
+    general: {
+      enabled: { type: Boolean, default: true },
+      label: { type: String, default: 'General Offering' }
+    }
+  },
+  
+  // Receipt Settings
+  sendReceipts: { type: Boolean, default: true },
+  receiptEmail: { type: String, default: '' },
+  includeAnnualStatement: { type: Boolean, default: true },
+  
+  // Notification Settings
+  notifyAdminOnDonation: { type: Boolean, default: true },
+  notifyDonorOnSuccess: { type: Boolean, default: true },
+  adminNotificationEmail: { type: String, default: '' },
+  
+  // Pledge Settings
+  pledgeReminderDays: { type: Number, default: 3 },
+  enablePledgeReminders: { type: Boolean, default: true }
+},
+
+// ... rest of existing settings ...
 
   // Social Media Links
   socialMedia: {

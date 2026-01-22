@@ -1,6 +1,5 @@
 const cloudinary = require('cloudinary').v2;
-//const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
 // Configure Cloudinary
@@ -15,14 +14,16 @@ console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌ M
 console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? '✅' : '❌ MISSING');
 console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅' : '❌ MISSING');
 
-// Create Cloudinary storage for multer
+// ✅ NEW API: params must be a function
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'church-gallery',
-    resource_type: 'auto',
-    quality: 'auto',
-    fetch_format: 'auto'
+  params: async (req, file) => {
+    return {
+      folder: 'church-gallery',
+      format: 'auto', // ✅ Changed from fetch_format
+      resource_type: 'auto',
+      transformation: [{ quality: 'auto' }] // ✅ Changed from quality: 'auto'
+    };
   }
 });
 

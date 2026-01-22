@@ -115,6 +115,10 @@ app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
+app.use('/api/campaigns', require('./routes/campaignRoutes'));
+app.use('/api/pledges', require('./routes/pledgeRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
+// Livestream routes
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 // Feedback routes
 app.use('/api/feedback', require('./routes/feedbackRoutes'));

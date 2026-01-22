@@ -234,6 +234,276 @@ exports.updateSecuritySettings = asyncHandler(async (req, res) => {
   }
 });
 
+
+// server/controllers/settingsController.js - ADD THESE METHODS
+
+// ============================================
+// M-PESA SETTINGS MANAGEMENT
+// ============================================
+
+// @desc    Get M-Pesa settings (admin only)
+// @route   GET /api/settings/mpesa
+// @access  Private/Admin
+exports.getMpesaSettings = asyncHandler(async (req, res) => {
+  try {
+    console.log('[SETTINGS-MPESA-GET] Fetching M-Pesa settings');
+
+    const settings = await Settings.getSettings();
+
+    // Don't expose secrets in response
+    const mpesaSettings = {
+      enabled: settings.paymentSettings.mpesa.enabled,
+      environment: settings.paymentSettings.mpesa.environment,
+      shortcode: settings.paymentSettings.mpesa.shortcode,
+      callbackUrl: settings.paymentSettings.mpesa.callbackUrl,
+      timeout: settings.paymentSettings.mpesa.timeout
+    };
+
+    res.json({
+      success: true,
+      mpesa: mpesaSettings
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-MPESA-GET] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch M-Pesa settings',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Update M-Pesa settings (admin only)
+// @route   PATCH /api/settings/mpesa
+// @access  Private/Admin
+exports.updateMpesaSettings = asyncHandler(async (req, res) => {
+  try {
+    const { consumerKey, consumerSecret, shortcode, passkey, environment, callbackUrl, timeout, enabled } = req.body;
+
+    console.log('[SETTINGS-MPESA-UPDATE] Updating M-Pesa settings');
+
+    // Validate required fields
+    if (!consumerKey && !consumerSecret && !shortcode && !passkey) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one M-Pesa credential must be provided'
+      });
+    }
+
+    // Validate environment
+    if (environment && !['sandbox', 'production'].includes(environment)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Environment must be "sandbox" or "production"'
+      });
+    }
+
+    const settings = await Settings.getSettings();
+
+    // Update only provided fields
+    if (consumerKey !== undefined) settings.paymentSettings.mpesa.consumerKey = consumerKey;
+    if (consumerSecret !== undefined) settings.paymentSettings.mpesa.consumerSecret = consumerSecret;
+    if (shortcode !== undefined) settings.paymentSettings.mpesa.shortcode = shortcode;
+    if (passkey !== undefined) settings.paymentSettings.mpesa.passkey = passkey;
+    if (environment !== undefined) settings.paymentSettings.mpesa.environment = environment;
+    if (callbackUrl !== undefined) settings.paymentSettings.mpesa.callbackUrl = callbackUrl;
+    if (timeout !== undefined) settings.paymentSettings.mpesa.timeout = timeout;
+    if (enabled !== undefined) settings.paymentSettings.mpesa.enabled = enabled;
+
+    settings.lastUpdatedBy = req.user._id;
+    await settings.save();
+
+    console.log('[SETTINGS-MPESA-UPDATE] M-Pesa settings updated');
+
+    res.json({
+      success: true,
+      message: 'M-Pesa settings updated successfully',
+      mpesa: {
+        enabled: settings.paymentSettings.mpesa.enabled,
+        environment: settings.paymentSettings.mpesa.environment,
+        shortcode: settings.paymentSettings.mpesa.shortcode
+      }
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-MPESA-UPDATE] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update M-Pesa settings',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Test M-Pesa connection
+// @route   POST /api/settings/mpesa/test
+// @access  Private/Admin
+exports.testMpesaConnection = asyncHandler(async (req, res) => {
+  try {
+    console.log('[SETTINGS-MPESA-TEST] Testing M-Pesa connection');
+
+    const settings = await Settings.getSettings();
+    const mpesa = settings.paymentSettings.mpesa;
+
+    // Basic validation
+    if (!mpesa.enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'M-Pesa is not enabled'
+      });
+    }
+
+    if (!mpesa.consumerKey || !mpesa.consumerSecret || !mpesa.shortcode || !mpesa.passkey) {
+      return res.status(400).json({
+        success: false,
+        message: 'M-Pesa credentials are incomplete',
+        missing: {
+          consumerKey: !mpesa.consumerKey,
+          consumerSecret: !mpesa.consumerSecret,
+          shortcode: !mpesa.shortcode,
+          passkey: !mpesa.passkey
+        }
+      });
+    }
+
+    // Mock test - in production, call actual M-Pesa OAuth endpoint
+    console.log('[SETTINGS-MPESA-TEST] Configuration valid');
+
+    res.json({
+      success: true,
+      message: 'M-Pesa configuration is valid',
+      environment: mpesa.environment,
+      shortcode: mpesa.shortcode,
+      status: 'configured'
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-MPESA-TEST] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'M-Pesa connection test failed',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// DONATION SETTINGS MANAGEMENT
+// ============================================
+
+// @desc    Get donation settings
+// @route   GET /api/settings/donations
+// @access  Public/Admin
+exports.getDonationSettings = asyncHandler(async (req, res) => {
+  try {
+    console.log('[SETTINGS-DONATIONS-GET] Fetching donation settings');
+
+    const settings = await Settings.getSettings();
+
+    res.json({
+      success: true,
+      donations: settings.donationSettings,
+      paymentGateway: settings.paymentSettings.paymentGateway,
+      minimumDonation: settings.paymentSettings.minimumDonation,
+      currency: settings.paymentSettings.currency
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-DONATIONS-GET] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch donation settings',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Update donation settings (admin only)
+// @route   PATCH /api/settings/donations
+// @access  Private/Admin
+exports.updateDonationSettings = asyncHandler(async (req, res) => {
+  try {
+    const updates = req.body;
+
+    console.log('[SETTINGS-DONATIONS-UPDATE] Updating donation settings');
+
+    const settings = await Settings.getSettings();
+
+    // Update donation settings
+    Object.keys(updates).forEach(key => {
+      if (settings.donationSettings[key] !== undefined) {
+        settings.donationSettings[key] = updates[key];
+      }
+    });
+
+    settings.lastUpdatedBy = req.user._id;
+    await settings.save();
+
+    console.log('[SETTINGS-DONATIONS-UPDATE] Donation settings updated');
+
+    res.json({
+      success: true,
+      message: 'Donation settings updated successfully',
+      donations: settings.donationSettings
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-DONATIONS-UPDATE] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update donation settings',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Update payment gateway settings (admin only)
+// @route   PATCH /api/settings/payment-gateway
+// @access  Private/Admin
+exports.updatePaymentGateway = asyncHandler(async (req, res) => {
+  try {
+    const { gateway, minimumDonation, currency } = req.body;
+
+    console.log('[SETTINGS-PAYMENT-GATEWAY] Updating payment gateway settings');
+
+    // Validate gateway
+    if (gateway && !['mpesa', 'stripe', 'paypal', 'flutterwave'].includes(gateway)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment gateway. Must be one of: mpesa, stripe, paypal, flutterwave'
+      });
+    }
+
+    const settings = await Settings.getSettings();
+
+    if (gateway) settings.paymentSettings.paymentGateway = gateway;
+    if (minimumDonation !== undefined) settings.paymentSettings.minimumDonation = minimumDonation;
+    if (currency) settings.paymentSettings.currency = currency;
+
+    settings.lastUpdatedBy = req.user._id;
+    await settings.save();
+
+    console.log('[SETTINGS-PAYMENT-GATEWAY] Payment gateway updated');
+
+    res.json({
+      success: true,
+      message: 'Payment gateway settings updated successfully',
+      gateway: settings.paymentSettings.paymentGateway,
+      minimumDonation: settings.paymentSettings.minimumDonation,
+      currency: settings.paymentSettings.currency
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-PAYMENT-GATEWAY] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update payment gateway settings',
+      error: error.message
+    });
+  }
+});
+
 // @desc    Update payment settings
 // @route   PATCH /api/settings/payment
 // @access  Private/Admin
