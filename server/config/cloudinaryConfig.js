@@ -14,24 +14,24 @@ console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌ M
 console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? '✅' : '❌ MISSING');
 console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅' : '❌ MISSING');
 
-// ✅ NEW API: params must be a function
+// ✅ FIX: params must be a function (not an object)
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
     return {
       folder: 'church-gallery',
-      format: 'auto', // ✅ Changed from fetch_format
+      format: 'auto',
       resource_type: 'auto',
-      transformation: [{ quality: 'auto' }] // ✅ Changed from quality: 'auto'
+      transformation: [{ quality: 'auto' }]
     };
   }
 });
 
-// Create multer instance with file size and type limits
+// Create multer instance
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB per file
+    fileSize: 5 * 1024 * 1024 // 5MB
   },
   fileFilter: (req, file, cb) => {
     const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
