@@ -14,15 +14,15 @@ console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌ M
 console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? '✅' : '❌ MISSING');
 console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅' : '❌ MISSING');
 
-// ✅ FIX: params must be a function (not an object)
+// ✅ FIXED: Removed invalid 'format: auto' parameter
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
     return {
       folder: 'church-gallery',
-      format: 'auto',
-      resource_type: 'auto',
-      transformation: [{ quality: 'auto' }]
+      resource_type: 'auto', // This is correct - handles images, videos, etc.
+      transformation: [{ quality: 'auto' }], // This optimizes file size
+      // DO NOT include 'format: auto' - it's not valid!
     };
   }
 });
