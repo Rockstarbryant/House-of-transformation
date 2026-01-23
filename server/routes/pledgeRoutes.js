@@ -5,7 +5,8 @@ const {
   getCampaignPledges,
   getPledge,
   updatePledge,
-  cancelPledge
+  cancelPledge,
+   getAllPledges 
 } = require('../controllers/pledgeController');
 
 const { protect } = require('../middleware/supabaseAuth');
@@ -23,6 +24,10 @@ router.post('/', protect, createPledge);
 // Get user's own pledges
 router.get('/my-pledges', protect, getUserPledges);
 
+// Add this route BEFORE the /:pledgeId route
+router.get('/all', protect, requirePermission('view:pledges:all', 'manage:donations'), getAllPledges);
+
+
 // Get single pledge (own pledge)
 router.get('/:pledgeId', protect, getPledge);
 
@@ -35,6 +40,8 @@ router.patch('/:pledgeId/cancel', protect, cancelPledge);
 
 // Get campaign pledges (requires view:pledges:all)
 router.get('/campaign/:campaignId', protect, requirePermission('view:pledges:all', 'manage:donations'), getCampaignPledges);
+
+
 
 // Update pledge (requires edit:pledges)
 router.put('/:pledgeId', protect, requirePermission('edit:pledges', 'manage:donations'), updatePledge);

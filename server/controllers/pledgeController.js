@@ -306,6 +306,52 @@ exports.getPledge = asyncHandler(async (req, res) => {
   }
 });
 
+// Add this function
+exports.getAllPledges = asyncHandler(async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    const { count } = await supabase
+      .from('pledges')
+      .select('*', { count: 'exact', head: true });
+
+    const { data, error } = await supabase
+      .from('pledges')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limitNum - 1);
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch pledges',
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      pledges: data,
+      pagination: {
+        total: count,
+        pages: Math.ceil(count / limitNum),
+        currentPage: pageNum,
+        limit: limitNum
+      }
+    });
+  } catch (error) {
+    console.error('[PLEDGE-GET-ALL] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch pledges'
+    });
+  }
+});
+
 // UPDATE PLEDGE (Admin only)
 exports.updatePledge = asyncHandler(async (req, res) => {
   try {

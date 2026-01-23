@@ -116,6 +116,7 @@ app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));
+app.use('/api/contributions', require('./routes/contributionRoutes'));
 app.use('/api/pledges', require('./routes/pledgeRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 // Livestream routes

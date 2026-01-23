@@ -1,19 +1,89 @@
 const Role = require('../models/Role');
 const User = require('../models/User');
-const asyncHandler = require('../middleware/asyncHandler');
 
 // ============================================
-// PART A: ROLE CRUD OPERATIONS
+// GET ALL AVAILABLE PERMISSIONS (for UI)
 // ============================================
+exports.getAvailablePermissions = async (req, res) => {
+  try {
+    // Get enum values directly from schema (correct path for array type)
+    const permissionsPath = Role.schema.path('permissions');
+    const permissionsEnum = permissionsPath.caster 
+      ? permissionsPath.caster.enumValues 
+      : permissionsPath.enumValues;
 
-// @desc    Get all roles
-// @route   GET /api/roles
-// @access  Public (admin can see all with details)
-exports.getAllRoles = asyncHandler(async (req, res) => {
+    // Group permissions by category
+    const grouped = {
+      broad: [],
+      events: [],
+      sermons: [],
+      gallery: [],
+      donations: [],
+      feedback: [],
+      users: [],
+      roles: [],
+      blog: [],
+      livestream: [],
+      volunteers: [],
+      settings: [],
+      analytics: []
+    };
+
+    permissionsEnum.forEach(perm => {
+      if (perm.startsWith('manage:')) {
+        grouped.broad.push(perm);
+      } else if (perm.includes('campaign') || perm.includes('pledge') || perm.includes('payment') || perm.includes('donation')) {
+        grouped.donations.push(perm);
+      } else if (perm.includes('feedback')) {
+        grouped.feedback.push(perm);
+      } else if (perm.includes('event')) {
+        grouped.events.push(perm);
+      } else if (perm.includes('sermon')) {
+        grouped.sermons.push(perm);
+      } else if (perm.includes('gallery')) {
+        grouped.gallery.push(perm);
+      } else if (perm.includes('user')) {
+        grouped.users.push(perm);
+      } else if (perm.includes('role')) {
+        grouped.roles.push(perm);
+      } else if (perm.includes('blog')) {
+        grouped.blog.push(perm);
+      } else if (perm.includes('livestream')) {
+        grouped.livestream.push(perm);
+      } else if (perm.includes('volunteer')) {
+        grouped.volunteers.push(perm);
+      } else if (perm.includes('setting')) {
+        grouped.settings.push(perm);
+      } else if (perm.includes('analytics') || perm.includes('audit')) {
+        grouped.analytics.push(perm);
+      }
+    });
+
+    res.json({
+      success: true,
+      permissions: {
+        all: permissionsEnum,
+        grouped
+      }
+    });
+
+  } catch (error) {
+    console.error('[ROLE-PERMISSIONS] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch permissions'
+    });
+  }
+};
+
+// ============================================
+// GET ALL ROLES
+// ============================================
+exports.getAllRoles = async (req, res) => {
   try {
     console.log('[ROLE-GET-ALL] Fetching all roles');
 
-    const roles = await Role.find().sort({ name: 1 });
+    const roles = await Role.find().sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -25,19 +95,17 @@ exports.getAllRoles = asyncHandler(async (req, res) => {
     console.error('[ROLE-GET-ALL] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch roles',
-      error: error.message
+      message: 'Failed to fetch roles'
     });
   }
-});
+};
 
-// @desc    Get single role by ID
-// @route   GET /api/roles/:id
-// @access  Public
-exports.getRoleById = asyncHandler(async (req, res) => {
+// ============================================
+// GET ROLE BY ID
+// ============================================
+exports.getRoleById = async (req, res) => {
   try {
     const { id } = req.params;
-
     console.log('[ROLE-GET] Fetching role:', id);
 
     const role = await Role.findById(id);
@@ -58,22 +126,22 @@ exports.getRoleById = asyncHandler(async (req, res) => {
     console.error('[ROLE-GET] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch role',
-      error: error.message
+      message: 'Failed to fetch role'
     });
   }
-});
+};
 
-// @desc    Create new role
-// @route   POST /api/roles
-// @access  Private/Admin
-exports.createRole = asyncHandler(async (req, res) => {
+// ============================================
+// CREATE ROLE
+// ============================================
+exports.createRole = async (req, res) => {
   try {
     const { name, description, permissions } = req.body;
 
     console.log('[ROLE-CREATE] Creating role:', name);
+    console.log('[ROLE-CREATE] Permissions received:', permissions);
 
-    // Validate input
+    // Validate required fields
     if (!name) {
       return res.status(400).json({
         success: false,
@@ -90,63 +158,24 @@ exports.createRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Validate permissions array - MATCH Role model enum exactly
-    const validPermissions = [
-      // ===== BROAD PERMISSIONS =====
-      'manage:events',
-      'manage:sermons',
-      'manage:gallery',
-      'manage:donations',
-      'manage:users',
-      'manage:roles',
-      'manage:blog',
-      'manage:livestream',
-      'manage:feedback',
-      'manage:volunteers',
-      'manage:settings',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (READ) =====
-      'read:feedback:sermon',
-      'read:feedback:service',
-      'read:feedback:testimony',
-      'read:feedback:suggestion',
-      'read:feedback:prayer',
-      'read:feedback:general',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (RESPOND) =====
-      'respond:feedback:sermon',
-      'respond:feedback:service',
-      'respond:feedback:testimony',
-      'respond:feedback:suggestion',
-      'respond:feedback:prayer',
-      'respond:feedback:general',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (PUBLISH) =====
-      'publish:feedback:testimony',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (ARCHIVE) =====
-      'archive:feedback:sermon',
-      'archive:feedback:service',
-      'archive:feedback:testimony',
-      'archive:feedback:suggestion',
-      'archive:feedback:prayer',
-      'archive:feedback:general',
-      
-      // ===== FEEDBACK STATS =====
-      'view:feedback:stats',
-      
-      // ===== OTHER =====
-      'view:analytics',
-      'view:audit_logs'
-    ];
+    // Get valid permissions from schema enum (correct path for array type)
+    const permissionsPath = Role.schema.path('permissions');
+    const validPermissions = permissionsPath.caster 
+      ? permissionsPath.caster.enumValues 
+      : permissionsPath.enumValues;
+    
+    console.log('[ROLE-CREATE] Valid permissions count:', validPermissions ? validPermissions.length : 0);
 
+    // Validate permissions
     if (permissions && Array.isArray(permissions)) {
       const invalidPerms = permissions.filter(p => !validPermissions.includes(p));
+      
       if (invalidPerms.length > 0) {
+        console.error('[ROLE-CREATE] Invalid permissions detected:', invalidPerms);
         return res.status(400).json({
           success: false,
           message: `Invalid permissions: ${invalidPerms.join(', ')}`,
-          validPermissions
+          validPermissions: validPermissions
         });
       }
     }
@@ -159,7 +188,7 @@ exports.createRole = asyncHandler(async (req, res) => {
       isSystemRole: false
     });
 
-    console.log('[ROLE-CREATE] Role created:', role._id);
+    console.log('[ROLE-CREATE] Role created successfully:', role._id);
 
     res.status(201).json({
       success: true,
@@ -169,23 +198,34 @@ exports.createRole = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('[ROLE-CREATE] Error:', error);
+    
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to create role',
       error: error.message
     });
   }
-});
+};
 
-// @desc    Update role (add/remove permissions)
-// @route   PATCH /api/roles/:id
-// @access  Private/Admin
-exports.updateRole = asyncHandler(async (req, res) => {
+// ============================================
+// UPDATE ROLE (Add/Remove Permissions)
+// ============================================
+exports.updateRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { description, permissions } = req.body;
 
     console.log('[ROLE-UPDATE] Updating role:', id);
+    console.log('[ROLE-UPDATE] New permissions:', permissions);
 
     const role = await Role.findById(id);
 
@@ -196,73 +236,40 @@ exports.updateRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Prevent modification of system roles (except permissions)
-    if (role.isSystemRole && description !== undefined && description !== role.description) {
+    // Prevent modification of system roles' permissions
+    if (role.isSystemRole && permissions) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot modify system role description'
+        message: 'Cannot modify system role permissions'
       });
     }
 
-    // Validate permissions if provided - MATCH Role model enum exactly
-    const validPermissions = [
-      // ===== BROAD PERMISSIONS =====
-      'manage:events',
-      'manage:sermons',
-      'manage:gallery',
-      'manage:donations',
-      'manage:users',
-      'manage:roles',
-      'manage:blog',
-      'manage:livestream',
-      'manage:feedback',
-      'manage:volunteers',
-      'manage:settings',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (READ) =====
-      'read:feedback:sermon',
-      'read:feedback:service',
-      'read:feedback:testimony',
-      'read:feedback:suggestion',
-      'read:feedback:prayer',
-      'read:feedback:general',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (RESPOND) =====
-      'respond:feedback:sermon',
-      'respond:feedback:service',
-      'respond:feedback:testimony',
-      'respond:feedback:suggestion',
-      'respond:feedback:prayer',
-      'respond:feedback:general',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (PUBLISH) =====
-      'publish:feedback:testimony',
-      
-      // ===== GRANULAR FEEDBACK PERMISSIONS (ARCHIVE) =====
-      'archive:feedback:sermon',
-      'archive:feedback:service',
-      'archive:feedback:testimony',
-      'archive:feedback:suggestion',
-      'archive:feedback:prayer',
-      'archive:feedback:general',
-      
-      // ===== FEEDBACK STATS =====
-      'view:feedback:stats',
-      
-      // ===== OTHER =====
-      'view:analytics',
-      'view:audit_logs'
-    ];
+    // Get valid permissions from schema enum (correct path for array type)
+    const permissionsPath = Role.schema.path('permissions');
+    const validPermissions = permissionsPath.caster 
+      ? permissionsPath.caster.enumValues 
+      : permissionsPath.enumValues;
+    
+    console.log('[ROLE-UPDATE] Valid permissions count:', validPermissions ? validPermissions.length : 0);
 
+    // Validate permissions if provided
     if (permissions && Array.isArray(permissions)) {
       const invalidPerms = permissions.filter(p => !validPermissions.includes(p));
+      
       if (invalidPerms.length > 0) {
+        console.error('[ROLE-UPDATE] Invalid permissions detected:', invalidPerms);
+        console.error('[ROLE-UPDATE] First 10 valid permissions:', validPermissions.slice(0, 10));
+        
         return res.status(400).json({
           success: false,
           message: `Invalid permissions: ${invalidPerms.join(', ')}`,
-          validPermissions
+          hint: 'Check if permissions are correctly spelled and exist in the Role model',
+          receivedCount: permissions.length,
+          invalidCount: invalidPerms.length,
+          sampleValid: validPermissions.slice(0, 20)
         });
       }
+
       role.permissions = permissions;
     }
 
@@ -273,7 +280,7 @@ exports.updateRole = asyncHandler(async (req, res) => {
 
     await role.save();
 
-    console.log('[ROLE-UPDATE] Role updated:', role._id);
+    console.log('[ROLE-UPDATE] Role updated successfully:', role._id);
 
     res.json({
       success: true,
@@ -283,18 +290,28 @@ exports.updateRole = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('[ROLE-UPDATE] Error:', error);
+    
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to update role',
       error: error.message
     });
   }
-});
+};
 
-// @desc    Delete role (except system roles)
-// @route   DELETE /api/roles/:id
-// @access  Private/Admin
-exports.deleteRole = asyncHandler(async (req, res) => {
+// ============================================
+// DELETE ROLE
+// ============================================
+exports.deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -309,23 +326,20 @@ exports.deleteRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Prevent deletion of system roles
+    // Cannot delete system roles
     if (role.isSystemRole) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot delete system roles',
-        roleId: role._id,
-        roleName: role.name
+        message: 'Cannot delete system roles'
       });
     }
 
     // Check if any users have this role
-    const usersWithRole = await User.countDocuments({ role: role._id });
+    const usersWithRole = await User.countDocuments({ role: id });
     if (usersWithRole > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete role. ${usersWithRole} user(s) currently have this role`,
-        affectedUsers: usersWithRole
+        message: `Cannot delete role: ${usersWithRole} user(s) still assigned to this role`
       });
     }
 
@@ -335,43 +349,34 @@ exports.deleteRole = asyncHandler(async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Role deleted successfully',
-      deletedRoleId: id
+      message: 'Role deleted successfully'
     });
 
   } catch (error) {
     console.error('[ROLE-DELETE] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete role',
-      error: error.message
+      message: 'Failed to delete role'
     });
   }
-});
-
+};
 
 // ============================================
-// PART B: USER ROLE ASSIGNMENT
+// ASSIGN ROLE TO USER
 // ============================================
-
-// @desc    Assign role to user
-// @route   PATCH /api/roles/assign-user
-// @access  Private/Admin
-exports.assignRoleToUser = asyncHandler(async (req, res) => {
+exports.assignRoleToUser = async (req, res) => {
   try {
     const { userId, roleId } = req.body;
 
-    console.log('[ROLE-ASSIGN] Assigning role to user:', userId, 'Role:', roleId);
+    console.log('[ROLE-ASSIGN] Assigning role', roleId, 'to user', userId);
 
-    // Validate input
     if (!userId || !roleId) {
       return res.status(400).json({
         success: false,
-        message: 'userId and roleId are required'
+        message: 'User ID and Role ID are required'
       });
     }
 
-    // Check if role exists
     const role = await Role.findById(roleId);
     if (!role) {
       return res.status(404).json({
@@ -380,7 +385,6 @@ exports.assignRoleToUser = asyncHandler(async (req, res) => {
       });
     }
 
-    // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -389,48 +393,34 @@ exports.assignRoleToUser = asyncHandler(async (req, res) => {
       });
     }
 
-    // Assign role to user
     user.role = roleId;
     await user.save();
 
-    // Fetch updated user with populated role
     const updatedUser = await User.findById(userId).populate('role');
 
-    console.log('[ROLE-ASSIGN] Role assigned successfully. User:', updatedUser.email, 'Role:', role.name);
+    console.log('[ROLE-ASSIGN] Role assigned successfully');
 
     res.json({
       success: true,
-      message: `Role "${role.name}" assigned to user "${user.name}"`,
-      user: {
-        id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: {
-          id: updatedUser.role._id,
-          name: updatedUser.role.name,
-          permissions: updatedUser.role.permissions
-        }
-      }
+      message: 'Role assigned successfully',
+      user: updatedUser
     });
 
   } catch (error) {
     console.error('[ROLE-ASSIGN] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to assign role',
-      error: error.message
+      message: 'Failed to assign role'
     });
   }
-});
+};
 
-// @desc    Get user with role + permissions
-// @route   GET /api/roles/user/:userId
-// @access  Private
-exports.getUserWithRole = asyncHandler(async (req, res) => {
+// ============================================
+// GET USER WITH ROLE
+// ============================================
+exports.getUserWithRole = async (req, res) => {
   try {
     const { userId } = req.params;
-
-    console.log('[ROLE-USER-GET] Fetching user with role:', userId);
 
     const user = await User.findById(userId).populate('role');
 
@@ -443,116 +433,65 @@ exports.getUserWithRole = asyncHandler(async (req, res) => {
 
     res.json({
       success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        supabase_uid: user.supabase_uid,
-        role: user.role ? {
-          id: user.role._id,
-          name: user.role.name,
-          description: user.role.description,
-          permissions: user.role.permissions,
-          isSystemRole: user.role.isSystemRole
-        } : null
-      }
+      user
     });
 
   } catch (error) {
-    console.error('[ROLE-USER-GET] Error:', error);
+    console.error('[ROLE-GET-USER] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch user',
-      error: error.message
+      message: 'Failed to fetch user'
     });
   }
-});
+};
 
-// @desc    Get all users by role
-// @route   GET /api/roles/:roleId/users
-// @access  Public
-exports.getUsersByRoleId = asyncHandler(async (req, res) => {
+// ============================================
+// GET USERS BY ROLE
+// ============================================
+exports.getUsersByRoleId = async (req, res) => {
   try {
     const { roleId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
 
-    console.log('[ROLE-USERS-GET] Fetching users for role:', roleId);
-
-    // Check if role exists
-    const role = await Role.findById(roleId);
-    if (!role) {
-      return res.status(404).json({
-        success: false,
-        message: 'Role not found'
-      });
-    }
-
-    const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 50;
-    const skip = (pageNum - 1) * limitNum;
-
-    // Get total count
-    const total = await User.countDocuments({ role: roleId });
-
-    // Get paginated users
-    const users = await User.find({ role: roleId })
-      .select('_id name email supabase_uid createdAt')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
-
-    const pages = Math.ceil(total / limitNum);
+    const users = await User.find({ role: roleId }).populate('role');
 
     res.json({
       success: true,
-      role: {
-        id: role._id,
-        name: role.name
-      },
-      users,
-      pagination: {
-        total,
-        pages,
-        currentPage: pageNum,
-        limit: limitNum
-      }
+      count: users.length,
+      users
     });
 
   } catch (error) {
-    console.error('[ROLE-USERS-GET] Error:', error);
+    console.error('[ROLE-GET-USERS] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch users',
-      error: error.message
+      message: 'Failed to fetch users'
     });
   }
-});
+};
 
-// @desc    Bulk assign role to multiple users
-// @route   POST /api/roles/bulk-assign
-// @access  Private/Admin
-exports.bulkAssignRole = asyncHandler(async (req, res) => {
+// ============================================
+// BULK ASSIGN ROLE
+// ============================================
+exports.bulkAssignRole = async (req, res) => {
   try {
     const { userIds, roleId } = req.body;
 
-    console.log('[ROLE-BULK-ASSIGN] Bulk assigning role to users');
+    console.log('[ROLE-BULK-ASSIGN] Assigning role', roleId, 'to', userIds.length, 'users');
 
-    // Validate input
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'userIds array is required and must not be empty'
+        message: 'User IDs array is required'
       });
     }
 
     if (!roleId) {
       return res.status(400).json({
         success: false,
-        message: 'roleId is required'
+        message: 'Role ID is required'
       });
     }
 
-    // Check if role exists
     const role = await Role.findById(roleId);
     if (!role) {
       return res.status(404).json({
@@ -561,146 +500,24 @@ exports.bulkAssignRole = asyncHandler(async (req, res) => {
       });
     }
 
-    // Perform bulk update
     const result = await User.updateMany(
       { _id: { $in: userIds } },
-      { role: roleId },
-      { runValidators: false }
+      { $set: { role: roleId } }
     );
 
-    console.log('[ROLE-BULK-ASSIGN] Updated', result.modifiedCount, 'users');
+    console.log('[ROLE-BULK-ASSIGN] Bulk assignment complete:', result.modifiedCount, 'users updated');
 
     res.json({
       success: true,
-      message: `Role "${role.name}" assigned to ${result.modifiedCount} user(s)`,
-      updatedCount: result.modifiedCount,
-      totalRequested: userIds.length,
-      role: {
-        id: role._id,
-        name: role.name
-      }
+      message: `Role assigned to ${result.modifiedCount} user(s)`,
+      modifiedCount: result.modifiedCount
     });
 
   } catch (error) {
     console.error('[ROLE-BULK-ASSIGN] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to bulk assign role',
-      error: error.message
+      message: 'Failed to bulk assign role'
     });
   }
-});
-
-// @desc    Get all permissions list (for frontend dropdown/checkboxes)
-// @route   GET /api/roles/permissions/list
-// @access  Public
-
-exports.getAvailablePermissions = asyncHandler(async (req, res) => {
-  try {
-    const permissionsList = [
-      // ===== EVENTS =====
-      { key: 'manage:events', label: 'Manage Events', category: 'Events' },
-      
-      // ===== SERMONS =====
-      { key: 'manage:sermons', label: 'Manage Sermons', category: 'Content' },
-      
-      // ===== GALLERY =====
-      { key: 'manage:gallery', label: 'Manage Gallery', category: 'Content' },
-      
-      // ===== BLOG =====
-      { key: 'manage:blog', label: 'Manage Blog', category: 'Content' },
-      
-      // ===== LIVESTREAM =====
-      { key: 'manage:livestream', label: 'Manage Livestream', category: 'Content' },
-      
-      // ===== DONATIONS (BROAD) =====
-      { key: 'manage:donations', label: 'Manage All Donations', category: 'Finance' },
-      
-      // ===== DONATIONS (GRANULAR - CAMPAIGNS) =====
-      { key: 'view:campaigns', label: 'View Campaigns', category: 'Finance' },
-      { key: 'create:campaigns', label: 'Create Campaigns', category: 'Finance' },
-      { key: 'edit:campaigns', label: 'Edit Campaigns', category: 'Finance' },
-      { key: 'delete:campaigns', label: 'Delete Campaigns', category: 'Finance' },
-      { key: 'activate:campaigns', label: 'Activate Campaigns', category: 'Finance' },
-      { key: 'feature:campaigns', label: 'Feature Campaigns on Homepage', category: 'Finance' },
-      
-      // ===== DONATIONS (GRANULAR - PLEDGES) =====
-      { key: 'view:pledges', label: 'View Own Pledges', category: 'Finance' },
-      { key: 'view:pledges:all', label: 'View All Pledges (Admin)', category: 'Finance' },
-      { key: 'approve:pledges', label: 'Approve Pledges', category: 'Finance' },
-      { key: 'edit:pledges', label: 'Edit Pledges', category: 'Finance' },
-      
-      // ===== DONATIONS (GRANULAR - PAYMENTS) =====
-      { key: 'view:payments', label: 'View Own Payments', category: 'Finance' },
-      { key: 'view:payments:all', label: 'View All Payments (Admin)', category: 'Finance' },
-      { key: 'process:payments', label: 'Process/Record Payments', category: 'Finance' },
-      { key: 'verify:payments', label: 'Verify Payments', category: 'Finance' },
-      
-      // ===== DONATIONS (REPORTS) =====
-      { key: 'view:donation:reports', label: 'View Donation Reports', category: 'Finance' },
-      
-      // ===== VOLUNTEERS =====
-      { key: 'manage:volunteers', label: 'Manage Volunteers', category: 'Volunteers' },
-      
-      // ===== USERS =====
-      { key: 'manage:users', label: 'Manage Users', category: 'Administration' },
-      
-      // ===== ROLES =====
-      { key: 'manage:roles', label: 'Manage Roles', category: 'Administration' },
-      
-      // ===== SETTINGS =====
-      { key: 'manage:settings', label: 'Manage Settings', category: 'Administration' },
-      
-      // ===== FEEDBACK (BROAD) =====
-      { key: 'manage:feedback', label: 'Manage All Feedback', category: 'Feedback' },
-      
-      // ===== FEEDBACK (GRANULAR - READ) =====
-      { key: 'read:feedback:sermon', label: 'Read Sermon Feedback', category: 'Feedback' },
-      { key: 'read:feedback:service', label: 'Read Service Feedback', category: 'Feedback' },
-      { key: 'read:feedback:testimony', label: 'Read Testimony Feedback', category: 'Feedback' },
-      { key: 'read:feedback:suggestion', label: 'Read Suggestion Feedback', category: 'Feedback' },
-      { key: 'read:feedback:prayer', label: 'Read Prayer Feedback', category: 'Feedback' },
-      { key: 'read:feedback:general', label: 'Read General Feedback', category: 'Feedback' },
-      
-      // ===== FEEDBACK (GRANULAR - RESPOND) =====
-      { key: 'respond:feedback:sermon', label: 'Respond to Sermon Feedback', category: 'Feedback' },
-      { key: 'respond:feedback:service', label: 'Respond to Service Feedback', category: 'Feedback' },
-      { key: 'respond:feedback:testimony', label: 'Respond to Testimony Feedback', category: 'Feedback' },
-      { key: 'respond:feedback:suggestion', label: 'Respond to Suggestion Feedback', category: 'Feedback' },
-      { key: 'respond:feedback:prayer', label: 'Respond to Prayer Feedback', category: 'Feedback' },
-      { key: 'respond:feedback:general', label: 'Respond to General Feedback', category: 'Feedback' },
-      
-      // ===== FEEDBACK (GRANULAR - PUBLISH) =====
-      { key: 'publish:feedback:testimony', label: 'Publish Testimonies', category: 'Feedback' },
-      
-      // ===== FEEDBACK (GRANULAR - ARCHIVE) =====
-      { key: 'archive:feedback:sermon', label: 'Archive Sermon Feedback', category: 'Feedback' },
-      { key: 'archive:feedback:service', label: 'Archive Service Feedback', category: 'Feedback' },
-      { key: 'archive:feedback:testimony', label: 'Archive Testimony Feedback', category: 'Feedback' },
-      { key: 'archive:feedback:suggestion', label: 'Archive Suggestion Feedback', category: 'Feedback' },
-      { key: 'archive:feedback:prayer', label: 'Archive Prayer Feedback', category: 'Feedback' },
-      { key: 'archive:feedback:general', label: 'Archive General Feedback', category: 'Feedback' },
-      
-      // ===== FEEDBACK (STATS) =====
-      { key: 'view:feedback:stats', label: 'View Feedback Stats', category: 'Feedback' },
-      
-      // ===== ANALYTICS =====
-      { key: 'view:analytics', label: 'View Analytics', category: 'Reporting' },
-      { key: 'view:audit_logs', label: 'View Audit Logs', category: 'Security' }
-    ];
-
-    res.json({
-      success: true,
-      permissions: permissionsList,
-      total: permissionsList.length
-    });
-
-  } catch (error) {
-    console.error('[PERMISSIONS-LIST] Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch permissions',
-      error: error.message
-    });
-  }
-});
+};

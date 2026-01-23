@@ -15,11 +15,10 @@ const roleSchema = new mongoose.Schema({
     default: null
   },
 
-  // ✅ CORRECT: Array of strings with enum validation
-  permissions: {
-    type: [String],  // ← This is the correct syntax
+  permissions: [{
+    type: String,
     enum: [
-      // ===== BROAD PERMISSIONS =====
+      // ===== BROAD PERMISSIONS (backward compatibility) =====
       'manage:events',
       'manage:sermons',
       'manage:gallery',
@@ -32,30 +31,32 @@ const roleSchema = new mongoose.Schema({
       'manage:volunteers',
       'manage:settings',
 
-      // ===== CAMPAIGN PERMISSIONS =====
-      'view:campaigns',
-      'create:campaigns',
-      'edit:campaigns',
-      'delete:campaigns',
-      'activate:campaigns',
-      'feature:campaigns',
+      // ===== GRANULAR DONATION PERMISSIONS =====
+// Campaign permissions
+'view:campaigns',
+'create:campaigns',
+'edit:campaigns',
+'delete:campaigns',
+'activate:campaigns',
+'feature:campaigns',
 
-      // ===== PLEDGE PERMISSIONS =====
-      'view:pledges',
-      'view:pledges:all',
-      'approve:pledges',
-      'edit:pledges',
+// Pledge permissions
+'view:pledges',
+'view:pledges:all',      // Admin - see all user pledges
+'approve:pledges',
+'edit:pledges',
 
-      // ===== PAYMENT PERMISSIONS =====
-      'view:payments',
-      'view:payments:all',
-      'process:payments',
-      'verify:payments',
+// Payment permissions
+'view:payments',
+'view:payments:all',     // Admin - see all payments
+'process:payments',      // Manual payment recording
+'verify:payments',
 
-      // ===== DONATION REPORTS =====
-      'view:donation:reports',
+// Reports
+'view:donation:reports',
       
-      // ===== FEEDBACK READ PERMISSIONS =====
+      // ===== GRANULAR FEEDBACK PERMISSIONS =====
+      // Read permissions (by category)
       'read:feedback:sermon',
       'read:feedback:service',
       'read:feedback:testimony',
@@ -63,7 +64,7 @@ const roleSchema = new mongoose.Schema({
       'read:feedback:prayer',
       'read:feedback:general',
       
-      // ===== FEEDBACK RESPOND PERMISSIONS =====
+      // Respond permissions (by category)
       'respond:feedback:sermon',
       'respond:feedback:service',
       'respond:feedback:testimony',
@@ -71,10 +72,10 @@ const roleSchema = new mongoose.Schema({
       'respond:feedback:prayer',
       'respond:feedback:general',
       
-      // ===== FEEDBACK SPECIAL PERMISSIONS =====
+      // Publish permission (testimony only)
       'publish:feedback:testimony',
       
-      // ===== FEEDBACK ARCHIVE PERMISSIONS =====
+      // Archive permissions (by category)
       'archive:feedback:sermon',
       'archive:feedback:service',
       'archive:feedback:testimony',
@@ -82,15 +83,14 @@ const roleSchema = new mongoose.Schema({
       'archive:feedback:prayer',
       'archive:feedback:general',
       
-      // ===== FEEDBACK STATS =====
+      // Stats permission
       'view:feedback:stats',
       
       // ===== OTHER PERMISSIONS =====
       'view:analytics',
       'view:audit_logs'
-    ],
-    default: []
-  },
+    ]
+  }],
 
   isSystemRole: {
     type: Boolean,
@@ -110,15 +110,13 @@ const roleSchema = new mongoose.Schema({
 });
 
 // Prevent modification of system roles
-roleSchema.pre('findOneAndUpdate', function(next) {
+roleSchema.pre('findByIdAndUpdate', function(next) {
   const update = this.getUpdate();
-  
   if (update && update.$set) {
     if (update.$set.name) {
-      return next(new Error('Cannot modify system role name'));
+      next(new Error('Cannot modify system role name'));
     }
   }
-  
   next();
 });
 
