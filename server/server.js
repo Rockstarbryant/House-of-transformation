@@ -119,6 +119,7 @@ app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/contributions', require('./routes/contributionRoutes'));
 app.use('/api/pledges', require('./routes/pledgeRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/donations/analytics', require('./routes/donationAnalyticsRoutes'));
 // Livestream routes
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 // Feedback routes

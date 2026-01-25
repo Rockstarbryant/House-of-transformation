@@ -6,6 +6,7 @@ const {
   updateCampaign,
   activateCampaign,
   completeCampaign,
+  getCampaignAnalytics,
   archiveCampaign,
   deleteCampaign,
   getFeaturedCampaigns
@@ -36,6 +37,9 @@ router.put('/:id', protect, requirePermission('edit:campaigns', 'manage:donation
 
 // Activate campaign
 router.patch('/:id/activate', protect, requirePermission('activate:campaigns', 'manage:donations'), activateCampaign);
+
+// Add this route with other protected routes
+router.get('/:id/analytics', protect, requirePermission('view:campaigns', 'manage:donations'), getCampaignAnalytics);
 
 // Complete campaign
 router.patch('/:id/complete', protect, requirePermission('edit:campaigns', 'manage:donations'), completeCampaign);

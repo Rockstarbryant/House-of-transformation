@@ -364,6 +364,100 @@ exports.activateCampaign = asyncHandler(async (req, res) => {
 });
 
 // ============================================
+// GET CAMPAIGN ANALYTICS (Pledges + Contributions)
+// ============================================
+exports.getCampaignAnalytics = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('[CAMPAIGN-ANALYTICS] Fetching analytics for:', id);
+
+    const campaign = await Campaign.findById(id);
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message: 'Campaign not found'
+      });
+    }
+
+    if (!campaign.supabaseId) {
+      return res.json({
+        success: true,
+        analytics: {
+          totalPledged: 0,
+          totalPaidFromPledges: 0,
+          remainingPledges: 0,
+          totalDirectContributions: 0,
+          totalRaised: 0,
+          pledgeCount: 0,
+          contributionCount: 0
+        }
+      });
+    }
+
+    // ✅ Get pledge statistics
+    const { data: pledgeStats, error: pledgeError } = await supabase
+      .from('pledges')
+      .select('pledged_amount, paid_amount, remaining_amount')
+      .eq('campaign_id', campaign.supabaseId);
+
+    if (pledgeError) {
+      console.error('[CAMPAIGN-ANALYTICS] Pledge error:', pledgeError);
+    }
+
+    // ✅ Get direct contribution statistics
+    const { data: contributionStats, error: contribError } = await supabase
+      .from('contributions')
+      .select('amount')
+      .eq('campaign_id', campaign.supabaseId)
+      .eq('status', 'verified');
+
+    if (contribError) {
+      console.error('[CAMPAIGN-ANALYTICS] Contribution error:', contribError);
+    }
+
+    // ✅ Calculate totals
+    const totalPledged = (pledgeStats || []).reduce((sum, p) => sum + Number(p.pledged_amount || 0), 0);
+    const totalPaidFromPledges = (pledgeStats || []).reduce((sum, p) => sum + Number(p.paid_amount || 0), 0);
+    const remainingPledges = (pledgeStats || []).reduce((sum, p) => sum + Number(p.remaining_amount || 0), 0);
+    const totalDirectContributions = (contributionStats || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
+    const totalRaised = totalPaidFromPledges + totalDirectContributions;
+
+    // ✅ Update MongoDB campaign with calculated amount
+    campaign.currentAmount = totalRaised;
+    await campaign.save();
+
+    // ✅ Update Supabase campaign
+    await supabase
+      .from('campaigns')
+      .update({ current_amount: totalRaised })
+      .eq('id', campaign.supabaseId);
+
+    res.json({
+      success: true,
+      analytics: {
+        totalPledged,
+        totalPaidFromPledges,
+        remainingPledges,
+        totalDirectContributions,
+        totalRaised,
+        pledgeCount: (pledgeStats || []).length,
+        contributionCount: (contributionStats || []).length
+      }
+    });
+
+  } catch (error) {
+    console.error('[CAMPAIGN-ANALYTICS] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch campaign analytics',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // COMPLETE CAMPAIGN (Active -> Completed)
 // ============================================
 exports.completeCampaign = asyncHandler(async (req, res) => {

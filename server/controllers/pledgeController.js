@@ -353,6 +353,7 @@ exports.getAllPledges = asyncHandler(async (req, res) => {
 });
 
 // UPDATE PLEDGE (Admin only)
+// UPDATE PLEDGE (Admin only)
 exports.updatePledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;
@@ -360,8 +361,15 @@ exports.updatePledge = asyncHandler(async (req, res) => {
 
     console.log('[PLEDGE-UPDATE] Updating pledge:', pledgeId);
 
-    // Only allow certain fields to be updated
-    const allowedUpdates = ['installment_plan', 'notes', 'due_date'];
+    // ✅ EXPANDED: Allow more fields to be updated
+    const allowedUpdates = [
+      'pledged_amount',      // ✅ NEW: Allow amount changes
+      'installment_plan', 
+      'notes', 
+      'due_date',
+      'next_payment_due'     // ✅ NEW: Allow updating next payment date
+    ];
+    
     const updateData = {};
 
     allowedUpdates.forEach(field => {
@@ -370,6 +378,31 @@ exports.updatePledge = asyncHandler(async (req, res) => {
       }
     });
 
+    // ✅ NEW: Validation for pledged_amount
+    if (updateData.pledged_amount !== undefined) {
+      if (updateData.pledged_amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Pledged amount must be greater than 0'
+        });
+      }
+
+      // Get current pledge to check paid amount
+      const { data: currentPledge } = await supabase
+        .from('pledges')
+        .select('paid_amount')
+        .eq('id', pledgeId)
+        .single();
+
+      if (currentPledge && updateData.pledged_amount < currentPledge.paid_amount) {
+        return res.status(400).json({
+          success: false,
+          message: `New pledged amount (${updateData.pledged_amount}) cannot be less than amount already paid (${currentPledge.paid_amount})`
+        });
+      }
+    }
+
+    // Update in Supabase
     const { data, error } = await supabase
       .from('pledges')
       .update(updateData)
