@@ -1,5 +1,5 @@
-const Livestream = require('../models/livestreamModel');
-const { generateCaptionsAndSummary } = require('./aiCaptionsService');
+//const Livestream = require('../server/models/livestreamModel');
+//const { generateCaptionsAndSummary } = require('../server/services/aiCaptionsService');
 
 /**
  * Run this job when livestream is archived

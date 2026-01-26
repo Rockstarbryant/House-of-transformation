@@ -1,67 +1,85 @@
 const Blog = require('../models/Blog');
 const asyncHandler = require('../middleware/asyncHandler');
 
-// Check role permissions for blog category
-const canPostInCategory = (userRole, category) => {
-  const permissions = {
-    'member': ['testimonies'],
-    'volunteer': ['testimonies', 'events'],
-    'usher': ['testimonies', 'events'],
-    'worship_team': ['testimonies', 'events'],
-    'pastor': ['testimonies', 'events', 'teaching', 'news'],
-    'bishop': ['testimonies', 'events', 'teaching', 'news'],
-    'admin': ['testimonies', 'events', 'teaching', 'news']
-  };
-
-  const allowedCategories = permissions[userRole] || [];
-  return allowedCategories.includes(category);
-};
-
-// @desc    Get all blogs
-// @route   GET /api/blogs
+// @desc    Get all blogs or filter by category
+// @route   GET /api/blog
+// @route   GET /api/blog?category=news
 // @access  Public
 exports.getBlogs = asyncHandler(async (req, res) => {
   const { category } = req.query;
   
+  console.log('[BLOG-GET] Fetching blogs');
+  console.log('[BLOG-GET] Query params:', { category });
+
+  // Build query - always filter by approved status
   let query = { approved: true };
-  if (category) {
-    query.category = category;
+  
+  // Add category filter if provided
+  if (category && category !== 'all' && category !== '') {
+    const categoryLower = category.toLowerCase().trim();
+    console.log('[BLOG-GET] Filtering by category:', categoryLower);
+    query.category = categoryLower;
   }
+
+  console.log('[BLOG-GET] Final query:', query);
 
   const blogs = await Blog.find(query)
     .populate('author', 'name username role')
     .sort({ createdAt: -1 });
 
+  console.log('[BLOG-GET] Found blogs:', blogs.length);
+
   res.json({
     success: true,
     count: blogs.length,
+    category: category || 'all',
     blogs
   });
 });
 
-// @desc    Get blogs by category
-// @route   GET /api/blogs/category/:category
+// @desc    Get blogs by category (alternative route)
+// @route   GET /api/blog/category/:category
 // @access  Public
 exports.getBlogsByCategory = asyncHandler(async (req, res) => {
   const { category } = req.params;
 
+  console.log('[BLOG-CATEGORY] Fetching blogs for category:', category);
+
+  if (!category || category === 'all') {
+    // If "all" or empty, return all approved blogs
+    const blogs = await Blog.find({ approved: true })
+      .populate('author', 'name username role')
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      category: 'all',
+      count: blogs.length,
+      blogs
+    });
+  }
+
+  const categoryLower = category.toLowerCase().trim();
+
   const blogs = await Blog.find({ 
-    category,
+    category: categoryLower,
     approved: true 
   })
     .populate('author', 'name username role')
     .sort({ createdAt: -1 });
 
+  console.log('[BLOG-CATEGORY] Found blogs:', blogs.length);
+
   res.json({
     success: true,
-    category,
+    category: categoryLower,
     count: blogs.length,
     blogs
   });
 });
 
 // @desc    Get single blog
-// @route   GET /api/blogs/:id
+// @route   GET /api/blog/:id
 // @access  Public
 exports.getBlog = asyncHandler(async (req, res) => {
   const blog = await Blog.findById(req.params.id)
@@ -83,14 +101,14 @@ exports.getBlog = asyncHandler(async (req, res) => {
 
 // @desc    Create blog
 // @route   POST /api/blog
-// @access  Private
+// @access  Private (requires manage:blog permission)
 exports.createBlog = asyncHandler(async (req, res) => {
   console.log('\n========================================');
   console.log('📝 CREATE BLOG REQUEST');
   console.log('========================================');
   console.log('Request Body:', JSON.stringify(req.body, null, 2));
-  console.log('User Object Keys:', Object.keys(req.user));
-  console.log('User Role:', req.user?.role);
+  console.log('User Email:', req.user?.email);
+  console.log('User ID:', req.user?._id);
   console.log('========================================\n');
   
   const { title, content, category, description, image } = req.body;
@@ -113,11 +131,10 @@ exports.createBlog = asyncHandler(async (req, res) => {
     });
   }
 
-  // Get user ID (MongoDB uses _id, not id)
+  // Get user ID
   const userId = req.user._id;
   if (!userId) {
     console.log('❌ User ID missing from req.user');
-    console.log('Available keys:', Object.keys(req.user));
     return res.status(400).json({
       success: false,
       message: 'User ID not found in request'
@@ -134,37 +151,21 @@ exports.createBlog = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if user can post in this category
-  console.log('🔍 Checking category permission...');
-  console.log('   User Role:', req.user.role);
-  console.log('   Category:', category);
-  
-  // Get role name from populated role object
-  const roleName = req.user.role?.name || req.user.role;
-  if (!canPostInCategory(roleName, category)) {
-    console.log('âŒ User cannot post in category:', category);
-    return res.status(403).json({
-      success: false,
-      message: `Your role (${roleName}) cannot post in ${category} category`,
-      allowedCategories: ['member', 'volunteer', 'usher', 'worship_team'].includes(roleName) 
-        ? ['testimonies'] 
-        : ['testimonies', 'events', 'teaching', 'news']
-    });
-  }
-
-  console.log('✅ Permission check passed');
-  console.log('📤 Creating blog document...');
+  console.log('✅ User has role');
 
   try {
+    // Note: Permission check is done by requirePermission middleware
+    // This controller only creates the blog
+
     const blog = await Blog.create({
       title,
       content,
       category,
       description,
       image,
-      author: userId,  // ✅ Fixed: using userId which handles both _id and id
-      authorRole: req.user.role,
-      approved: req.user.role === 'admin' ? true : false
+      author: userId,
+      authorRole: req.user.role.name || req.user.role,
+      approved: req.user.role.name === 'admin' ? true : false
     });
 
     console.log('✅ Blog created with ID:', blog._id);
@@ -176,7 +177,7 @@ exports.createBlog = asyncHandler(async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: req.user.role === 'admin' 
+      message: req.user.role.name === 'admin' 
         ? 'Blog created and approved' 
         : 'Blog submitted for approval',
       blog: populatedBlog
@@ -189,8 +190,8 @@ exports.createBlog = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update blog (author or admin only)
-// @route   PUT /api/blogs/:id
-// @access  Private
+// @route   PUT /api/blog/:id
+// @access  Private (requires manage:blog permission)
 exports.updateBlog = asyncHandler(async (req, res) => {
   let blog = await Blog.findById(req.params.id);
 
@@ -201,25 +202,16 @@ exports.updateBlog = asyncHandler(async (req, res) => {
     });
   }
 
-  // ✅ Fixed: Use _id for comparison
+  // Fixed: Use _id for comparison
   const userId = req.user._id?.toString() || req.user.id?.toString();
+  const isAdmin = req.user.role?.name === 'admin';
   
-  // Check authorization
-  if (blog.author.toString() !== userId && req.user.role !== 'admin') {
+  // Check authorization - author or admin can edit
+  if (blog.author.toString() !== userId && !isAdmin) {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to update this blog' 
     });
-  }
-
-  // Check category permission if changing category
-  if (req.body.category && req.body.category !== blog.category) {
-    if (!canPostInCategory(req.user.role, req.body.category)) {
-      return res.status(403).json({
-        success: false,
-        message: `Cannot move blog to ${req.body.category} category`
-      });
-    }
   }
 
   blog = await Blog.findByIdAndUpdate(
@@ -230,13 +222,14 @@ exports.updateBlog = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
+    message: 'Blog updated successfully',
     blog
   });
 });
 
 // @desc    Delete blog (author or admin only)
-// @route   DELETE /api/blogs/:id
-// @access  Private
+// @route   DELETE /api/blog/:id
+// @access  Private (requires manage:blog permission)
 exports.deleteBlog = asyncHandler(async (req, res) => {
   const blog = await Blog.findById(req.params.id);
 
@@ -247,11 +240,12 @@ exports.deleteBlog = asyncHandler(async (req, res) => {
     });
   }
 
-  // ✅ Fixed: Use _id for comparison
+  // Fixed: Use _id for comparison
   const userId = req.user._id?.toString() || req.user.id?.toString();
+  const isAdmin = req.user.role?.name === 'admin';
 
-  // Check authorization
-  if (blog.author.toString() !== userId && req.user.role !== 'admin') {
+  // Check authorization - author or admin can delete
+  if (blog.author.toString() !== userId && !isAdmin) {
     return res.status(403).json({ 
       success: false, 
       message: 'Not authorized to delete this blog' 
@@ -262,15 +256,14 @@ exports.deleteBlog = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Blog deleted'
+    message: 'Blog deleted successfully'
   });
 });
 
 // @desc    Approve blog (admin only)
-// @route   PUT /api/blogs/:id/approve
+// @route   PUT /api/blog/:id/approve
 // @access  Private/Admin
 exports.approveBlog = asyncHandler(async (req, res) => {
-  // ✅ Fixed: Use _id
   const userId = req.user._id;
   
   const blog = await Blog.findByIdAndUpdate(
@@ -290,7 +283,7 @@ exports.approveBlog = asyncHandler(async (req, res) => {
 });
 
 // @desc    Get pending blogs (admin only)
-// @route   GET /api/blogs/pending
+// @route   GET /api/blog/pending
 // @access  Private/Admin
 exports.getPendingBlogs = asyncHandler(async (req, res) => {
   const blogs = await Blog.find({ approved: false })

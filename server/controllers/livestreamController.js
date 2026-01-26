@@ -2,6 +2,8 @@ const Livestream = require('../models/livestreamModel');
 const asyncHandler = require('express-async-handler');
 const { validationResult } = require('express-validator');
 const { processCaptionsForStream } = require('../services/captionWorker');
+const { extractYouTubeTranscript, extractFacebookTranscript } = require('../services/transcriptService');
+const { generateSummaryFromTranscript } = require('../services/aiSummaryFromTranscript');
 
 // ===== HELPER: Extract Video ID from URL =====
 const extractVideoId = (url, platform) => {
@@ -428,6 +430,266 @@ exports.deleteStream = asyncHandler(async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to delete livestream' 
+    });
+  }
+});
+
+/**
+ * GET /api/livestreams/:id/transcript
+ * Get transcript (raw + cleaned) - PUBLIC but only if stream is public
+ */
+exports.getTranscript = asyncHandler(async (req, res) => {
+  try {
+    const livestream = await Livestream.findOne({
+      _id: req.params.id,
+      isPublic: true
+    });
+
+    if (!livestream) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Livestream not found or not public' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        raw: livestream.transcript?.raw || null,
+        cleaned: livestream.transcript?.cleaned || null,
+        extractionStatus: livestream.transcript?.extractionStatus || 'pending',
+        extractionError: livestream.transcript?.extractionError || null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching transcript:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch transcript' 
+    });
+  }
+});
+
+/**
+ * PUT /api/livestreams/:id/transcript
+ * Update cleaned transcript (ADMIN ONLY)
+ */
+exports.updateTranscript = asyncHandler(async (req, res) => {
+  try {
+    const { cleaned } = req.body;
+
+    if (!cleaned || typeof cleaned !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cleaned transcript is required and must be a string'
+      });
+    }
+
+    if (cleaned.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cleaned transcript cannot be empty'
+      });
+    }
+
+    if (cleaned.length > 50000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transcript too long (max 50,000 characters)'
+      });
+    }
+
+    const livestream = await Livestream.findById(req.params.id);
+    
+    if (!livestream) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Livestream not found' 
+      });
+    }
+
+    // âœ… SECURITY: Check authorization
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized' 
+      });
+    }
+
+    livestream.transcript = livestream.transcript || {};
+    livestream.transcript.cleaned = cleaned.trim();
+    livestream.transcript.lastUpdatedBy = req.user._id;
+    livestream.transcript.lastUpdatedAt = new Date();
+    livestream.transcript.extractionStatus = 'manual';
+
+    await livestream.save();
+
+    res.json({
+      success: true,
+      message: 'Transcript updated successfully',
+      data: {
+        cleaned: livestream.transcript.cleaned,
+        lastUpdatedAt: livestream.transcript.lastUpdatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error updating transcript:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update transcript' 
+    });
+  }
+});
+
+/**
+ * POST /api/livestreams/:id/transcript/extract
+ * Attempt to extract transcript from YouTube/Facebook (ADMIN ONLY)
+ */
+exports.extractTranscript = asyncHandler(async (req, res) => {
+  try {
+    const livestream = await Livestream.findById(req.params.id);
+    
+    if (!livestream) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Livestream not found' 
+      });
+    }
+
+    // âœ… SECURITY: Check authorization
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized' 
+      });
+    }
+
+    const { transcriptService } = require('../services/transcriptService');
+    let extractedText = null;
+    let extractionStatus = 'failed';
+    let extractionError = null;
+
+    // Try YouTube first
+    if (livestream.youtubeVideoId) {
+      try {
+        extractedText = await transcriptService.extractYouTubeTranscript(livestream.youtubeVideoId);
+        if (extractedText) {
+          extractionStatus = 'success';
+        } else {
+          extractionError = 'YouTube captions not available for this video';
+        }
+      } catch (error) {
+        extractionError = `YouTube extraction failed: ${error.message}`;
+      }
+    }
+
+    // Try Facebook if YouTube failed
+    if (!extractedText && livestream.facebookUrl) {
+      try {
+        extractedText = await transcriptService.extractFacebookTranscript(livestream.facebookUrl);
+        if (extractedText) {
+          extractionStatus = 'success';
+        } else {
+          extractionError = 'Facebook transcript extraction not available. Please provide manually.';
+        }
+      } catch (error) {
+        extractionError = `Facebook extraction failed: ${error.message}`;
+      }
+    }
+
+    livestream.transcript = livestream.transcript || {};
+    livestream.transcript.raw = extractedText;
+    livestream.transcript.extractionAttempted = true;
+    livestream.transcript.extractionStatus = extractionStatus;
+    livestream.transcript.extractionError = extractionError || null;
+    
+    // If first time extracting, use raw as cleaned
+    if (!livestream.transcript.cleaned && extractedText) {
+      livestream.transcript.cleaned = extractedText;
+    }
+
+    await livestream.save();
+
+    res.json({
+      success: extractionStatus === 'success',
+      message: extractionStatus === 'success' 
+        ? 'Transcript extracted successfully' 
+        : 'Transcript extraction failed. Please provide manually.',
+      data: {
+        raw: livestream.transcript.raw,
+        cleaned: livestream.transcript.cleaned,
+        extractionStatus: livestream.transcript.extractionStatus,
+        extractionError: livestream.transcript.extractionError
+      }
+    });
+  } catch (error) {
+    console.error('Error extracting transcript:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to extract transcript' 
+    });
+  }
+});
+
+/**
+ * POST /api/livestreams/:id/transcript/generate-summary
+ * Generate AI summary from cleaned transcript (ADMIN ONLY)
+ */
+exports.generateSummaryFromTranscript = asyncHandler(async (req, res) => {
+  try {
+    const livestream = await Livestream.findById(req.params.id);
+    
+    if (!livestream) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Livestream not found' 
+      });
+    }
+
+    // âœ… SECURITY: Check authorization
+    if (livestream.createdBy.toString() !== req.user._id.toString() && req.user.role?.name !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized' 
+      });
+    }
+
+    const cleaned = livestream.transcript?.cleaned;
+    if (!cleaned || cleaned.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cleaned transcript is required. Please extract or provide transcript first.'
+      });
+    }
+
+    const { generateSummaryFromTranscript } = require('../services/aiSummaryFromTranscript');
+    
+    const summary = await generateSummaryFromTranscript(livestream, cleaned);
+
+    livestream.aiSummary = {
+      summary: summary.summary,
+      keyPoints: summary.keyPoints,
+      captions: livestream.aiSummary?.captions || [],
+      generatedAt: summary.generatedAt,
+      aiModel: summary.aiModel
+    };
+
+    await livestream.save();
+
+    res.json({
+      success: true,
+      message: 'AI summary generated successfully',
+      data: {
+        summary: livestream.aiSummary.summary,
+        keyPoints: livestream.aiSummary.keyPoints,
+        generatedAt: livestream.aiSummary.generatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error generating summary:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to generate AI summary' 
     });
   }
 });

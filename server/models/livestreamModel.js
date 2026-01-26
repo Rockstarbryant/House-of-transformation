@@ -89,6 +89,33 @@ const livestreamSchema = new mongoose.Schema({
   aiModel: String
 },
 
+  // Transcript Management
+  transcript: {
+    raw: {
+      type: String,          // Auto-extracted from YouTube/Facebook
+      default: null
+    },
+    cleaned: {
+      type: String,          // Admin-edited version
+      default: null
+    },
+    lastUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    lastUpdatedAt: Date,
+    extractionAttempted: {
+      type: Boolean,
+      default: false
+    },
+    extractionStatus: {
+      type: String,
+      enum: ['pending', 'success', 'failed', 'manual'],
+      default: 'pending'
+    },
+    extractionError: String  // Error message if extraction failed
+  },
+
   // Archive Info
   archivedAt: Date,
   archiveUrl: String, // Link to archived video
@@ -117,6 +144,8 @@ const livestreamSchema = new mongoose.Schema({
     default: Date.now
   }
 }, { timestamps: true });
+
+
 
 // Index for faster queries
 livestreamSchema.index({ status: 1, startTime: -1 });

@@ -11,11 +11,17 @@ const {
   archiveStream,
   addAISummary,
   deleteStream,
+  getTranscript,
+  updateTranscript,
+  extractTranscript,
+  generateSummaryFromTranscript,
   getAnalytics
 } = require('../controllers/livestreamController');
 
 // ===== PUBLIC ROUTES (NO AUTH REQUIRED) =====
 router.get('/active', getActiveStream);
+// Get transcript (PUBLIC - view only)
+router.get('/:id/transcript', getTranscript);
 router.get('/archives', getArchives);
 router.get('/:id', getStreamById);
 
@@ -26,5 +32,30 @@ router.put('/:id/archive', protect, requirePermission('manage:livestream'), arch
 router.put('/:id/ai-summary', protect, requirePermission('manage:livestream'), addAISummary);
 router.delete('/:id', protect, requirePermission('manage:livestream'), deleteStream);
 router.get('/admin/analytics', protect, requirePermission('manage:livestream'), getAnalytics);
+// ===== TRANSCRIPT ROUTES =====
+
+// Update cleaned transcript (ADMIN ONLY)
+router.put(
+  '/:id/transcript',
+  protect,
+  requirePermission('manage:livestream'),
+  updateTranscript
+);
+
+// Extract transcript from video URL (ADMIN ONLY)
+router.post(
+  '/:id/transcript/extract',
+  protect,
+  requirePermission('manage:livestream'),
+  extractTranscript
+);
+
+// Generate AI summary from transcript (ADMIN ONLY)
+router.post(
+  '/:id/transcript/generate-summary',
+  protect,
+  requirePermission('manage:livestream'),
+  generateSummaryFromTranscript
+);
 
 module.exports = router;
