@@ -67,7 +67,7 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Get M-Pesa settings
+    // GET M-PESA SETTINGS FROM DATABASE
     const settings = await Settings.getSettings();
     const mpesa = settings.paymentSettings.mpesa;
 
@@ -78,7 +78,42 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Create payment record in Supabase (status: pending)
+    // VALIDATE M-PESA CREDENTIALS EXIST
+    if (!mpesa.consumerKey || !mpesa.consumerSecret || !mpesa.shortcode || !mpesa.passkey) {
+      return res.status(400).json({
+        success: false,
+        message: 'M-Pesa credentials are not configured. Please configure M-Pesa settings first.',
+        missing: {
+          consumerKey: !mpesa.consumerKey,
+          consumerSecret: !mpesa.consumerSecret,
+          shortcode: !mpesa.shortcode,
+          passkey: !mpesa.passkey
+        }
+      });
+    }
+
+    // GENERATE TIMESTAMP AND PASSWORD (Base64)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
+
+    const passwordString = mpesa.shortcode + mpesa.passkey + timestamp;
+    const password = Buffer.from(passwordString).toString('base64');
+
+    console.log('[PAYMENT-MPESA-INITIATE] M-Pesa credentials loaded');
+    console.log('[PAYMENT-MPESA-INITIATE] Environment:', mpesa.environment);
+    console.log('[PAYMENT-MPESA-INITIATE] Party A (Phone):', phoneNumber);
+    console.log('[PAYMENT-MPESA-INITIATE] Party B (Shortcode):', mpesa.shortcode);
+    console.log('[PAYMENT-MPESA-INITIATE] Transaction Type:', mpesa.transactionType);
+    console.log('[PAYMENT-MPESA-INITIATE] Timestamp:', timestamp);
+    console.log('[PAYMENT-MPESA-INITIATE] Password (Base64):', password.substring(0, 20) + '...');
+
+    // CREATE PAYMENT RECORD IN SUPABASE (status: pending)
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert([{
@@ -102,21 +137,60 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
       });
     }
 
-    // TODO: Call actual M-Pesa API (STK Push)
-    // For now, return mock response for testing
-    console.log('[PAYMENT-MPESA-INITIATE] Payment initiated:', payment.id);
+    // ACTUALLY CALL M-PESA API
+    const MpesaService = require('../services/mpesaService');
+    const mpesaService = new MpesaService(mpesa);
 
-    res.json({
-      success: true,
-      message: 'M-Pesa payment initiated. Please check your phone for prompt.',
-      payment: {
-        id: payment.id,
-        amount: payment.amount,
-        status: payment.status,
-        phoneNumber: phoneNumber,
-        createdAt: payment.created_at
-      }
-    });
+    try {
+      console.log('[PAYMENT-MPESA-INITIATE] Calling M-Pesa API...');
+      const mpesaResult = await mpesaService.initiateSTKPush(
+        phoneNumber,
+        amount,
+        `PLEDGE_${payment.id}`,
+        mpesa.transactionDesc
+      );
+
+      console.log('[PAYMENT-MPESA-INITIATE] STK Push sent successfully:', mpesaResult);
+
+      // Update payment with M-Pesa response
+      await supabase
+        .from('payments')
+        .update({
+          mpesa_transaction_id: mpesaResult.checkoutRequestId
+        })
+        .eq('id', payment.id);
+
+      res.json({
+        success: true,
+        message: 'M-Pesa payment initiated. Check your phone for prompt.',
+        payment: {
+          id: payment.id,
+          amount: payment.amount,
+          status: payment.status,
+          phoneNumber: phoneNumber,
+          checkoutRequestId: mpesaResult.checkoutRequestId,
+          createdAt: payment.created_at
+        }
+      });
+
+    } catch (mpesaError) {
+      console.error('[PAYMENT-MPESA-INITIATE] M-Pesa API error:', mpesaError);
+      
+      // Update payment status to failed
+      await supabase
+        .from('payments')
+        .update({
+          status: 'failed',
+          failure_reason: mpesaError.message
+        })
+        .eq('id', payment.id);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to initiate M-Pesa STK push',
+        error: mpesaError.message
+      });
+    }
 
   } catch (error) {
     console.error('[PAYMENT-MPESA-INITIATE] Error:', error);
@@ -146,94 +220,180 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
     const resultDesc = result.ResultDesc;
 
     console.log('[PAYMENT-MPESA-CALLBACK] Processing callback for:', checkoutRequestId);
+    console.log('[PAYMENT-MPESA-CALLBACK] Result Code:', resultCode);
+    console.log('[PAYMENT-MPESA-CALLBACK] Result Description:', resultDesc);
 
     if (resultCode === 0) {
       // Payment successful
+      console.log('[PAYMENT-MPESA-CALLBACK] Payment successful');
+
       const callbackMetadata = result.CallbackMetadata?.Item || [];
       const mpesaReceiptNumber = callbackMetadata.find(item => item.Name === 'MpesaReceiptNumber')?.Value;
       const transactionDate = callbackMetadata.find(item => item.Name === 'TransactionDate')?.Value;
       const phoneNumber = callbackMetadata.find(item => item.Name === 'PhoneNumber')?.Value;
 
-      // Update payment in Supabase
-      const { data: payment, error: updateError } = await supabase
+      console.log('[PAYMENT-MPESA-CALLBACK] Receipt:', mpesaReceiptNumber);
+      console.log('[PAYMENT-MPESA-CALLBACK] Phone:', phoneNumber);
+      console.log('[PAYMENT-MPESA-CALLBACK] Transaction Date:', transactionDate);
+
+      // Find payment by checkout request ID
+      const { data: payment, error: paymentError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('mpesa_transaction_id', checkoutRequestId)
+        .single();
+
+      if (paymentError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Payment not found:', paymentError);
+        return res.json({ success: false });
+      }
+
+      // Update payment status to success
+      const { data: updatedPayment, error: updateError } = await supabase
         .from('payments')
         .update({
           status: 'success',
-          mpesa_transaction_id: mpesaReceiptNumber,
           mpesa_receipt_number: mpesaReceiptNumber,
           completed_at: new Date().toISOString()
         })
-        .eq('mpesa_transaction_id', checkoutRequestId)
+        .eq('id', payment.id)
         .select()
         .single();
 
       if (updateError) {
-        console.error('[PAYMENT-MPESA-CALLBACK] Update error:', updateError);
+        console.error('[PAYMENT-MPESA-CALLBACK] Payment update error:', updateError);
         return res.json({ success: false });
       }
 
-      // Update pledge status
-      const { data: pledge } = await supabase
+      console.log('[PAYMENT-MPESA-CALLBACK] Payment updated to success:', payment.id);
+
+      // GET AND UPDATE PLEDGE
+      const { data: pledge, error: pledgeError } = await supabase
         .from('pledges')
         .select('*')
         .eq('id', payment.pledge_id)
         .single();
 
-      if (pledge) {
-        const newPaidAmount = pledge.paid_amount + payment.amount;
-        const newRemainingAmount = pledge.pledged_amount - newPaidAmount;
-
-        let pledgeStatus = pledge.status;
-        if (newRemainingAmount === 0) {
-          pledgeStatus = 'completed';
-        } else if (newPaidAmount > 0) {
-          pledgeStatus = 'partial';
-        }
-
-        await supabase
-          .from('pledges')
-          .update({
-            paid_amount: newPaidAmount,
-            remaining_amount: newRemainingAmount,
-            status: pledgeStatus
-          })
-          .eq('id', payment.pledge_id);
+      if (pledgeError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Pledge not found:', pledgeError);
+        return res.json({ success: false });
       }
 
-      // Update campaign current_amount
-      const { data: campaign } = await supabase
+      // Calculate new pledge amounts
+      const newPaidAmount = (pledge.paid_amount || 0) + payment.amount;
+      const newRemainingAmount = pledge.pledged_amount - newPaidAmount;
+
+      // Determine pledge status
+      let pledgeStatus = 'partial';
+      if (newRemainingAmount <= 0) {
+        pledgeStatus = 'completed';
+      } else if (newPaidAmount > 0) {
+        pledgeStatus = 'partial';
+      }
+
+      console.log('[PAYMENT-MPESA-CALLBACK] Updating pledge:', {
+        pledgeId: pledge.id,
+        oldStatus: pledge.status,
+        newStatus: pledgeStatus,
+        oldPaidAmount: pledge.paid_amount,
+        newPaidAmount: newPaidAmount,
+        oldRemainingAmount: pledge.remaining_amount,
+        newRemainingAmount: newRemainingAmount
+      });
+
+      // Update pledge
+      const { error: pledgeUpdateError } = await supabase
+        .from('pledges')
+        .update({
+          paid_amount: newPaidAmount,
+          remaining_amount: newRemainingAmount,
+          status: pledgeStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pledge.id);
+
+      if (pledgeUpdateError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Pledge update error:', pledgeUpdateError);
+        return res.json({ success: false });
+      }
+
+      console.log('[PAYMENT-MPESA-CALLBACK] Pledge updated successfully');
+
+      // GET AND UPDATE CAMPAIGN
+      const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('id', payment.campaign_id)
+        .eq('id', pledge.campaign_id)
         .single();
 
-      if (campaign) {
-        await supabase
-          .from('campaigns')
-          .update({
-            current_amount: campaign.current_amount + payment.amount
-          })
-          .eq('id', payment.campaign_id);
+      if (campaignError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Campaign not found:', campaignError);
+        return res.json({ success: false });
       }
 
-      console.log('[PAYMENT-MPESA-CALLBACK] Payment success processed:', payment.id);
+      const newCampaignAmount = (campaign.current_amount || 0) + payment.amount;
+
+      console.log('[PAYMENT-MPESA-CALLBACK] Updating campaign:', {
+        campaignId: campaign.id,
+        oldAmount: campaign.current_amount,
+        newAmount: newCampaignAmount,
+        paymentAmount: payment.amount
+      });
+
+      // Update campaign
+      const { error: campaignUpdateError } = await supabase
+        .from('campaigns')
+        .update({
+          current_amount: newCampaignAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pledge.campaign_id);
+
+      if (campaignUpdateError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Campaign update error:', campaignUpdateError);
+        return res.json({ success: false });
+      }
+
+      console.log('[PAYMENT-MPESA-CALLBACK] Campaign updated successfully');
+      console.log('[PAYMENT-MPESA-CALLBACK] Payment flow completed:', {
+        paymentId: payment.id,
+        pledgeId: pledge.id,
+        campaignId: campaign.id,
+        amount: payment.amount
+      });
+
+      return res.json({ success: true });
 
     } else {
       // Payment failed
       console.log('[PAYMENT-MPESA-CALLBACK] Payment failed:', resultDesc);
 
-      // Update payment status to failed
-      await supabase
+      // Find and update payment status to failed
+      const { data: payment } = await supabase
         .from('payments')
-        .update({
-          status: 'failed',
-          failure_reason: resultDesc
-        })
-        .eq('mpesa_transaction_id', checkoutRequestId);
-    }
+        .select('*')
+        .eq('mpesa_transaction_id', checkoutRequestId)
+        .single();
 
-    // M-Pesa expects JSON response
-    res.json({ success: true });
+      if (payment) {
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({
+            status: 'failed',
+            failure_reason: resultDesc,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', payment.id);
+
+        if (updateError) {
+          console.error('[PAYMENT-MPESA-CALLBACK] Failed payment update error:', updateError);
+        } else {
+          console.log('[PAYMENT-MPESA-CALLBACK] Payment marked as failed:', payment.id);
+        }
+      }
+
+      return res.json({ success: true });
+    }
 
   } catch (error) {
     console.error('[PAYMENT-MPESA-CALLBACK] Error:', error);
@@ -306,40 +466,81 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
     }
 
     // Update pledge
-    const newPaidAmount = pledge.paid_amount + amount;
-    const newRemainingAmount = pledge.pledged_amount - newPaidAmount;
+const newPaidAmount = pledge.paid_amount + amount;
+const newRemainingAmount = pledge.pledged_amount - newPaidAmount;
 
-    let pledgeStatus = pledge.status;
-    if (newRemainingAmount === 0) {
-      pledgeStatus = 'completed';
-    } else if (newPaidAmount > 0) {
-      pledgeStatus = 'partial';
-    }
+let pledgeStatus = pledge.status;
+if (newRemainingAmount <= 0) {
+  pledgeStatus = 'completed';
+} else if (newPaidAmount > 0) {
+  pledgeStatus = 'partial';
+}
 
-    await supabase
-      .from('pledges')
-      .update({
-        paid_amount: newPaidAmount,
-        remaining_amount: newRemainingAmount,
-        status: pledgeStatus
-      })
-      .eq('id', pledgeId);
+console.log('[PAYMENT-MANUAL] Updating pledge:', {
+  pledgeId: pledgeId,
+  oldStatus: pledge.status,
+  newStatus: pledgeStatus,
+  newPaidAmount: newPaidAmount,
+  newRemainingAmount: newRemainingAmount
+});
+
+const { error: pledgeUpdateError } = await supabase
+  .from('pledges')
+  .update({
+    paid_amount: newPaidAmount,
+    remaining_amount: newRemainingAmount,
+    status: pledgeStatus,
+    updated_at: new Date().toISOString()
+  })
+  .eq('id', pledgeId);
+
+if (pledgeUpdateError) {
+  console.error('[PAYMENT-MANUAL] Pledge update error:', pledgeUpdateError);
+  return res.status(500).json({
+    success: false,
+    message: 'Failed to update pledge',
+    error: pledgeUpdateError.message
+  });
+}
+
+console.log('[PAYMENT-MANUAL] Pledge updated successfully');
 
     // Update campaign
-    const { data: campaign } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('id', pledge.campaign_id)
-      .single();
+    // Update campaign
+const { data: campaign } = await supabase
+  .from('campaigns')
+  .select('*')
+  .eq('id', pledge.campaign_id)
+  .single();
 
-    if (campaign) {
-      await supabase
-        .from('campaigns')
-        .update({
-          current_amount: campaign.current_amount + amount
-        })
-        .eq('id', pledge.campaign_id);
-    }
+if (campaign) {
+  const newCampaignAmount = (campaign.current_amount || 0) + amount;
+
+  console.log('[PAYMENT-MANUAL] Updating campaign:', {
+    campaignId: campaign.id,
+    oldAmount: campaign.current_amount,
+    newAmount: newCampaignAmount
+  });
+
+  const { error: campaignUpdateError } = await supabase
+    .from('campaigns')
+    .update({
+      current_amount: newCampaignAmount,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', pledge.campaign_id);
+
+  if (campaignUpdateError) {
+    console.error('[PAYMENT-MANUAL] Campaign update error:', campaignUpdateError);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update campaign',
+      error: campaignUpdateError.message
+    });
+  }
+
+  console.log('[PAYMENT-MANUAL] Campaign updated successfully');
+}
 
     console.log('[PAYMENT-MANUAL] Payment recorded:', payment.id);
 

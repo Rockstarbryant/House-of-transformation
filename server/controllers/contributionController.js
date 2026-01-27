@@ -78,6 +78,38 @@ exports.createContribution = asyncHandler(async (req, res) => {
       });
     }
 
+    
+
+// VALIDATE M-PESA IF PAYMENT METHOD IS MPESA
+if (paymentMethod === 'mpesa') {
+  const Settings = require('../models/Settings');
+  const settings = await Settings.getSettings();
+  const mpesa = settings.paymentSettings.mpesa;
+
+  if (!mpesa.enabled) {
+    return res.status(400).json({
+      success: false,
+      message: 'M-Pesa payments are not enabled'
+    });
+  }
+
+  if (!mpesa.consumerKey || !mpesa.consumerSecret || !mpesa.shortcode || !mpesa.passkey) {
+    return res.status(400).json({
+      success: false,
+      message: 'M-Pesa is not properly configured. Contact admin.'
+    });
+  }
+
+  // Generate timestamp and password for M-Pesa
+  const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+  const passwordString = mpesa.shortcode + mpesa.passkey + timestamp;
+  const password = Buffer.from(passwordString).toString('base64');
+
+  console.log('[CONTRIBUTION-CREATE] M-Pesa credentials validated');
+  console.log('[CONTRIBUTION-CREATE] Environment:', mpesa.environment);
+  console.log('[CONTRIBUTION-CREATE] Transaction Type:', mpesa.transactionType);
+}
+
     // Create contribution in Supabase
     const { data, error } = await supabase
       .from('contributions')

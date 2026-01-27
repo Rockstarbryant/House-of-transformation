@@ -279,15 +279,18 @@ exports.getMpesaSettings = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 exports.updateMpesaSettings = asyncHandler(async (req, res) => {
   try {
-    const { consumerKey, consumerSecret, shortcode, passkey, environment, callbackUrl, timeout, enabled } = req.body;
+    const { 
+      consumerKey, consumerSecret, shortcode, passkey, environment, callbackUrl, 
+      timeout, enabled, partyA, partyB, transactionType, transactionDesc, accountRef, amount 
+    } = req.body;
 
     console.log('[SETTINGS-MPESA-UPDATE] Updating M-Pesa settings');
 
     // Validate required fields
-    if (!consumerKey && !consumerSecret && !shortcode && !passkey) {
+    if (!consumerKey && !consumerSecret && !shortcode && !passkey && !partyA && !partyB) {
       return res.status(400).json({
         success: false,
-        message: 'At least one M-Pesa credential must be provided'
+        message: 'At least some M-Pesa credentials must be provided'
       });
     }
 
@@ -296,6 +299,14 @@ exports.updateMpesaSettings = asyncHandler(async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Environment must be "sandbox" or "production"'
+      });
+    }
+
+    // Validate transaction type
+    if (transactionType && !['CustomerPayBillOnline', 'CustomerBuyGoodsOnline'].includes(transactionType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction type must be "CustomerPayBillOnline" or "CustomerBuyGoodsOnline"'
       });
     }
 
@@ -310,6 +321,14 @@ exports.updateMpesaSettings = asyncHandler(async (req, res) => {
     if (callbackUrl !== undefined) settings.paymentSettings.mpesa.callbackUrl = callbackUrl;
     if (timeout !== undefined) settings.paymentSettings.mpesa.timeout = timeout;
     if (enabled !== undefined) settings.paymentSettings.mpesa.enabled = enabled;
+    
+    // NEW FIELDS
+    if (partyA !== undefined) settings.paymentSettings.mpesa.partyA = partyA;
+    if (partyB !== undefined) settings.paymentSettings.mpesa.partyB = partyB;
+    if (transactionType !== undefined) settings.paymentSettings.mpesa.transactionType = transactionType;
+    if (transactionDesc !== undefined) settings.paymentSettings.mpesa.transactionDesc = transactionDesc;
+    if (accountRef !== undefined) settings.paymentSettings.mpesa.accountRef = accountRef;
+    if (amount !== undefined) settings.paymentSettings.mpesa.amount = amount;
 
     settings.lastUpdatedBy = req.user._id;
     await settings.save();
@@ -322,7 +341,10 @@ exports.updateMpesaSettings = asyncHandler(async (req, res) => {
       mpesa: {
         enabled: settings.paymentSettings.mpesa.enabled,
         environment: settings.paymentSettings.mpesa.environment,
-        shortcode: settings.paymentSettings.mpesa.shortcode
+        shortcode: settings.paymentSettings.mpesa.shortcode,
+        partyA: settings.paymentSettings.mpesa.partyA,
+        partyB: settings.paymentSettings.mpesa.partyB,
+        transactionType: settings.paymentSettings.mpesa.transactionType
       }
     });
 
@@ -354,27 +376,44 @@ exports.testMpesaConnection = asyncHandler(async (req, res) => {
       });
     }
 
-    if (!mpesa.consumerKey || !mpesa.consumerSecret || !mpesa.shortcode || !mpesa.passkey) {
+    // Check all required credentials
+    const missingFields = {};
+    if (!mpesa.consumerKey) missingFields.consumerKey = true;
+    if (!mpesa.consumerSecret) missingFields.consumerSecret = true;
+    if (!mpesa.shortcode) missingFields.shortcode = true;
+    if (!mpesa.passkey) missingFields.passkey = true;
+    if (!mpesa.partyA) missingFields.partyA = true;
+    if (!mpesa.partyB) missingFields.partyB = true;
+    if (!mpesa.transactionType) missingFields.transactionType = true;
+    if (!mpesa.transactionDesc) missingFields.transactionDesc = true;
+    if (!mpesa.accountRef) missingFields.accountRef = true;
+
+    if (Object.keys(missingFields).length > 0) {
       return res.status(400).json({
         success: false,
         message: 'M-Pesa credentials are incomplete',
-        missing: {
-          consumerKey: !mpesa.consumerKey,
-          consumerSecret: !mpesa.consumerSecret,
-          shortcode: !mpesa.shortcode,
-          passkey: !mpesa.passkey
-        }
+        missing: missingFields
       });
     }
 
-    // Mock test - in production, call actual M-Pesa OAuth endpoint
+    // Generate timestamp and password
+    const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+    const passwordString = mpesa.shortcode + mpesa.passkey + timestamp;
+    const password = Buffer.from(passwordString).toString('base64');
+
     console.log('[SETTINGS-MPESA-TEST] Configuration valid');
+    console.log('[SETTINGS-MPESA-TEST] Generated timestamp:', timestamp);
+    console.log('[SETTINGS-MPESA-TEST] Generated password (hashed):', password.substring(0, 20) + '...');
 
     res.json({
       success: true,
       message: 'M-Pesa configuration is valid',
       environment: mpesa.environment,
       shortcode: mpesa.shortcode,
+      partyA: mpesa.partyA,
+      partyB: mpesa.partyB,
+      transactionType: mpesa.transactionType,
+      timestamp: timestamp,
       status: 'configured'
     });
 
@@ -383,6 +422,81 @@ exports.testMpesaConnection = asyncHandler(async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'M-Pesa connection test failed',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// SIMULATE M-PESA STK PUSH (For Testing)
+// ============================================
+
+exports.simulateMpesaStkPush = asyncHandler(async (req, res) => {
+  try {
+    const { phoneNumber, amount, accountRef } = req.body;
+
+    console.log('[SETTINGS-MPESA-SIMULATE] Initiating real STK Push');
+
+    // Validate
+    if (!phoneNumber || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number and amount are required'
+      });
+    }
+
+    const phoneRegex = /^254\d{9}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format. Must be: 254XXXXXXXXX'
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be greater than 0'
+      });
+    }
+
+    // Get M-Pesa settings
+    const settings = await Settings.getSettings();
+    const mpesa = settings.paymentSettings.mpesa;
+
+    // Validate credentials
+    if (!mpesa.enabled || !mpesa.consumerKey || !mpesa.consumerSecret || !mpesa.shortcode || !mpesa.passkey) {
+      return res.status(400).json({
+        success: false,
+        message: 'M-Pesa is not properly configured'
+      });
+    }
+
+    // Initialize M-Pesa service with actual credentials
+    const MpesaService = require('../services/mpesaService');
+    const mpesaService = new MpesaService(mpesa);
+
+    // Call real M-Pesa API
+    const result = await mpesaService.initiateSTKPush(
+      phoneNumber,
+      amount,
+      accountRef || mpesa.accountRef,
+      mpesa.transactionDesc
+    );
+
+    console.log('[SETTINGS-MPESA-SIMULATE] STK Push initiated:', result);
+
+    res.json({
+      success: true,
+      message: 'STK Push sent successfully! Check your phone for the prompt.',
+      result: result
+    });
+
+  } catch (error) {
+    console.error('[SETTINGS-MPESA-SIMULATE] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to initiate STK push',
       error: error.message
     });
   }
@@ -466,6 +580,7 @@ exports.updatePaymentGateway = asyncHandler(async (req, res) => {
     const { gateway, minimumDonation, currency } = req.body;
 
     console.log('[SETTINGS-PAYMENT-GATEWAY] Updating payment gateway settings');
+    console.log('[SETTINGS-PAYMENT-GATEWAY] Received data:', req.body);
 
     // Validate gateway
     if (gateway && !['mpesa', 'stripe', 'paypal', 'flutterwave'].includes(gateway)) {
@@ -477,21 +592,47 @@ exports.updatePaymentGateway = asyncHandler(async (req, res) => {
 
     const settings = await Settings.getSettings();
 
+    // Update basic payment settings
     if (gateway) settings.paymentSettings.paymentGateway = gateway;
     if (minimumDonation !== undefined) settings.paymentSettings.minimumDonation = minimumDonation;
     if (currency) settings.paymentSettings.currency = currency;
+
+    // IMPORTANT: Also update M-Pesa nested fields if they're in the request
+    if (req.body.mpesa) {
+      const mpesaData = req.body.mpesa;
+      
+      if (mpesaData.consumerKey !== undefined) settings.paymentSettings.mpesa.consumerKey = mpesaData.consumerKey;
+      if (mpesaData.consumerSecret !== undefined) settings.paymentSettings.mpesa.consumerSecret = mpesaData.consumerSecret;
+      if (mpesaData.shortcode !== undefined) settings.paymentSettings.mpesa.shortcode = mpesaData.shortcode;
+      if (mpesaData.passkey !== undefined) settings.paymentSettings.mpesa.passkey = mpesaData.passkey;
+      if (mpesaData.environment !== undefined) settings.paymentSettings.mpesa.environment = mpesaData.environment;
+      if (mpesaData.callbackUrl !== undefined) settings.paymentSettings.mpesa.callbackUrl = mpesaData.callbackUrl;
+      if (mpesaData.timeout !== undefined) settings.paymentSettings.mpesa.timeout = mpesaData.timeout;
+      if (mpesaData.enabled !== undefined) settings.paymentSettings.mpesa.enabled = mpesaData.enabled;
+      
+      // NEW FIELDS
+      if (mpesaData.partyA !== undefined) settings.paymentSettings.mpesa.partyA = mpesaData.partyA;
+      if (mpesaData.partyB !== undefined) settings.paymentSettings.mpesa.partyB = mpesaData.partyB;
+      if (mpesaData.transactionType !== undefined) settings.paymentSettings.mpesa.transactionType = mpesaData.transactionType;
+      if (mpesaData.transactionDesc !== undefined) settings.paymentSettings.mpesa.transactionDesc = mpesaData.transactionDesc;
+      if (mpesaData.accountRef !== undefined) settings.paymentSettings.mpesa.accountRef = mpesaData.accountRef;
+      if (mpesaData.amount !== undefined) settings.paymentSettings.mpesa.amount = mpesaData.amount;
+    }
 
     settings.lastUpdatedBy = req.user._id;
     await settings.save();
 
     console.log('[SETTINGS-PAYMENT-GATEWAY] Payment gateway updated');
+    console.log('[SETTINGS-PAYMENT-GATEWAY] Saved M-Pesa config:', {
+      shortcode: settings.paymentSettings.mpesa.shortcode,
+      partyA: settings.paymentSettings.mpesa.partyA,
+      partyB: settings.paymentSettings.mpesa.partyB
+    });
 
     res.json({
       success: true,
       message: 'Payment gateway settings updated successfully',
-      gateway: settings.paymentSettings.paymentGateway,
-      minimumDonation: settings.paymentSettings.minimumDonation,
-      currency: settings.paymentSettings.currency
+      settings: settings
     });
 
   } catch (error) {

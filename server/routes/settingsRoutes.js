@@ -17,6 +17,7 @@ const {
   getMpesaSettings,
   updateMpesaSettings,
   testMpesaConnection,
+  simulateMpesaStkPush,
   getDonationSettings,
   updateDonationSettings,
   updatePaymentGateway
@@ -67,6 +68,8 @@ router.patch('/features', protect, requireAdmin, updateFeatures);
 router.get('/mpesa', protect, requireAdmin, getMpesaSettings);
 router.patch('/mpesa', protect, requireAdmin, updateMpesaSettings);
 router.post('/mpesa/test', protect, requireAdmin, testMpesaConnection);
+// STK Push Simulation (for testing)
+router.post('/mpesa/simulate', protect, requireAdmin, simulateMpesaStkPush);
 
 // Payment gateway settings (admin only)
 //router.patch('/payment-gateway', protect, requireAdmin, updatePaymentGateway);

@@ -77,19 +77,35 @@ paymentSettings: {
   
   // M-Pesa Configuration
   mpesa: {
-    enabled: { type: Boolean, default: true },
-    consumerKey: { type: String, default: '' },
-    consumerSecret: { type: String, default: '' },
-    shortcode: { type: String, default: '' },
-    passkey: { type: String, default: '' },
-    environment: { 
-      type: String, 
-      enum: ['sandbox', 'production'],
-      default: 'sandbox'
-    },
-    callbackUrl: { type: String, default: '' },
-    timeout: { type: Number, default: 1000 }
+  enabled: { type: Boolean, default: true },
+  consumerKey: { type: String, default: '' },
+  consumerSecret: { type: String, default: '' },
+  shortcode: { type: String, default: '' },
+  passkey: { type: String, default: '' },
+  environment: { 
+    type: String, 
+    enum: ['sandbox', 'production'],
+    default: 'sandbox'
   },
+  callbackUrl: { type: String, default: '' },
+  timeout: { type: Number, default: 1000 },
+  
+  // NEW FIELDS FOR PAYMENT PROCESSING
+  partyA: { type: String, default: '' }, // Phone number initiating request
+  partyB: { type: String, default: '' }, // Business shortcode receiving funds
+  transactionType: { 
+    type: String,
+    enum: ['CustomerPayBillOnline', 'CustomerBuyGoodsOnline'],
+    default: 'CustomerPayBillOnline'
+  },
+  transactionDesc: { type: String, default: 'Church Donation' },
+  accountRef: { type: String, default: 'HOT-DONATION' },
+  amount: { type: Number, default: 0 },
+  
+  // SECURITY
+  timestamp: { type: String, default: '' }, // Generated on request
+  password: { type: String, default: '' } // Base64(shortcode+passkey+timestamp)
+},
   
   // Stripe Configuration
   stripe: {
