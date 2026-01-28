@@ -81,6 +81,8 @@ const roleSchema = new mongoose.Schema({
       'archive:feedback:suggestion',
       'archive:feedback:prayer',
       'archive:feedback:general',
+
+       'manage:announcements', 
       
       // ===== FEEDBACK STATS =====
       'view:feedback:stats',

@@ -2,6 +2,7 @@
 const express = require('express');
 const {
   createContribution,
+  initiateMpesaContributionPayment,
   getAllContributions,
   verifyContribution
 } = require('../controllers/contributionController');
@@ -14,6 +15,7 @@ const router = express.Router();
 
 // PUBLIC ROUTES - Anyone can contribute
 router.post('/', optionalAuth, createContribution);
+router.post('/mpesa/initiate', optionalAuth, initiateMpesaContributionPayment);
 
 // ADMIN ROUTES - View and manage contributions
 router.get('/', protect, requirePermission('view:payments:all', 'manage:donations'), getAllContributions);

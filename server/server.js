@@ -58,7 +58,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-Requested-With', 'X-CSRF-Token', 'Accept', 'Accept-Language', 'Authorization'],
   optionsSuccessStatus: 200
 }));
 
@@ -126,6 +126,8 @@ app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 // Volunteer routes
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
+// Add with other routes (around line 80-100)
+app.use('/api/announcements', require('./routes/announcementRoutes'));
 
 app.use('/api/', protect);
 

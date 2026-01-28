@@ -235,7 +235,7 @@ exports.updateRole = async (req, res) => {
         message: 'Role not found'
       });
     }
-
+/*
     // Prevent modification of system roles' permissions
     if (role.isSystemRole && permissions) {
       return res.status(403).json({
@@ -243,7 +243,7 @@ exports.updateRole = async (req, res) => {
         message: 'Cannot modify system role permissions'
       });
     }
-
+*/
     // Get valid permissions from schema enum (correct path for array type)
     const permissionsPath = Role.schema.path('permissions');
     const validPermissions = permissionsPath.caster 
