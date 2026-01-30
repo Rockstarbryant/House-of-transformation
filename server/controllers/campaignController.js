@@ -457,6 +457,49 @@ exports.getCampaignAnalytics = asyncHandler(async (req, res) => {
   }
 });
 
+// NEW FUNCTION - Add to campaignController.js
+exports.updateOverdueCampaigns = asyncHandler(async (req, res) => {
+  try {
+    const now = new Date();
+    
+    // Find all active campaigns past their end date
+    const overdueCampaigns = await Campaign.find({
+      status: 'active',
+      endDate: { $lt: now }
+    });
+
+    console.log(`[CAMPAIGNS] Found ${overdueCampaigns.length} overdue campaigns`);
+
+    for (const campaign of overdueCampaigns) {
+      // Mark as completed
+      campaign.status = 'completed';
+      await campaign.save();
+
+      // Sync to Supabase
+      if (campaign.supabaseId) {
+        await supabase
+          .from('campaigns')
+          .update({ status: 'completed' })
+          .eq('id', campaign.supabaseId);
+      }
+
+      console.log(`[CAMPAIGNS] Marked campaign ${campaign._id} as completed`);
+    }
+
+    res.json({
+      success: true,
+      message: `Updated ${overdueCampaigns.length} campaigns`,
+      count: overdueCampaigns.length
+    });
+  } catch (error) {
+    console.error('[CAMPAIGNS] Update overdue error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update overdue campaigns'
+    });
+  }
+});
+
 // ============================================
 // COMPLETE CAMPAIGN (Active -> Completed)
 // ============================================

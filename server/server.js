@@ -172,9 +172,9 @@ app.listen(PORT, () => {
   console.log(`✓ CORS enabled for: ${allowedOrigins.join(', ')}`);
   console.log(`✓ Cloudinary: Configured`);
   console.log(`✓ Rate limiting enabled:`);
-  console.log(`  - General API: 100 requests per 15 minutes`);
-  console.log(`  - Login: 5 attempts per 15 minutes`);
-  console.log(`  - Signup: 3 attempts per 15 minutes`);
+  console.log(`  - General API: 1000 requests per 15 minutes`);
+  console.log(`  - Login: 10 attempts per 15 minutes`);
+  console.log(`  - Signup: 5 attempts per 15 minutes`);
 });
 
 module.exports = app;

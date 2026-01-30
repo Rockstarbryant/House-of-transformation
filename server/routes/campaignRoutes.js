@@ -9,6 +9,7 @@ const {
   getCampaignAnalytics,
   archiveCampaign,
   deleteCampaign,
+  updateOverdueCampaigns,
   getFeaturedCampaigns
 } = require('../controllers/campaignController');
 
@@ -37,6 +38,8 @@ router.put('/:id', protect, requirePermission('edit:campaigns', 'manage:donation
 
 // Activate campaign
 router.patch('/:id/activate', protect, requirePermission('activate:campaigns', 'manage:donations'), activateCampaign);
+
+router.post('/check-overdue', protect, requirePermission('manage:donations'), updateOverdueCampaigns);
 
 // Add this route with other protected routes
 router.get('/:id/analytics', protect, requirePermission('view:campaigns', 'manage:donations'), getCampaignAnalytics);

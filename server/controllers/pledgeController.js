@@ -77,7 +77,7 @@ exports.createPledge = asyncHandler(async (req, res) => {
         member_email: req.user.email,
         pledged_amount: pledgedAmount,
         paid_amount: 0,
-        // ❌ REMOVED: remaining_amount - Supabase calculates this automatically
+        // ✅ REMOVED: remaining_amount - Supabase calculates this automatically
         status: 'pending',
         installment_plan: installmentPlan || 'lump-sum',
         due_date: campaign.endDate,
@@ -115,10 +115,8 @@ exports.createPledge = asyncHandler(async (req, res) => {
 });
 
 // ============================================
-// REST OF THE FILE STAYS THE SAME
+// GET USER'S PLEDGES - ✅ WITH CAMPAIGN ENRICHMENT
 // ============================================
-
-// GET USER'S PLEDGES
 exports.getUserPledges = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -144,7 +142,7 @@ exports.getUserPledges = asyncHandler(async (req, res) => {
     }
 
     // Get paginated pledges
-    const { data, error } = await supabase
+    const { data: pledges, error } = await supabase
       .from('pledges')
       .select('*')
       .eq('user_id', req.user._id)
@@ -160,11 +158,47 @@ exports.getUserPledges = asyncHandler(async (req, res) => {
       });
     }
 
+    // ✅ ENRICH WITH CAMPAIGN DATA
+    const campaignIds = [...new Set(pledges.map(p => p.campaign_id).filter(Boolean))];
+
+    console.log('[PLEDGE-GET-USER] Enriching with campaign data for', campaignIds.length, 'campaigns');
+
+    const { data: campaigns, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id, title, campaign_type, status, goal_amount, current_amount')
+      .in('id', campaignIds);
+
+    if (campaignError) {
+      console.error('[PLEDGE-GET-USER] Campaign fetch error:', campaignError);
+    }
+
+    // Create lookup map
+    const campaignMap = {};
+    if (campaigns) {
+      campaigns.forEach(campaign => {
+        campaignMap[campaign.id] = campaign;
+      });
+    }
+
+    // Enrich pledges
+    const enrichedPledges = pledges.map(pledge => {
+      const campaign = campaignMap[pledge.campaign_id];
+      
+      return {
+        ...pledge,
+        campaign_title: campaign?.title || 'Unknown Campaign',
+        campaign_type: campaign?.campaign_type || null,
+        campaign_status: campaign?.status || null,
+        campaign_goal: campaign?.goal_amount || 0,
+        campaign_current: campaign?.current_amount || 0
+      };
+    });
+
     const pages = Math.ceil(count / limitNum);
 
     res.json({
       success: true,
-      pledges: data,
+      pledges: enrichedPledges, // ✅ Send enriched data
       pagination: {
         total: count,
         pages,
@@ -183,7 +217,9 @@ exports.getUserPledges = asyncHandler(async (req, res) => {
   }
 });
 
-// GET CAMPAIGN PLEDGES (Admin only)
+// ============================================
+// GET CAMPAIGN PLEDGES - ✅ WITH CAMPAIGN ENRICHMENT
+// ============================================
 exports.getCampaignPledges = asyncHandler(async (req, res) => {
   try {
     const { campaignId } = req.params;
@@ -217,7 +253,7 @@ exports.getCampaignPledges = asyncHandler(async (req, res) => {
     }
 
     // Get paginated data
-    const { data, error } = await supabase
+    const { data: pledges, error } = await supabase
       .from('pledges')
       .select('*')
       .eq('campaign_id', campaignId)
@@ -233,11 +269,33 @@ exports.getCampaignPledges = asyncHandler(async (req, res) => {
       });
     }
 
+    // ✅ ENRICH WITH CAMPAIGN DATA
+    // Since we already know the campaignId, just fetch that one campaign
+    const { data: campaign, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id, title, campaign_type, status, goal_amount, current_amount')
+      .eq('id', campaignId)
+      .single();
+
+    if (campaignError) {
+      console.error('[PLEDGE-GET-CAMPAIGN] Campaign fetch error:', campaignError);
+    }
+
+    // Enrich all pledges with the same campaign data
+    const enrichedPledges = pledges.map(pledge => ({
+      ...pledge,
+      campaign_title: campaign?.title || 'Unknown Campaign',
+      campaign_type: campaign?.campaign_type || null,
+      campaign_status: campaign?.status || null,
+      campaign_goal: campaign?.goal_amount || 0,
+      campaign_current: campaign?.current_amount || 0
+    }));
+
     const pages = Math.ceil(count / limitNum);
 
     res.json({
       success: true,
-      pledges: data,
+      pledges: enrichedPledges, // ✅ Send enriched data
       pagination: {
         total: count,
         pages,
@@ -256,7 +314,9 @@ exports.getCampaignPledges = asyncHandler(async (req, res) => {
   }
 });
 
+// ============================================
 // GET SINGLE PLEDGE
+// ============================================
 exports.getPledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;
@@ -306,7 +366,9 @@ exports.getPledge = asyncHandler(async (req, res) => {
   }
 });
 
-// Add this function
+// ============================================
+// GET ALL PLEDGES - ✅ WITH CAMPAIGN ENRICHMENT
+// ============================================
 exports.getAllPledges = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -315,17 +377,22 @@ exports.getAllPledges = asyncHandler(async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
+    console.log('[PLEDGE-GET-ALL] Fetching all pledges with campaign data');
+
+    // Get total count
     const { count } = await supabase
       .from('pledges')
       .select('*', { count: 'exact', head: true });
 
-    const { data, error } = await supabase
+    // Get paginated pledges
+    const { data: pledges, error } = await supabase
       .from('pledges')
       .select('*')
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1);
 
     if (error) {
+      console.error('[PLEDGE-GET-ALL] Supabase error:', error);
       return res.status(500).json({
         success: false,
         message: 'Failed to fetch pledges',
@@ -333,9 +400,51 @@ exports.getAllPledges = asyncHandler(async (req, res) => {
       });
     }
 
+    // ✅ ENRICH WITH CAMPAIGN DATA
+    // Get unique campaign IDs from pledges
+    const campaignIds = [...new Set(pledges.map(p => p.campaign_id).filter(Boolean))];
+
+    console.log('[PLEDGE-GET-ALL] Enriching with campaign data for', campaignIds.length, 'campaigns');
+
+    // Fetch all campaigns in one query
+    const { data: campaigns, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id, title, campaign_type, status, goal_amount, current_amount')
+      .in('id', campaignIds);
+
+    if (campaignError) {
+      console.error('[PLEDGE-GET-ALL] Campaign fetch error:', campaignError);
+      // Don't fail the request, just log and continue without enrichment
+    }
+
+    // Create campaign lookup map: { [uuid]: campaign }
+    const campaignMap = {};
+    if (campaigns) {
+      campaigns.forEach(campaign => {
+        campaignMap[campaign.id] = campaign;
+      });
+    }
+
+    // ✅ ENRICH PLEDGES WITH CAMPAIGN INFO
+    const enrichedPledges = pledges.map(pledge => {
+      const campaign = campaignMap[pledge.campaign_id];
+      
+      return {
+        ...pledge,
+        // Add campaign fields
+        campaign_title: campaign?.title || 'Unknown Campaign',
+        campaign_type: campaign?.campaign_type || null,
+        campaign_status: campaign?.status || null,
+        campaign_goal: campaign?.goal_amount || 0,
+        campaign_current: campaign?.current_amount || 0
+      };
+    });
+
+    console.log('[PLEDGE-GET-ALL] Successfully enriched', enrichedPledges.length, 'pledges');
+
     res.json({
       success: true,
-      pledges: data,
+      pledges: enrichedPledges, // ✅ Send enriched data
       pagination: {
         total: count,
         pages: Math.ceil(count / limitNum),
@@ -343,17 +452,20 @@ exports.getAllPledges = asyncHandler(async (req, res) => {
         limit: limitNum
       }
     });
+
   } catch (error) {
     console.error('[PLEDGE-GET-ALL] Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch pledges'
+      message: 'Failed to fetch pledges',
+      error: error.message
     });
   }
 });
 
+// ============================================
 // UPDATE PLEDGE (Admin only)
-// UPDATE PLEDGE (Admin only)
+// ============================================
 exports.updatePledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;
@@ -437,7 +549,9 @@ exports.updatePledge = asyncHandler(async (req, res) => {
   }
 });
 
+// ============================================
 // CANCEL PLEDGE (User/Admin)
+// ============================================
 exports.cancelPledge = asyncHandler(async (req, res) => {
   try {
     const { pledgeId } = req.params;

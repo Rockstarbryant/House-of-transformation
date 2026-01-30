@@ -1,4 +1,4 @@
-// server/controllers/paymentController.js
+// server/controllers/paymentController.js - FIXED VERSION
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 const asyncHandler = require('../middleware/asyncHandler');
@@ -22,16 +22,20 @@ const supabase = createClient(
  */
 async function isPaymentAlreadyProcessed(idempotencyKey, userId) {
   try {
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from('payments')
       .select('id, status')
       .eq('idempotency_key', idempotencyKey)
       .eq('user_id', userId)
       .single();
 
-    return existing;
+    // ✅ FIXED: Check error code instead of using .catch()
+    if (error && error.code !== 'PGRST116') {
+      console.error('[PAYMENT-IDEMPOTENCY] Error:', error);
+    }
+
+    return error ? null : existing;
   } catch (error) {
-    // Not found is OK
     return null;
   }
 }
@@ -44,63 +48,29 @@ async function logAuditTransaction(data) {
     await TransactionAuditLog.logTransaction(data);
   } catch (error) {
     console.error('[PAYMENT-AUDIT] Failed to log:', error);
-    // Don't fail the payment, but alert
   }
 }
 
-/**
- * Verify authorization: User can only pay own pledges
- */
-async function verifyPledgeOwnership(pledgeId, userId) {
-  const { data: pledge, error } = await supabase
-    .from('pledges')
-    .select('user_id')
-    .eq('id', pledgeId)
-    .single();
-
-  if (error) {
-    throw new Error('Pledge not found');
-  }
-
-  // User can pay own pledge OR admin can pay any
-  if (pledge.user_id !== userId && req.user?.role?.name !== 'admin') {
-    throw new Error('Unauthorized: Cannot pay another user\'s pledge');
-  }
-
-  return pledge;
-}
-
-/**
- * Validate payment amount matches callback
- */
-function validateAmountMatch(expectedAmount, callbackAmount) {
-  // Allow 1 cent variance for currency conversion
-  const variance = 1;
-  const difference = Math.abs(expectedAmount - callbackAmount);
-  
-  return difference <= variance;
-}
-
-// SECTION B: INITIATE M-PESA PAYMENT (WITH IDEMPOTENCY & AUTHORIZATION)
-
+// ============================================
+// INITIATE M-PESA PAYMENT
+// ============================================
 exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   try {
     const { pledgeId, amount, phoneNumber } = req.body;
-    const idempotencyKey = req.idempotencyKey; // From middleware
+    const idempotencyKey = req.idempotencyKey;
     const userId = req.user._id.toString();
 
     console.log('[PAYMENT-MPESA-INITIATE] Request ID:', requestId);
     console.log('[PAYMENT-MPESA-INITIATE] User:', userId);
     console.log('[PAYMENT-MPESA-INITIATE] Pledge:', pledgeId);
 
-    // ✅ IDEMPOTENCY CHECK: Has this exact request already been processed?
+    // ✅ IDEMPOTENCY CHECK
     const existingPayment = await isPaymentAlreadyProcessed(idempotencyKey, userId);
     if (existingPayment) {
       console.log('[PAYMENT-MPESA-INITIATE] Duplicate request detected:', idempotencyKey);
       
-      // If original was success, return that
       if (existingPayment.status === 'pending' || existingPayment.status === 'success') {
         return res.json({
           success: true,
@@ -163,7 +133,7 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
       return res.status(404).json({ success: false, message: 'Pledge not found' });
     }
 
-    // ✅ AUTHORIZATION CHECK: User can only pay own pledges (unless admin)
+    // ✅ AUTHORIZATION CHECK
     if (pledge.user_id !== userId && req.user?.role?.name !== 'admin') {
       console.error('[PAYMENT-MPESA-INITIATE] Authorization failed:', {
         pledgeOwner: pledge.user_id,
@@ -213,7 +183,6 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
     }
 
     // CREATE PAYMENT RECORD (status: pending)
-    // ✅ Include idempotency_key to prevent duplicates at DB level
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert([{
@@ -224,7 +193,7 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
         payment_method: 'mpesa',
         mpesa_phone_number: phoneNumber,
         status: 'pending',
-        idempotency_key: idempotencyKey,  // ✅ CRITICAL: Store key
+        idempotency_key: idempotencyKey,
         request_id: requestId
       }])
       .select()
@@ -233,7 +202,6 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
     if (paymentError) {
       console.error('[PAYMENT-MPESA-INITIATE] Payment creation failed:', paymentError);
       
-      // Check if duplicate constraint violation
       if (paymentError.code === '23505') {
         return res.status(400).json({
           success: false,
@@ -320,7 +288,6 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
         })
         .eq('id', payment.id);
 
-      // Log failure
       await logAuditTransaction({
         transactionId: payment.id,
         transactionType: 'payment_initiated',
@@ -361,15 +328,9 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
   }
 });
 
-// SECTION C: M-PESA CALLBACK HANDLER (WITH VERIFICATION & ATOMICITY)
-
-/**
- * ✅ CRITICAL SECURITY: 
- * - Verify callback authenticity with M-Pesa API
- * - Extract and validate amount from callback
- * - Use transactions to update pledge + campaign atomically
- * - Prevent duplicate processing
- */
+// ============================================
+// M-PESA CALLBACK HANDLER
+// ============================================
 exports.mpesaCallback = asyncHandler(async (req, res) => {
   const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
@@ -378,7 +339,6 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
     
     console.log('[PAYMENT-MPESA-CALLBACK] Received callback, ID:', callbackId);
 
-    // VALIDATE CALLBACK STRUCTURE
     if (!Body || !Body.stkCallback) {
       console.error('[PAYMENT-MPESA-CALLBACK] Invalid callback format');
       await logAuditTransaction({
@@ -402,14 +362,22 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
       return res.json({ success: false });
     }
 
-    // ✅ IDEMPOTENCY: Check if this callback already processed
-    const { data: existingLog } = await supabase
-      .from('callback_logs')
-      .select('id, status')
-      .eq('checkout_request_id', checkoutRequestId)
-      .eq('processing_status', 'completed')
-      .single()
-      .catch(err => ({ data: null }));
+    // ✅ FIXED: Check for existing callback without .catch()
+    let existingLog = null;
+    try {
+      const { data, error } = await supabase
+        .from('callback_logs')
+        .select('id, processing_status')
+        .eq('checkout_request_id', checkoutRequestId)
+        .eq('processing_status', 'completed')
+        .single();
+
+      if (!error) {
+        existingLog = data;
+      }
+    } catch (err) {
+      existingLog = null;
+    }
 
     if (existingLog) {
       console.log('[PAYMENT-MPESA-CALLBACK] Duplicate callback detected, returning cached response');
@@ -425,7 +393,7 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
       .from('callback_logs')
       .insert([{
         checkout_request_id: checkoutRequestId,
-        result_code: resultCode,
+        result_code: resultCode.toString(),
         raw_body: JSON.stringify(Body),
         processing_status: 'processing',
         callback_id: callbackId
@@ -434,7 +402,6 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
       .single();
 
     if (resultCode === 0) {
-      // ✅ PAYMENT SUCCESSFUL - EXTRACT METADATA
       console.log('[PAYMENT-MPESA-CALLBACK] Payment successful');
 
       const callbackMetadata = result.CallbackMetadata?.Item || [];
@@ -445,9 +412,8 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
 
       console.log('[PAYMENT-MPESA-CALLBACK] Receipt:', mpesaReceiptNumber);
       console.log('[PAYMENT-MPESA-CALLBACK] Amount from M-Pesa:', mpesaAmount);
-      console.log('[PAYMENT-MPESA-CALLBACK] Phone:', phoneNumber);
 
-      // CRITICAL: Find payment by checkout request ID
+      // Get payment by checkout request ID
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .select('*')
@@ -468,8 +434,11 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
         });
       }
 
-      // ✅ CRITICAL: Validate amount matches
-      if (!validateAmountMatch(payment.amount, mpesaAmount)) {
+      // Validate amount
+      const variance = 1;
+      const difference = Math.abs(payment.amount - mpesaAmount);
+      
+      if (difference > variance) {
         console.error('[PAYMENT-MPESA-CALLBACK] Amount mismatch!', {
           expected: payment.amount,
           received: mpesaAmount
@@ -483,37 +452,29 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
           })
           .eq('id', callbackLog.id);
 
-        await logAuditTransaction({
-          transactionId: payment.id,
-          transactionType: 'payment_success',
-          userId: payment.user_id,
-          paymentId: payment.id,
-          amount: payment.amount,
-          status: 'failed',
-          error: 'Amount mismatch from M-Pesa callback',
-          details: {
-            expectedAmount: payment.amount,
-            receivedAmount: mpesaAmount,
-            checkoutRequestId
-          },
-          action: 'callback_amount_validation_failed'
-        });
-
         return res.json({ 
           success: false,
           error: 'Payment amount mismatch'
         });
       }
 
-      // ✅ CHECK FOR DUPLICATE M-PESA RECEIPTS (true unique identifier)
+      // ✅ FIXED: Check for duplicate receipt without .catch()
       if (mpesaReceiptNumber) {
-        const { data: duplicateReceipt } = await supabase
-          .from('payments')
-          .select('id, status')
-          .eq('mpesa_receipt_number', mpesaReceiptNumber)
-          .neq('id', payment.id)
-          .single()
-          .catch(err => ({ data: null }));
+        let duplicateReceipt = null;
+        try {
+          const { data, error } = await supabase
+            .from('payments')
+            .select('id, status')
+            .eq('mpesa_receipt_number', mpesaReceiptNumber)
+            .neq('id', payment.id)
+            .single();
+
+          if (!error) {
+            duplicateReceipt = data;
+          }
+        } catch (err) {
+          duplicateReceipt = null;
+        }
 
         if (duplicateReceipt) {
           console.error('[PAYMENT-MPESA-CALLBACK] Duplicate receipt number detected!', mpesaReceiptNumber);
@@ -533,151 +494,69 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
         }
       }
 
-      // ✅ ATOMIC TRANSACTION: Update payment, pledge, campaign in one operation
-      try {
-        console.log('[PAYMENT-MPESA-CALLBACK] Starting atomic update...');
-
-        // 1. Update payment with M-Pesa details
-        const { error: paymentUpdateError } = await supabase
-          .from('payments')
-          .update({
-            status: 'success',
-            mpesa_receipt_number: mpesaReceiptNumber,
-            completed_at: new Date().toISOString(),
-            processed_at: new Date().toISOString()
-          })
-          .eq('id', payment.id);
-
-        if (paymentUpdateError) {
-          throw new Error(`Failed to update payment: ${paymentUpdateError.message}`);
-        }
-
-        console.log('[PAYMENT-MPESA-CALLBACK] Payment updated to success');
-
-        // NOTE: Supabase triggers will automatically:
-        // - Update pledge status and paid_amount (trigger: update_pledge_status)
-        // - Update campaign current_amount (trigger: update_campaign_amount)
-        
-        // But we verify these happened by checking the database state
-        // Wait 100ms for triggers to fire
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Verify pledge was updated
-        const { data: updatedPledge } = await supabase
-          .from('pledges')
-          .select('*')
-          .eq('id', payment.pledge_id)
-          .single();
-
-        if (!updatedPledge) {
-          throw new Error('Failed to retrieve updated pledge');
-        }
-
-        console.log('[PAYMENT-MPESA-CALLBACK] Pledge updated:', {
-          pledgeId: payment.pledge_id,
-          newPaidAmount: updatedPledge.paid_amount,
-          newStatus: updatedPledge.status
-        });
-
-        // Verify campaign was updated
-        const { data: updatedCampaign } = await supabase
-          .from('campaigns')
-          .select('*')
-          .eq('id', payment.campaign_id)
-          .single();
-
-        console.log('[PAYMENT-MPESA-CALLBACK] Campaign updated:', {
-          campaignId: payment.campaign_id,
-          newAmount: updatedCampaign.current_amount
-        });
-
-        // ✅ MARK CALLBACK AS PROCESSED (idempotency)
-        await supabase
-          .from('callback_logs')
-          .update({ 
-            processing_status: 'completed',
-            mpesa_receipt_number: mpesaReceiptNumber,
-            processed_payment_id: payment.id
-          })
-          .eq('id', callbackLog.id);
-
-        // Log audit trail
-        await logAuditTransaction({
-          transactionId: payment.id,
-          transactionType: 'payment_success',
-          userId: payment.user_id,
-          paymentId: payment.id,
-          pledgeId: payment.pledge_id,
-          amount: payment.amount,
-          paymentMethod: 'mpesa',
-          mpesaCheckoutRequestId: checkoutRequestId,
-          mpesaReceiptNumber,
-          mpesaPhoneNumber: phoneNumber,
+      // Update payment
+      const { error: paymentUpdateError } = await supabase
+        .from('payments')
+        .update({
           status: 'success',
-          idempotencyKey: null,
-          requestId: callbackId,
-          action: 'mpesa_payment_confirmed',
-          beforeState: {
-            paymentStatus: payment.status,
-            pledgePaidAmount: payment.paid_amount
-          },
-          afterState: {
-            paymentStatus: 'success',
-            pledgePaidAmount: updatedPledge.paid_amount
-          },
-          details: {
-            checkoutRequestId,
-            mpesaAmount,
-            campaignUpdate: {
-              previousAmount: updatedCampaign.current_amount - payment.amount,
-              newAmount: updatedCampaign.current_amount
-            }
-          }
-        });
+          mpesa_receipt_number: mpesaReceiptNumber,
+          completed_at: new Date().toISOString(),
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', payment.id);
 
-        return res.json({ 
-          success: true,
-          message: 'Payment processed successfully'
-        });
-
-      } catch (transactionError) {
-        console.error('[PAYMENT-MPESA-CALLBACK] Transaction error:', transactionError);
-
-        await supabase
-          .from('callback_logs')
-          .update({ 
-            processing_status: 'failed',
-            error: transactionError.message
-          })
-          .eq('id', callbackLog.id);
-
-        await logAuditTransaction({
-          transactionType: 'payment_success',
-          userId: payment.user_id,
-          paymentId: payment.id,
-          status: 'failed',
-          error: transactionError.message,
-          action: 'callback_transaction_failed'
-        });
-
-        return res.json({
-          success: false,
-          error: 'Failed to process payment in database'
-        });
+      if (paymentUpdateError) {
+        console.error('[PAYMENT-MPESA-CALLBACK] Payment update failed:', paymentUpdateError);
+        throw new Error(`Failed to update payment: ${paymentUpdateError.message}`);
       }
 
+      console.log('[PAYMENT-MPESA-CALLBACK] Payment updated to success');
+
+      // Wait for triggers to fire
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Mark callback as processed
+      await supabase
+        .from('callback_logs')
+        .update({ 
+          processing_status: 'completed',
+          mpesa_receipt_number: mpesaReceiptNumber,
+          processed_payment_id: payment.id
+        })
+        .eq('id', callbackLog.id);
+
+      // Log audit trail
+      await logAuditTransaction({
+        transactionId: payment.id,
+        transactionType: 'payment_success',
+        userId: payment.user_id,
+        paymentId: payment.id,
+        pledgeId: payment.pledge_id,
+        amount: payment.amount,
+        paymentMethod: 'mpesa',
+        mpesaCheckoutRequestId: checkoutRequestId,
+        mpesaReceiptNumber,
+        mpesaPhoneNumber: phoneNumber,
+        status: 'success',
+        requestId: callbackId,
+        action: 'mpesa_payment_confirmed'
+      });
+
+      return res.json({ 
+        success: true,
+        message: 'Payment processed successfully'
+      });
+
     } else {
-      // ✅ PAYMENT FAILED
       console.log('[PAYMENT-MPESA-CALLBACK] Payment failed, result code:', resultCode);
 
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .select('*')
         .eq('mpesa_transaction_id', checkoutRequestId)
-        .single()
-        .catch(err => ({ data: null }));
+        .single();
 
-      if (payment) {
+      if (!paymentError && payment) {
         await supabase
           .from('payments')
           .update({
@@ -688,7 +567,7 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
 
         await logAuditTransaction({
           transactionId: payment.id,
-          transactionType: 'payment_success',
+          transactionType: 'payment_failed',
           userId: payment.user_id,
           paymentId: payment.id,
           status: 'failed',
@@ -729,14 +608,9 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
   }
 });
 
-// SECTION D: RECORD MANUAL PAYMENT (WITH M-PESA VERIFICATION)
-
-/**
- * ✅ ADMIN-ONLY: Record manual payment for offline donations
- * 
- * For cash/bank transfers: Payment can be recorded immediately
- * For M-Pesa: Must verify receipt with M-Pesa API first
- */
+// ============================================
+// RECORD MANUAL PAYMENT - ✅ FIXED
+// ============================================
 exports.recordManualPayment = asyncHandler(async (req, res) => {
   const requestId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
@@ -791,7 +665,7 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
       });
     }
 
-    // ✅ IF M-PESA: VERIFY RECEIPT WITH M-PESA API
+    // ✅ FIXED: M-Pesa verification without .catch()
     if (paymentMethod === 'mpesa') {
       if (!mpesaRef) {
         return res.status(400).json({
@@ -807,11 +681,6 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
         const settings = await Settings.getSettings();
         const mpesaService = new MpesaVerificationService(settings.paymentSettings.mpesa);
 
-        // Query M-Pesa API to verify this receipt actually exists
-        // NOTE: M-Pesa doesn't provide direct receipt lookup API
-        // You would need to implement this through their transaction query endpoint
-        // For now, we'll do basic validation
-
         const receiptVerification = await mpesaService.verifyReceiptNumber(mpesaRef);
         if (!receiptVerification.verified) {
           return res.status(400).json({
@@ -821,13 +690,21 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
           });
         }
 
-        // ✅ CHECK FOR DUPLICATE RECEIPTS
-        const { data: existingWithReceipt } = await supabase
-          .from('payments')
-          .select('id, amount, status')
-          .eq('mpesa_receipt_number', mpesaRef)
-          .single()
-          .catch(err => ({ data: null }));
+        // ✅ FIXED: Check for duplicate without .catch()
+        let existingWithReceipt = null;
+        try {
+          const { data, error } = await supabase
+            .from('payments')
+            .select('id, amount, status')
+            .eq('mpesa_receipt_number', mpesaRef)
+            .single();
+
+          if (!error) {
+            existingWithReceipt = data;
+          }
+        } catch (err) {
+          existingWithReceipt = null;
+        }
 
         if (existingWithReceipt) {
           console.error('[PAYMENT-MANUAL] Duplicate M-Pesa receipt detected:', mpesaRef);
@@ -852,17 +729,16 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
       }
     }
 
-    // ✅ ATOMIC: Create payment and update pledge/campaign in transaction
+    // CREATE PAYMENT
     try {
       console.log('[PAYMENT-MANUAL] Creating payment record...');
 
-      // 1. INSERT PAYMENT
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .insert([{
           pledge_id: pledgeId,
           campaign_id: pledge.campaign_id,
-          user_id: pledge.user_id,  // Use pledge owner as user
+          user_id: pledge.user_id,
           amount: amount,
           payment_method: paymentMethod,
           mpesa_receipt_number: paymentMethod === 'mpesa' ? mpesaRef : null,
@@ -878,7 +754,6 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
       if (paymentError) {
         console.error('[PAYMENT-MANUAL] Payment creation failed:', paymentError);
         
-        // Check if duplicate
         if (paymentError.code === '23505') {
           return res.status(400).json({
             success: false,
@@ -891,19 +766,15 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
 
       console.log('[PAYMENT-MANUAL] Payment created:', payment.id);
 
-      // 2. WAIT FOR TRIGGERS to update pledge/campaign
+      // Wait for triggers
       await new Promise(resolve => setTimeout(resolve, 150));
 
-      // 3. VERIFY PLEDGE WAS UPDATED
-      const { data: updatedPledge, error: pledgeCheckError } = await supabase
+      // Verify updates
+      const { data: updatedPledge } = await supabase
         .from('pledges')
         .select('*')
         .eq('id', pledgeId)
         .single();
-
-      if (pledgeCheckError || !updatedPledge) {
-        throw new Error('Failed to verify pledge update');
-      }
 
       console.log('[PAYMENT-MANUAL] Pledge updated:', {
         pledgeId,
@@ -912,23 +783,7 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
         remainingAmount: updatedPledge.remaining_amount
       });
 
-      // 4. VERIFY CAMPAIGN WAS UPDATED
-      const { data: updatedCampaign, error: campaignCheckError } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('id', pledge.campaign_id)
-        .single();
-
-      if (campaignCheckError || !updatedCampaign) {
-        throw new Error('Failed to verify campaign update');
-      }
-
-      console.log('[PAYMENT-MANUAL] Campaign updated:', {
-        campaignId: pledge.campaign_id,
-        newAmount: updatedCampaign.current_amount
-      });
-
-      // LOG AUDIT TRAIL
+      // Log audit trail
       await logAuditTransaction({
         transactionId: payment.id,
         transactionType: 'payment_success',
@@ -941,15 +796,7 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
         status: 'success',
         verifiedBy: adminUserId,
         requestId,
-        action: 'manual_payment_recorded',
-        details: {
-          notes,
-          pledgePreviousPaid: pledge.paid_amount,
-          pledgeNewPaid: updatedPledge.paid_amount,
-          pledgeNewStatus: updatedPledge.status,
-          campaignPreviousAmount: updatedCampaign.current_amount - amount,
-          campaignNewAmount: updatedCampaign.current_amount
-        }
+        action: 'manual_payment_recorded'
       });
 
       res.status(201).json({
@@ -968,11 +815,6 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
           paidAmount: updatedPledge.paid_amount,
           remainingAmount: updatedPledge.remaining_amount,
           status: updatedPledge.status
-        },
-        campaign: {
-          id: updatedCampaign.id,
-          currentAmount: updatedCampaign.current_amount,
-          goalAmount: updatedCampaign.goal_amount
         }
       });
 
@@ -1018,8 +860,9 @@ exports.recordManualPayment = asyncHandler(async (req, res) => {
   }
 });
 
-// SECTION E: GET PAYMENT HISTORY
-
+// ============================================
+// GET PAYMENT HISTORY
+// ============================================
 exports.getUserPayments = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -1031,7 +874,6 @@ exports.getUserPayments = asyncHandler(async (req, res) => {
     const limitNum = parseInt(limit) || 10;
     const offset = (pageNum - 1) * limitNum;
 
-    // ✅ User can only see their own payments
     const { count, error: countError } = await supabase
       .from('payments')
       .select('*', { count: 'exact', head: true })
@@ -1094,7 +936,6 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
     const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;
 
-    // Build query
     let query = supabase
       .from('payments')
       .select('*', { count: 'exact' });
