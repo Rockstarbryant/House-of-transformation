@@ -1,4 +1,4 @@
-// server/routes/transactionAuditRoutes.js
+// server/routes/auditRoutes.js - FIXED VERSION
 const express = require('express');
 const router = express.Router();
 const {
@@ -10,8 +10,9 @@ const {
   getAuditStats
 } = require('../controllers/transactionAuditController');
 
-const { protect } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/rbac');
+// ✅ FIXED: Use correct middleware (supabaseAuth, not auth)
+const { protect } = require('../middleware/supabaseAuth');
+const { requirePermission } = require('../middleware/requirePermission');
 
 // ============================================
 // PROTECTED ROUTES - Require Authentication

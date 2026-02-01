@@ -38,7 +38,7 @@ async function isPaymentAlreadyProcessed(idempotencyKey, userId) {
   } catch (error) {
     return null;
   }
-}
+}  
 
 /**
  * Log financial transaction to audit trail
@@ -279,14 +279,27 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
     } catch (mpesaError) {
       console.error('[PAYMENT-MPESA-INITIATE] M-Pesa API error:', mpesaError.message);
 
+      // Update payment status to failed using the correct object-based error handling
+  const { error: updateError } = await supabase
+    .from('payments')
+    .update({
+      status: 'failed',
+      failure_reason: mpesaError.message
+    })
+    .eq('id', payment.id);
+
+  if (updateError) {
+    console.error('[PAYMENT-MPESA-INITIATE] Critical: Could not update failed status', updateError);
+  }
+
       // Update payment status to failed
-      await supabase
+     /* await supabase
         .from('payments')
         .update({
           status: 'failed',
           failure_reason: mpesaError.message
         })
-        .eq('id', payment.id);
+        .eq('id', payment.id);  */
 
       await logAuditTransaction({
         transactionId: payment.id,
@@ -363,7 +376,7 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
     }
 
     // ✅ FIXED: Check for existing callback without .catch()
-    let existingLog = null;
+  /*  let existingLog = null;
     try {
       const { data, error } = await supabase
         .from('callback_logs')
@@ -377,7 +390,24 @@ exports.mpesaCallback = asyncHandler(async (req, res) => {
       }
     } catch (err) {
       existingLog = null;
-    }
+    }  */
+
+      //
+const { data: existingLog, error: logError } = await supabase
+  .from('callback_logs')
+  .select('id, processing_status')
+  .eq('checkout_request_id', checkoutRequestId)
+  .eq('processing_status', 'completed')
+  .single();
+
+// If error code is PGRST116, it just means "not found", which is fine.
+if (logError && logError.code !== 'PGRST116') {
+    console.error('[PAYMENT-MPESA-CALLBACK] DB Error:', logError);
+}
+
+if (existingLog) {
+  return res.json({ success: true, isDuplicate: true });
+}
 
     if (existingLog) {
       console.log('[PAYMENT-MPESA-CALLBACK] Duplicate callback detected, returning cached response');

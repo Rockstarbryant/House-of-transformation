@@ -138,6 +138,7 @@ app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 app.use('/api/audit', require('./routes/auditRoutes'));
+app.use('/api/transaction-audit', require('./routes/transactionAuditRoutes'));
 
 app.use('/api/email-notifications', require('./routes/emailNotificationRoutes'));
 

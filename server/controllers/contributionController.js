@@ -1,4 +1,4 @@
-// server/controllers/contributionController.js - COMPLETE VERSION
+// server/controllers/contributionController.js - FIXED VERSION
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 const asyncHandler = require('../middleware/asyncHandler');
@@ -39,6 +39,80 @@ async function checkDuplicateContribution(contributorName, amount, campaignId, p
   }
 
   return data && data.length > 0 ? data[0] : null;
+}
+
+// ============================================
+// HELPER: Enrich contributions with related data
+// ============================================
+async function enrichContributions(contributions) {
+  if (!contributions || contributions.length === 0) {
+    return [];
+  }
+
+  // Enrich with campaign data
+  const campaignIds = [...new Set(contributions.map(c => c.campaign_id).filter(Boolean))];
+  
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('id, title, campaign_type, status')
+    .in('id', campaignIds);
+
+  const campaignMap = {};
+  if (campaigns) {
+    campaigns.forEach(c => {
+      campaignMap[c.id] = c;
+    });
+  }
+
+  // Enrich with user data
+  const User = require('../models/User');
+  const createdByIds = [...new Set(contributions.map(c => c.created_by_id).filter(Boolean))];
+  const verifiedByIds = [...new Set(contributions.map(c => c.verified_by_id).filter(Boolean))];
+  const allUserIds = [...new Set([...createdByIds, ...verifiedByIds])];
+
+  let users = [];
+  if (allUserIds.length > 0) {
+    users = await User.find({ _id: { $in: allUserIds } }).select('_id firstName lastName name fullName email');
+  }
+
+  const userMap = {};
+  users.forEach(u => {
+    // Try multiple field combinations to handle different User model structures
+    let userName = 'Unknown User';
+    
+    if (u.name) {
+      // If there's a single "name" field
+      userName = u.name;
+    } else if (u.fullName) {
+      // If there's a "fullName" field
+      userName = u.fullName;
+    } else if (u.firstName && u.lastName) {
+      // If there are separate firstName/lastName fields
+      userName = `${u.firstName} ${u.lastName}`;
+    } else if (u.firstName) {
+      // If only firstName exists
+      userName = u.firstName;
+    } else if (u.email) {
+      // Fallback to email username
+      userName = u.email.split('@')[0];
+    }
+    
+    userMap[u._id.toString()] = userName.trim();
+  });
+
+  // Enrich each contribution
+  return contributions.map(c => {
+    const campaign = campaignMap[c.campaign_id];
+    
+    return {
+      ...c,
+      campaign_title: campaign?.title || null,
+      campaign_type: campaign?.campaign_type || null,
+      campaign_status: campaign?.status || null,
+      created_by_name: c.created_by_id ? userMap[c.created_by_id] || 'Unknown' : null,
+      verified_by_name: c.verified_by_id ? userMap[c.verified_by_id] || 'Unknown' : null
+    };
+  });
 }
 
 // ============================================
@@ -230,76 +304,40 @@ exports.getAllContributions = asyncHandler(async (req, res) => {
 
     const { count } = await query;
 
-    const { data: contributions, error } = await supabase
+    // Build the query again for the actual data fetch
+    let dataQuery = supabase
       .from('contributions')
       .select('*')
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1);
 
+    // Apply same filters to data query
+    if (status) dataQuery = dataQuery.eq('status', status);
+    if (paymentMethod) dataQuery = dataQuery.eq('payment_method', paymentMethod);
+    if (campaignId) dataQuery = dataQuery.eq('campaign_id', campaignId);
+
+    const { data: contributions, error } = await dataQuery;
+
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
 
-    // Enrich with campaign data
-    const campaignIds = [...new Set(contributions.map(c => c.campaign_id).filter(Boolean))];
-    
-    const { data: campaigns } = await supabase
-      .from('campaigns')
-      .select('id, title, campaign_type, status')
-      .in('id', campaignIds);
-
-    const campaignMap = {};
-    if (campaigns) {
-      campaigns.forEach(c => {
-        campaignMap[c.id] = c;
-      });
-    }
-
-    // Enrich with user data
-    const User = require('../models/User');
-    const createdByIds = [...new Set(contributions.map(c => c.created_by_id).filter(Boolean))];
-    const verifiedByIds = [...new Set(contributions.map(c => c.verified_by_id).filter(Boolean))];
-    const allUserIds = [...new Set([...createdByIds, ...verifiedByIds])];
-
-    let usersMap = {};
-    if (allUserIds.length > 0) {
-      const users = await User.find({ _id: { $in: allUserIds } }).select('_id name email').lean();
-      users.forEach(user => {
-        usersMap[user._id.toString()] = user;
-      });
-    }
-
     // Enrich contributions
-    const enriched = contributions.map(contrib => {
-      const campaign = campaignMap[contrib.campaign_id];
-      const createdBy = usersMap[contrib.created_by_id];
-      const verifiedBy = usersMap[contrib.verified_by_id];
-      
-      return {
-        ...contrib,
-        campaign_title: campaign?.title || 'General Offering',
-        campaign_type: campaign?.campaign_type || null,
-        campaign_status: campaign?.status || null,
-        created_by_name: createdBy?.name || null,
-        created_by_email: createdBy?.email || null,
-        verified_by_name: verifiedBy?.name || null,
-        verified_by_email: verifiedBy?.email || null
-      };
-    });
+    const enriched = await enrichContributions(contributions || []);
 
     res.json({
       success: true,
       contributions: enriched,
       pagination: {
-        total: count,
-        pages: Math.ceil(count / limitNum),
-        currentPage: pageNum,
-        limit: limitNum
+        page: pageNum,
+        limit: limitNum,
+        total: count || 0,
+        pages: Math.ceil((count || 0) / limitNum)
       }
     });
 
   } catch (error) {
-    console.error('[CONTRIBUTION-GET-ALL] Error:', error);
+    console.error('[GET-ALL] Error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch contributions' });
   }
 });
@@ -311,34 +349,77 @@ exports.verifyContribution = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: existing } = await supabase
+    console.log('[VERIFY] Starting verification for contribution:', id);
+    console.log('[VERIFY] User ID:', req.user?._id?.toString());
+
+    // Check if user exists
+    if (!req.user || !req.user._id) {
+      console.error('[VERIFY] No user found in request');
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { data: existing, error: fetchError } = await supabase
       .from('contributions')
       .select('*')
       .eq('id', id)
       .single();
 
+    if (fetchError) {
+      console.error('[VERIFY] Fetch error:', fetchError);
+      return res.status(404).json({ success: false, message: 'Contribution not found', error: fetchError.message });
+    }
+
     if (!existing) {
+      console.error('[VERIFY] Contribution not found in database');
       return res.status(404).json({ success: false, message: 'Contribution not found' });
     }
 
+    console.log('[VERIFY] Current status:', existing.status);
+
     if (existing.status === 'verified') {
+      console.log('[VERIFY] Already verified');
       return res.status(400).json({ success: false, message: 'Already verified' });
     }
 
+    const updateData = {
+      status: 'verified',
+      verified_by_id: req.user._id.toString(),
+      verified_at: new Date().toISOString()
+    };
+
+    console.log('[VERIFY] Updating with:', updateData);
+
     const { data, error } = await supabase
       .from('contributions')
-      .update({
-        status: 'verified',
-        verified_by_id: req.user._id.toString(),
-        verified_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
-      return res.status(500).json({ success: false, error: error.message });
+      console.error('[VERIFY] Update error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to update contribution',
+        error: error.message 
+      });
     }
+
+    console.log('[VERIFY] ✅ Successfully updated. New status:', data.status);
+    console.log('[VERIFY] ✅ Verified by ID:', data.verified_by_id);
+    console.log('[VERIFY] ✅ Verified at:', data.verified_at);
+
+    // ✅ CRITICAL FIX: Enrich the single contribution before returning
+    const enriched = await enrichContributions([data]);
+    const enrichedContribution = enriched[0];
+
+    console.log('[VERIFY] ✅ Enriched contribution:', {
+      id: enrichedContribution.id,
+      status: enrichedContribution.status,
+      verified_by_id: enrichedContribution.verified_by_id,
+      verified_by_name: enrichedContribution.verified_by_name,
+      created_by_name: enrichedContribution.created_by_name
+    });
 
     // Log audit
     try {
@@ -355,11 +436,22 @@ exports.verifyContribution = asyncHandler(async (req, res) => {
       console.error('[VERIFY] Audit error:', auditError);
     }
 
-    res.json({ success: true, contribution: data });
+    console.log('[VERIFY] ✅ Sending response with enriched contribution');
+
+    res.json({ 
+      success: true, 
+      message: 'Contribution verified successfully',
+      contribution: enrichedContribution 
+    });
 
   } catch (error) {
-    console.error('[VERIFY] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to verify' });
+    console.error('[VERIFY] Unexpected error:', error);
+    console.error('[VERIFY] Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to verify contribution',
+      error: error.message 
+    });
   }
 });
 
