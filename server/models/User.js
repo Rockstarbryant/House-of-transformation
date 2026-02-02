@@ -35,6 +35,13 @@ const userSchema = new mongoose.Schema({
     default: null
   },
   
+  // ===== NEW: Gender field =====
+  gender: {
+    type: String,
+    enum: ['male', 'female'],
+    required: false
+  },
+  
   // ===== CHANGED FROM STRING ENUM TO ROLE REFERENCE =====
   role: {
     type: mongoose.Schema.Types.ObjectId,
@@ -59,6 +66,26 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  
+  // ===== NEW: Track if user is banned =====
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  bannedAt: {
+    type: Date,
+    default: null
+  },
+  bannedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  banReason: {
+    type: String,
+    default: null
+  },
+  
   createdAt: {
     type: Date,
     default: Date.now
@@ -105,5 +132,6 @@ userSchema.index({ supabase_uid: 1 }, { unique: true });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ isActive: 1 });
+userSchema.index({ isBanned: 1 });
 
 module.exports = mongoose.model('User', userSchema);

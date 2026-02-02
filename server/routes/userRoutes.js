@@ -1,7 +1,7 @@
 const express = require('express');
 const {
   getAllUsers,
-  getAllUsersWithPagination,  // NEW
+  getAllUsersWithPagination,
   getUserById,
   getMyProfile,
   updateUser,
@@ -9,29 +9,46 @@ const {
   searchUsers,
   getUsersByRole,
   deleteUser,
-  bulkUpdateRoles,            // NEW
-  sendBulkNotification,        // NEW
-  getUserStats                 // NEW
+  banUser,
+  checkBanStatus,
+  manualRegisterUser,
+  deleteSelfAccount,
+  bulkUpdateRoles,
+  sendBulkNotification,
+  getUserStats
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/supabaseAuth');
 
 const router = express.Router();
 
-// Public routes
-router.get('/stats', getUserStats);                    // NEW - before :id route
-router.get('/', getAllUsersWithPagination);           // CHANGED - added pagination
+// ============================================
+// PUBLIC ROUTES
+// ============================================
+router.get('/stats', getUserStats);
+router.get('/', getAllUsersWithPagination);
 router.get('/search', searchUsers);
 router.get('/role/:role', getUsersByRole);
+router.post('/check-ban', checkBanStatus); // Check if email/IP is banned
 router.get('/:id', getUserById);
 
-// Protected routes
-router.get('/me/profile', protect, getMyProfile);
-router.put('/:id', protect, updateUser);
+// ============================================
+// PROTECTED ROUTES (Authenticated Users)
+// ============================================
+router.use(protect); // All routes below require authentication
 
-// Admin routes
-router.post('/bulk/role-update', protect, authorize('admin'), bulkUpdateRoles);        // NEW
-router.post('/notifications/send', protect, authorize('admin'), sendBulkNotification); // NEW
-router.put('/:id/role', protect, authorize('admin'), updateUserRole);
-router.delete('/:id', protect, authorize('admin'), deleteUser);
+// User's own profile
+router.get('/me/profile', getMyProfile);
+router.put('/:id', updateUser); // Users can update own profile, admin can update any
+router.delete('/me/delete-account', deleteSelfAccount); // User self-deletion
+
+// ============================================
+// ADMIN ROUTES
+// ============================================
+router.post('/bulk/role-update', authorize('admin'), bulkUpdateRoles);
+router.post('/notifications/send', authorize('admin'), sendBulkNotification);
+router.post('/manual-register', authorize('admin'), manualRegisterUser); // NEW: Manual registration
+router.put('/:id/role', authorize('admin'), updateUserRole);
+router.delete('/:id', authorize('admin'), deleteUser); // Hard delete
+router.post('/:id/ban', authorize('admin'), banUser); // NEW: Ban user
 
 module.exports = router;
