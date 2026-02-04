@@ -292,15 +292,7 @@ exports.initiateMpesaPayment = asyncHandler(async (req, res) => {
     console.error('[PAYMENT-MPESA-INITIATE] Critical: Could not update failed status', updateError);
   }
 
-      // Update payment status to failed
-     /* await supabase
-        .from('payments')
-        .update({
-          status: 'failed',
-          failure_reason: mpesaError.message
-        })
-        .eq('id', payment.id);  */
-
+      
       await logAuditTransaction({
         transactionId: payment.id,
         transactionType: 'payment_initiated',

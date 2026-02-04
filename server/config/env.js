@@ -6,6 +6,11 @@ module.exports = {
 SUPABASE_URL: process.env.SUPABASE_URL,
 SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
 SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY, // For server-side ops
+
+
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   //JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret_key',
   //JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',
   

@@ -42,6 +42,7 @@ exports.streamAnnouncements = async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering for nginx
+    res.write(': SSE stream initialized\n\n');
 
     // Add this client to the list
     addSSEClient(res);

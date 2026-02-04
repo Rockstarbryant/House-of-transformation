@@ -8,12 +8,12 @@ const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
 
-require('./config/cloudinaryConfig');
+//require('./config/cloudinaryConfig');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const config = require('./config/env');
-console.log('\n🔐 Supabase Configuration Check:');
+console.log('\n🔍 Supabase Configuration Check:');
 console.log('   SUPABASE_URL:', config.SUPABASE_URL ? '✓ Loaded' : '✗ MISSING');
 console.log('   SUPABASE_ANON_KEY:', config.SUPABASE_ANON_KEY ? '✓ Loaded' : '✗ MISSING');
 console.log('   SUPABASE_SERVICE_KEY:', config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '✗ MISSING');
@@ -24,6 +24,8 @@ console.log('');
 const auditMiddleware = require('./middleware/auditMiddleware');
 const { protect } = require('./middleware/supabaseAuth');
 const maintenanceMiddleware = require('../backup/maintenanceMiddleware');
+
+require('./config/cloudinaryConfig');
 
 connectDB();
 
@@ -49,7 +51,8 @@ const allowedOrigins = process.env.NODE_ENV === 'development'
       'https://comfy-gumdrop-df8b26.netlify.app',
       'https://hotadmin.vercel.app',
       'https://house-of-transformation.vercel.app',
-      'https://houseoftransformation-nextjs.vercel.app'
+      'https://houseoftransformation-nextjs.vercel.app',
+      'https://busiahouseoftransformation.netlify.app'
     ];
 
 app.use('/api', auditMiddleware);
@@ -98,19 +101,16 @@ app.get('/api/health', (req, res) => {
 // Apply general API rate limiter to all /api routes
 app.use('/api/', apiLimiter);
 
-//  STEP 1: Auth routes MUST be first
+// ✅ STEP 1: Auth routes MUST be first (NO AUTH REQUIRED)
 app.use('/api/auth', require('./routes/authRoutes'));
 
-//  STEP 2: Public settings endpoint - NO auth needed, NO maintenance check
+// ✅ STEP 2: Public settings endpoint - NO auth needed, NO maintenance check
 app.use('/api/settings/public', require('./routes/settingsRoutes'));
 
-//  STEP 3: Apply authentication to all remaining routes
-
-
-// ⚠️ STEP 4: NOW apply maintenance middleware (req.user is populated!)
-//app.use('/api/', maintenanceMiddleware);
-
-//  STEP 5: Now all protected routes can use maintenance middleware
+// ============================================
+// ✅ STEP 3: PUBLIC ROUTES (NO AUTH NEEDED)
+// These routes should work without authentication
+// ============================================
 app.use('/api/sermons', require('./routes/sermonRoutes'));
 app.use('/api/blog', require('./routes/blogRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
@@ -120,30 +120,31 @@ app.use('/api/contributions', require('./routes/contributionRoutes'));
 app.use('/api/pledges', require('./routes/pledgeRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/donations/analytics', require('./routes/donationAnalyticsRoutes'));
-// Livestream routes
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
-// Feedback routes
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
-// Volunteer routes
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
-// Add with other routes (around line 80-100)
+
+// ============================================
+// ✅ CRITICAL FIX: Announcements route uses its own auth
+// The /stream endpoint uses protectSSE middleware
+// Other endpoints use protect middleware
+// DO NOT apply global protect before this route
+// ============================================
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 
-app.use('/api/', protect);
+// ============================================
+// ✅ STEP 4: PROTECTED ROUTES (REQUIRE AUTH)
+// ============================================
 
-// User routes
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/roles', require('./routes/roleRoutes'));
-app.use('/api/settings', require('./routes/settingsRoutes'));
-app.use('/api/analytics', require('./routes/analyticsRoutes'));
-
-app.use('/api/audit', require('./routes/auditRoutes'));
-app.use('/api/transaction-audit', require('./routes/transactionAuditRoutes'));
-
-app.use('/api/email-notifications', require('./routes/emailNotificationRoutes'));
-
-// In server.js, add after other routes:
-app.use('/api/email', require('./routes/emailTestRoutes'));
+// User routes (require authentication)
+app.use('/api/users', protect, require('./routes/userRoutes'));
+app.use('/api/roles', protect, require('./routes/roleRoutes'));
+app.use('/api/settings', protect, require('./routes/settingsRoutes'));
+app.use('/api/analytics', protect, require('./routes/analyticsRoutes'));
+app.use('/api/audit', protect, require('./routes/auditRoutes'));
+app.use('/api/transaction-audit', protect, require('./routes/transactionAuditRoutes'));
+app.use('/api/email-notifications', protect, require('./routes/emailNotificationRoutes'));
+app.use('/api/email', protect, require('./routes/emailTestRoutes'));
 
 // ============================================
 // 404 HANDLER (BEFORE ERROR HANDLER)
