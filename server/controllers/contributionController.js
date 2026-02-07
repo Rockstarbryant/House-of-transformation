@@ -1,9 +1,13 @@
-// server/controllers/contributionController.js - FIXED VERSION
+// server/controllers/contributionController.js - ✅ MIRRORS PLEDGE PAYMENT PATTERN
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 const asyncHandler = require('../middleware/asyncHandler');
 const Campaign = require('../models/Campaign');
+const Settings = require('../models/Settings');
 const TransactionAuditLog = require('../models/TransactionAuditLog');
+const MpesaService = require('../services/mpesaService');
+const DOMPurify = require('isomorphic-dompurify');
+const validator = require('validator');
 
 const supabase = createClient(
   config.SUPABASE_URL,
@@ -11,47 +15,87 @@ const supabase = createClient(
 );
 
 // ============================================
-// HELPER: Check for duplicate recent contributions
+// CONFIGURATION
 // ============================================
-async function checkDuplicateContribution(contributorName, amount, campaignId, paymentMethod) {
-  // Only check for cash and bank transfers (not M-Pesa STK which auto-generates)
-  if (paymentMethod !== 'cash' && paymentMethod !== 'bank_transfer') {
+const MIN_AMOUNT = 10;
+const MAX_AMOUNT = 500000;
+const DUPLICATE_WINDOW_MINUTES = 8;
+
+// ============================================
+// HELPER: Check idempotency
+// ============================================
+async function isContributionAlreadyProcessed(idempotencyKey, userId) {
+  try {
+    const { data: existing, error } = await supabase
+      .from('contributions')
+      .select('id, status')
+      .eq('idempotency_key', idempotencyKey)
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[CONTRIBUTION-IDEMPOTENCY] Error:', error);
+    }
+
+    return error ? null : existing;
+  } catch (error) {
     return null;
   }
-
-  // Check for same contributor, same amount, same campaign within last 8 minutes
-  const eightMinutesAgo = new Date(Date.now() - 8 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from('contributions')
-    .select('*')
-    .eq('contributor_name', contributorName)
-    .eq('amount', amount)
-    .eq('campaign_id', campaignId)
-    .eq('payment_method', paymentMethod)
-    .gte('created_at', eightMinutesAgo)
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (error) {
-    console.error('[DUPLICATE-CHECK] Error:', error);
-    return null;
-  }
-
-  return data && data.length > 0 ? data[0] : null;
 }
 
 // ============================================
-// HELPER: Enrich contributions with related data
+// HELPER: Sanitize inputs
+// ============================================
+function sanitizeInput(data) {
+  const sanitized = { ...data };
+  
+  if (sanitized.contributorName) {
+    sanitized.contributorName = DOMPurify.sanitize(sanitized.contributorName);
+  }
+  
+  if (sanitized.contributorEmail) {
+    sanitized.contributorEmail = validator.normalizeEmail(sanitized.contributorEmail) || null;
+    if (sanitized.contributorEmail && !validator.isEmail(sanitized.contributorEmail)) {
+      sanitized.contributorEmail = null;
+    }
+  }
+  
+  if (sanitized.notes) {
+    sanitized.notes = DOMPurify.sanitize(sanitized.notes);
+  }
+  
+  return sanitized;
+}
+
+// ============================================
+// HELPER: Validate amount
+// ============================================
+function validateAmount(amount) {
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return { valid: false, message: 'Invalid amount' };
+  }
+  
+  if (amount < MIN_AMOUNT) {
+    return { valid: false, message: `Minimum contribution is KES ${MIN_AMOUNT}` };
+  }
+  
+  if (amount > MAX_AMOUNT) {
+    return { valid: false, message: `Maximum contribution is KES ${MAX_AMOUNT}` };
+  }
+  
+  return { valid: true };
+}
+
+// ============================================
+// HELPER: Enrich contributions
 // ============================================
 async function enrichContributions(contributions) {
   if (!contributions || contributions.length === 0) {
     return [];
   }
 
-  // Enrich with campaign data
+  // Get campaigns
   const campaignIds = [...new Set(contributions.map(c => c.campaign_id).filter(Boolean))];
-  
   const { data: campaigns } = await supabase
     .from('campaigns')
     .select('id, title, campaign_type, status')
@@ -64,7 +108,7 @@ async function enrichContributions(contributions) {
     });
   }
 
-  // Enrich with user data
+  // Get users
   const User = require('../models/User');
   const createdByIds = [...new Set(contributions.map(c => c.created_by_id).filter(Boolean))];
   const verifiedByIds = [...new Set(contributions.map(c => c.verified_by_id).filter(Boolean))];
@@ -77,33 +121,17 @@ async function enrichContributions(contributions) {
 
   const userMap = {};
   users.forEach(u => {
-    // Try multiple field combinations to handle different User model structures
     let userName = 'Unknown User';
-    
-    if (u.name) {
-      // If there's a single "name" field
-      userName = u.name;
-    } else if (u.fullName) {
-      // If there's a "fullName" field
-      userName = u.fullName;
-    } else if (u.firstName && u.lastName) {
-      // If there are separate firstName/lastName fields
-      userName = `${u.firstName} ${u.lastName}`;
-    } else if (u.firstName) {
-      // If only firstName exists
-      userName = u.firstName;
-    } else if (u.email) {
-      // Fallback to email username
-      userName = u.email.split('@')[0];
-    }
-    
+    if (u.name) userName = u.name;
+    else if (u.fullName) userName = u.fullName;
+    else if (u.firstName && u.lastName) userName = `${u.firstName} ${u.lastName}`;
+    else if (u.firstName) userName = u.firstName;
+    else if (u.email) userName = u.email.split('@')[0];
     userMap[u._id.toString()] = userName.trim();
   });
 
-  // Enrich each contribution
   return contributions.map(c => {
     const campaign = campaignMap[c.campaign_id];
-    
     return {
       ...c,
       campaign_title: campaign?.title || null,
@@ -116,10 +144,11 @@ async function enrichContributions(contributions) {
 }
 
 // ============================================
-// CREATE CONTRIBUTION
+// CREATE CONTRIBUTION (Cash/Bank only)
 // ============================================
 exports.createContribution = asyncHandler(async (req, res) => {
   try {
+    const sanitizedData = sanitizeInput(req.body);
     const {
       campaignId,
       contributorName,
@@ -127,12 +156,9 @@ exports.createContribution = asyncHandler(async (req, res) => {
       contributorPhone,
       amount,
       paymentMethod,
-      mpesaRef,
       notes,
       isAnonymous
-    } = req.body;
-
-    console.log('[CONTRIBUTION-CREATE] Creating contribution');
+    } = sanitizedData;
 
     // Validate
     if (!campaignId || !amount || !paymentMethod) {
@@ -142,10 +168,19 @@ exports.createContribution = asyncHandler(async (req, res) => {
       });
     }
 
-    if (amount <= 0) {
+    // ✅ CRITICAL: Only allow cash/bank through this endpoint
+    if (paymentMethod === 'mpesa') {
       return res.status(400).json({
         success: false,
-        message: 'Amount must be greater than 0'
+        message: 'M-Pesa payments must use /mpesa/initiate endpoint'
+      });
+    }
+
+    const amountValidation = validateAmount(amount);
+    if (!amountValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: amountValidation.message
       });
     }
 
@@ -158,7 +193,7 @@ exports.createContribution = asyncHandler(async (req, res) => {
 
     // Get campaign
     const campaign = await Campaign.findById(campaignId);
-    if (!campaign) {
+    if (!campaign || !campaign.supabaseId) {
       return res.status(404).json({ success: false, message: 'Campaign not found' });
     }
 
@@ -166,73 +201,59 @@ exports.createContribution = asyncHandler(async (req, res) => {
       return res.status(400).json({ success: false, message: 'Campaign is not active' });
     }
 
-    if (!campaign.supabaseId) {
-      return res.status(400).json({ success: false, message: 'Campaign not synced' });
+    // Check for duplicates (cash/bank only)
+    const windowStart = new Date(Date.now() - DUPLICATE_WINDOW_MINUTES * 60 * 1000).toISOString();
+    const { data: recentContrib } = await supabase
+      .from('contributions')
+      .select('*')
+      .eq('contributor_name', contributorName || 'Anonymous')
+      .eq('amount', amount)
+      .eq('campaign_id', campaign.supabaseId)
+      .eq('payment_method', paymentMethod)
+      .gte('created_at', windowStart)
+      .limit(1);
+
+    if (recentContrib && recentContrib.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Duplicate contribution detected! A ${paymentMethod} contribution of KES ${amount} was recorded recently.`
+      });
     }
 
-    // ✅ CHECK FOR DUPLICATES (only for manual entries)
-    if (paymentMethod === 'cash' || paymentMethod === 'bank_transfer') {
-      const duplicate = await checkDuplicateContribution(
-        contributorName || 'Anonymous',
-        amount,
-        campaign.supabaseId,
-        paymentMethod
-      );
-
-      if (duplicate) {
-        return res.status(409).json({
-          success: false,
-          message: `Duplicate contribution detected! A ${paymentMethod} contribution of ${amount} from ${contributorName} was recorded ${Math.round((Date.now() - new Date(duplicate.created_at).getTime()) / 60000)} minutes ago. Please wait at least 8 minutes before adding another identical contribution.`,
-          duplicate: {
-            id: duplicate.id,
-            amount: duplicate.amount,
-            created_at: duplicate.created_at
-          }
-        });
-      }
-    }
-
-    // ✅ AUTO-VERIFY FOR ADMIN MANUAL ENTRIES
-    let initialStatus = 'pending';
-    let verifiedAt = null;
-    let verifiedById = null;
-
+    // Auto-verify for admin
     const isAdmin = req.user && (
       req.user.role?.name === 'admin' || 
       req.user.role?.permissions?.includes('manage:donations')
     );
 
-    // Admin manually adding cash/bank = auto-verified
-    if (isAdmin && (paymentMethod === 'cash' || paymentMethod === 'bank_transfer')) {
+    let initialStatus = 'pending';
+    let verifiedAt = null;
+    let verifiedById = null;
+
+    if (isAdmin) {
       initialStatus = 'verified';
       verifiedAt = new Date().toISOString();
       verifiedById = req.user._id.toString();
     }
 
-    // Build insert data
-    const insertData = {
-      campaign_id: campaign.supabaseId,
-      contributor_name: contributorName || 'Anonymous',
-      contributor_email: isAnonymous ? null : (contributorEmail || null),
-      contributor_phone: isAnonymous ? null : (contributorPhone || null),
-      amount: amount,
-      payment_method: paymentMethod,
-      mpesa_ref: mpesaRef || null,
-      notes: notes || null,
-      is_anonymous: isAnonymous || false,
-      status: initialStatus,
-      verified_at: verifiedAt,
-      verified_by_id: verifiedById
-    };
-
-    if (req.user && req.user._id) {
-      insertData.created_by_id = req.user._id.toString();
-    }
-
     // Create contribution
     const { data, error } = await supabase
       .from('contributions')
-      .insert([insertData])
+      .insert([{
+        campaign_id: campaign.supabaseId,
+        contributor_name: contributorName || 'Anonymous',
+        contributor_email: isAnonymous ? null : (contributorEmail || null),
+        contributor_phone: isAnonymous ? null : (contributorPhone || null),
+        amount: amount,
+        payment_method: paymentMethod,
+        notes: notes || null,
+        is_anonymous: isAnonymous || false,
+        status: initialStatus,
+        verified_at: verifiedAt,
+        verified_by_id: verifiedById,
+        created_by_id: req.user?._id?.toString() || null,
+        user_id: req.user?._id?.toString() || null
+      }])
       .select()
       .single();
 
@@ -240,61 +261,197 @@ exports.createContribution = asyncHandler(async (req, res) => {
       console.error('[CONTRIBUTION-CREATE] Error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to record contribution',
-        error: error.message
+        message: 'Failed to record contribution'
       });
     }
 
-    console.log('[CONTRIBUTION-CREATE] Success:', data.id, 'Status:', data.status);
+    // Audit log
+    await TransactionAuditLog.logTransaction({
+      transactionType: 'contribution',
+      transactionId: data.id,
+      userId: req.user?._id?.toString() || 'anonymous',
+      action: isAdmin ? 'admin_contribution_created' : 'contribution_created',
+      amount: amount,
+      paymentMethod: paymentMethod,
+      status: initialStatus
+    }).catch(err => console.error('[AUDIT] Error:', err));
 
-    // Log to audit trail
-    try {
-      await TransactionAuditLog.logTransaction({
-        transactionType: 'contribution',
-        transactionId: data.id,
-        userId: req.user?._id?.toString() || 'anonymous',
-        action: isAdmin ? 'admin_contribution_created' : 'contribution_created',
-        amount: amount,
-        paymentMethod: paymentMethod,
-        status: initialStatus,
-        details: {
-          campaignId: campaign._id.toString(),
-          campaignTitle: campaign.title,
-          contributorName: contributorName || 'Anonymous',
-          isAnonymous,
-          autoVerified: initialStatus === 'verified'
-        }
-      });
-    } catch (auditError) {
-      console.error('[CONTRIBUTION-CREATE] Audit log error:', auditError);
-    }
-
+    const enriched = await enrichContributions([data]);
+    
     res.status(201).json({
       success: true,
-      message: 'Contribution recorded successfully',
-      contribution: data
+      message: initialStatus === 'verified' 
+        ? 'Contribution verified and recorded successfully'
+        : 'Contribution recorded successfully',
+      contribution: enriched[0]
     });
 
   } catch (error) {
     console.error('[CONTRIBUTION-CREATE] Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create contribution',
-      error: error.message
+    res.status(500).json({ 
+      success: false, 
+      message: 'An error occurred while recording the contribution'
     });
   }
 });
 
 // ============================================
-// GET ALL CONTRIBUTIONS (WITH ENRICHMENT)
+// INITIATE M-PESA CONTRIBUTION - ✅ MIRRORS PLEDGE PAYMENT
+// ============================================
+exports.initiateMpesaContributionPayment = asyncHandler(async (req, res) => {
+  const requestId = `contrib_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    const { campaignId, amount, phoneNumber } = req.body;
+    const idempotencyKey = req.idempotencyKey || req.headers['idempotency-key'];
+    const userId = req.user?._id?.toString() || 'anonymous';
+
+    console.log('[CONTRIBUTION-MPESA] Request ID:', requestId);
+    console.log('[CONTRIBUTION-MPESA] Campaign:', campaignId);
+
+    // ✅ IDEMPOTENCY CHECK (mirrors pledge payment)
+    if (idempotencyKey && userId !== 'anonymous') {
+      const existingContrib = await isContributionAlreadyProcessed(idempotencyKey, userId);
+      if (existingContrib) {
+        console.log('[CONTRIBUTION-MPESA] Duplicate request:', idempotencyKey);
+        
+        if (existingContrib.status === 'pending' || existingContrib.status === 'verified') {
+          return res.json({
+            success: true,
+            message: 'Payment already initiated',
+            isDuplicate: true,
+            contributionId: existingContrib.id,
+            status: existingContrib.status
+          });
+        }
+      }
+    }
+
+    // Validate inputs
+    if (!campaignId || !amount || !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Campaign ID, amount, and phone number are required'
+      });
+    }
+
+    const phoneRegex = /^254\d{9}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number. Format: 254XXXXXXXXX'
+      });
+    }
+
+    const amountValidation = validateAmount(amount);
+    if (!amountValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: amountValidation.message
+      });
+    }
+
+    // Get campaign
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign || !campaign.supabaseId) {
+      return res.status(404).json({ success: false, message: 'Campaign not found' });
+    }
+
+    // Get M-Pesa settings
+    const settings = await Settings.getSettings();
+    const mpesa = settings.paymentSettings.mpesa;
+
+    if (!mpesa.enabled) {
+      return res.status(400).json({ success: false, message: 'M-Pesa not enabled' });
+    }
+
+    // ✅ CRITICAL FIX: DON'T CREATE CONTRIBUTION YET
+    // Only create after callback confirms payment (mirrors pledge payment)
+
+    // Initiate STK Push
+    const mpesaService = new MpesaService(mpesa);
+    
+    try {
+      const mpesaResult = await mpesaService.initiateSTKPush(
+        phoneNumber,
+        amount,
+        `CONTRIB_${campaign.supabaseId.substring(0, 8)}`,
+        `Donation to ${campaign.title.substring(0, 20)}`
+      );
+
+      console.log('[CONTRIBUTION-MPESA] STK initiated:', mpesaResult.checkoutRequestId);
+
+      // Store metadata for callback matching
+      await TransactionAuditLog.create({
+        transactionType: 'mpesa_stk_push',
+        transactionId: mpesaResult.checkoutRequestId,
+        userId: userId,
+        action: 'contribution_stk_initiated',
+        amount: amount,
+        paymentMethod: 'mpesa',
+        status: 'pending',
+        metadata: {
+          phoneNumber: phoneNumber,
+          campaignId: campaignId,
+          campaignSupabaseId: campaign.supabaseId,
+          checkoutRequestId: mpesaResult.checkoutRequestId,
+          merchantRequestId: mpesaResult.merchantRequestId,
+          idempotencyKey: idempotencyKey
+        }
+      }).catch(err => console.error('[AUDIT] Error:', err));
+
+      res.json({
+        success: true,
+        message: 'M-Pesa payment initiated successfully',
+        data: {
+          checkoutRequestId: mpesaResult.checkoutRequestId,
+          merchantRequestId: mpesaResult.merchantRequestId,
+          responseCode: mpesaResult.responseCode,
+          responseDescription: mpesaResult.responseDescription,
+          phoneNumber: phoneNumber,
+          amount: amount
+        }
+      });
+
+    } catch (mpesaError) {
+      console.error('[CONTRIBUTION-MPESA] STK Push failed:', mpesaError);
+      
+      await TransactionAuditLog.create({
+        transactionType: 'mpesa_stk_push',
+        transactionId: requestId,
+        userId: userId,
+        action: 'contribution_stk_failed',
+        amount: amount,
+        paymentMethod: 'mpesa',
+        status: 'failed',
+        metadata: {
+          error: mpesaError.message,
+          phoneNumber: phoneNumber,
+          campaignId: campaignId
+        }
+      }).catch(err => console.error('[AUDIT] Error:', err));
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to initiate M-Pesa payment. Please try again.'
+      });
+    }
+
+  } catch (error) {
+    console.error('[CONTRIBUTION-MPESA] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'An error occurred while initiating the payment'
+    });
+  }
+});
+
+// ============================================
+// GET ALL CONTRIBUTIONS
 // ============================================
 exports.getAllContributions = asyncHandler(async (req, res) => {
   try {
-    const { status, paymentMethod, campaignId, page = 1, limit = 1000 } = req.query;
-
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const offset = (pageNum - 1) * limitNum;
+    const { status, paymentMethod, campaignId, page = 1, limit = 100 } = req.query;
 
     let query = supabase.from('contributions').select('*', { count: 'exact' });
 
@@ -302,42 +459,31 @@ exports.getAllContributions = asyncHandler(async (req, res) => {
     if (paymentMethod) query = query.eq('payment_method', paymentMethod);
     if (campaignId) query = query.eq('campaign_id', campaignId);
 
-    const { count } = await query;
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
 
-    // Build the query again for the actual data fetch
-    let dataQuery = supabase
-      .from('contributions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limitNum - 1);
-
-    // Apply same filters to data query
-    if (status) dataQuery = dataQuery.eq('status', status);
-    if (paymentMethod) dataQuery = dataQuery.eq('payment_method', paymentMethod);
-    if (campaignId) dataQuery = dataQuery.eq('campaign_id', campaignId);
-
-    const { data: contributions, error } = await dataQuery;
+    const { data, error, count } = await query;
 
     if (error) {
-      return res.status(500).json({ success: false, error: error.message });
+      console.error('[GET-CONTRIBUTIONS] Error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to fetch contributions' });
     }
 
-    // Enrich contributions
-    const enriched = await enrichContributions(contributions || []);
+    const enriched = await enrichContributions(data || []);
 
     res.json({
       success: true,
       contributions: enriched,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total: count || 0,
-        pages: Math.ceil((count || 0) / limitNum)
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit)
       }
     });
 
   } catch (error) {
-    console.error('[GET-ALL] Error:', error);
+    console.error('[GET-CONTRIBUTIONS] Error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch contributions' });
   }
 });
@@ -349,121 +495,69 @@ exports.verifyContribution = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log('[VERIFY] Starting verification for contribution:', id);
-    console.log('[VERIFY] User ID:', req.user?._id?.toString());
-
-    // Check if user exists
-    if (!req.user || !req.user._id) {
-      console.error('[VERIFY] No user found in request');
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-
     const { data: existing, error: fetchError } = await supabase
       .from('contributions')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (fetchError) {
-      console.error('[VERIFY] Fetch error:', fetchError);
-      return res.status(404).json({ success: false, message: 'Contribution not found', error: fetchError.message });
-    }
-
-    if (!existing) {
-      console.error('[VERIFY] Contribution not found in database');
+    if (fetchError || !existing) {
       return res.status(404).json({ success: false, message: 'Contribution not found' });
     }
 
-    console.log('[VERIFY] Current status:', existing.status);
-
     if (existing.status === 'verified') {
-      console.log('[VERIFY] Already verified');
       return res.status(400).json({ success: false, message: 'Already verified' });
     }
 
-    const updateData = {
-      status: 'verified',
-      verified_by_id: req.user._id.toString(),
-      verified_at: new Date().toISOString()
-    };
-
-    console.log('[VERIFY] Updating with:', updateData);
-
-    const { data, error } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from('contributions')
-      .update(updateData)
+      .update({
+        status: 'verified',
+        verified_at: new Date().toISOString(),
+        verified_by_id: req.user._id.toString()
+      })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      console.error('[VERIFY] Update error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Failed to update contribution',
-        error: error.message 
-      });
+    if (updateError) {
+      console.error('[VERIFY] Error:', updateError);
+      return res.status(500).json({ success: false, message: 'Failed to verify' });
     }
 
-    console.log('[VERIFY] ✅ Successfully updated. New status:', data.status);
-    console.log('[VERIFY] ✅ Verified by ID:', data.verified_by_id);
-    console.log('[VERIFY] ✅ Verified at:', data.verified_at);
+    const [enriched] = await enrichContributions([updated]);
 
-    // ✅ CRITICAL FIX: Enrich the single contribution before returning
-    const enriched = await enrichContributions([data]);
-    const enrichedContribution = enriched[0];
-
-    console.log('[VERIFY] ✅ Enriched contribution:', {
-      id: enrichedContribution.id,
-      status: enrichedContribution.status,
-      verified_by_id: enrichedContribution.verified_by_id,
-      verified_by_name: enrichedContribution.verified_by_name,
-      created_by_name: enrichedContribution.created_by_name
-    });
-
-    // Log audit
-    try {
-      await TransactionAuditLog.logTransaction({
-        transactionType: 'contribution',
-        transactionId: id,
-        userId: req.user._id.toString(),
-        action: 'contribution_verified',
-        amount: existing.amount,
-        paymentMethod: existing.payment_method,
-        status: 'success'
-      });
-    } catch (auditError) {
-      console.error('[VERIFY] Audit error:', auditError);
-    }
-
-    console.log('[VERIFY] ✅ Sending response with enriched contribution');
+    await TransactionAuditLog.logTransaction({
+      transactionType: 'contribution',
+      transactionId: id,
+      userId: req.user._id.toString(),
+      action: 'contribution_verified',
+      amount: existing.amount,
+      paymentMethod: existing.payment_method,
+      status: 'success'
+    }).catch(err => console.error('[AUDIT] Error:', err));
 
     res.json({ 
       success: true, 
       message: 'Contribution verified successfully',
-      contribution: enrichedContribution 
+      contribution: enriched 
     });
 
   } catch (error) {
-    console.error('[VERIFY] Unexpected error:', error);
-    console.error('[VERIFY] Error stack:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to verify contribution',
-      error: error.message 
-    });
+    console.error('[VERIFY] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to verify' });
   }
 });
 
 // ============================================
-// UPDATE CONTRIBUTION (Cash/Bank only)
+// UPDATE CONTRIBUTION
 // ============================================
 exports.updateContribution = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { contributorName, contributorEmail, contributorPhone, amount, notes } = req.body;
+    const sanitized = sanitizeInput(req.body);
+    const { contributorName, contributorEmail, contributorPhone, amount, notes } = sanitized;
 
-    // Get existing
     const { data: existing } = await supabase
       .from('contributions')
       .select('*')
@@ -471,10 +565,9 @@ exports.updateContribution = asyncHandler(async (req, res) => {
       .single();
 
     if (!existing) {
-      return res.status(404).json({ success: false, message: 'Contribution not found' });
+      return res.status(404).json({ success: false, message: 'Not found' });
     }
 
-    // Only allow editing cash/bank
     if (existing.payment_method === 'mpesa') {
       return res.status(400).json({
         success: false,
@@ -482,12 +575,18 @@ exports.updateContribution = asyncHandler(async (req, res) => {
       });
     }
 
-    // Only allow editing pending or failed
     if (existing.status === 'verified') {
       return res.status(400).json({
         success: false,
-        message: 'Cannot edit verified contributions. Please cancel first.'
+        message: 'Cannot edit verified contributions'
       });
+    }
+
+    if (amount !== undefined) {
+      const validation = validateAmount(amount);
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, message: validation.message });
+      }
     }
 
     const updates = {};
@@ -506,7 +605,7 @@ exports.updateContribution = asyncHandler(async (req, res) => {
       .single();
 
     if (error) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, message: 'Failed to update' });
     }
 
     res.json({ success: true, contribution: data });
@@ -518,13 +617,12 @@ exports.updateContribution = asyncHandler(async (req, res) => {
 });
 
 // ============================================
-// DELETE CONTRIBUTION (Cash/Bank only)
+// DELETE CONTRIBUTION - ✅ ENHANCED RULES
 // ============================================
 exports.deleteContribution = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get existing
     const { data: existing } = await supabase
       .from('contributions')
       .select('*')
@@ -532,35 +630,41 @@ exports.deleteContribution = asyncHandler(async (req, res) => {
       .single();
 
     if (!existing) {
-      return res.status(404).json({ success: false, message: 'Contribution not found' });
+      return res.status(404).json({ success: false, message: 'Not found' });
     }
 
-    // Only allow deleting cash/bank
-    if (existing.payment_method === 'mpesa') {
+    // ✅ NEW RULE: Can delete failed, cancelled, or recent pending
+    const canDelete = 
+      existing.status === 'failed' ||
+      existing.status === 'cancelled' ||
+      (existing.status === 'pending' && 
+       existing.payment_method !== 'mpesa') || // Can delete pending cash/bank
+      (existing.status === 'pending' && 
+       existing.payment_method === 'mpesa' &&
+       !existing.mpesa_ref); // Can delete M-Pesa if no checkout ID yet
+
+    if (!canDelete) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot delete M-Pesa contributions'
+        message: existing.status === 'verified'
+          ? 'Cannot delete verified contributions'
+          : 'Cannot delete M-Pesa payment awaiting callback'
       });
     }
 
-    // Cannot delete verified contributions
-    if (existing.status === 'verified') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete verified contributions. Please cancel verification first.'
-      });
-    }
+    await supabase.from('contributions').delete().eq('id', id);
 
-    const { error } = await supabase
-      .from('contributions')
-      .delete()
-      .eq('id', id);
+    await TransactionAuditLog.logTransaction({
+      transactionType: 'contribution',
+      transactionId: id,
+      userId: req.user._id.toString(),
+      action: 'contribution_deleted',
+      amount: existing.amount,
+      paymentMethod: existing.payment_method,
+      status: 'success'
+    }).catch(err => console.error('[AUDIT] Error:', err));
 
-    if (error) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, message: 'Contribution deleted' });
+    res.json({ success: true, message: 'Contribution deleted successfully' });
 
   } catch (error) {
     console.error('[DELETE] Error:', error);
@@ -568,108 +672,4 @@ exports.deleteContribution = asyncHandler(async (req, res) => {
   }
 });
 
-// ============================================
-// INITIATE M-PESA PAYMENT
-// ============================================
-exports.initiateMpesaContributionPayment = asyncHandler(async (req, res) => {
-  try {
-    const { campaignId, amount, phoneNumber } = req.body;
-
-    if (!campaignId || !amount || !phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Campaign ID, amount, and phone number are required'
-      });
-    }
-
-    const phoneRegex = /^254\d{9}$/;
-    if (!phoneRegex.test(phoneNumber)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid phone number. Must be: 254XXXXXXXXX'
-      });
-    }
-
-    if (amount <= 0) {
-      return res.status(400).json({ success: false, message: 'Invalid amount' });
-    }
-
-    const Campaign = require('../models/Campaign');
-    const campaign = await Campaign.findById(campaignId);
-
-    if (!campaign || !campaign.supabaseId) {
-      return res.status(404).json({ success: false, message: 'Campaign not found' });
-    }
-
-    const Settings = require('../models/Settings');
-    const settings = await Settings.getSettings();
-    const mpesa = settings.paymentSettings.mpesa;
-
-    if (!mpesa.enabled) {
-      return res.status(400).json({ success: false, message: 'M-Pesa not enabled' });
-    }
-
-    // Create contribution
-    const { data: contribution, error: contributionError } = await supabase
-      .from('contributions')
-      .insert([{
-        campaign_id: campaign.supabaseId,
-        contributor_name: 'Pending User',
-        contributor_phone: phoneNumber,
-        amount: amount,
-        payment_method: 'mpesa',
-        status: 'pending',
-        is_anonymous: false
-      }])
-      .select()
-      .single();
-
-    if (contributionError) {
-      return res.status(500).json({ success: false, error: contributionError.message });
-    }
-
-    // Call M-Pesa
-    const MpesaService = require('../services/mpesaService');
-    const mpesaService = new MpesaService(mpesa);
-
-    try {
-      const mpesaResult = await mpesaService.initiateSTKPush(
-        phoneNumber,
-        amount,
-        `CONTRIB_${contribution.id}`,
-        mpesa.transactionDesc
-      );
-
-      await supabase
-        .from('contributions')
-        .update({ mpesa_ref: mpesaResult.checkoutRequestId })
-        .eq('id', contribution.id);
-
-      res.json({
-        success: true,
-        message: 'M-Pesa payment initiated',
-        contribution: {
-          id: contribution.id,
-          amount: contribution.amount,
-          checkoutRequestId: mpesaResult.checkoutRequestId
-        }
-      });
-
-    } catch (mpesaError) {
-      await supabase
-        .from('contributions')
-        .update({ status: 'failed' })
-        .eq('id', contribution.id);
-
-      return res.status(500).json({
-        success: false,
-        message: 'M-Pesa failed',
-        error: mpesaError.message
-      });
-    }
-
-  } catch (error) {
-    console.error('[MPESA-INITIATE] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to initiate payment' });
-  }
-});
+module.exports = exports;

@@ -49,6 +49,14 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     // Default will be set to 'member' role ID in pre-save hook or on signup
   },
+
+  // ===== ✨ NEW: Authentication Provider =====
+  authProvider: {
+    type: String,
+    enum: ['email', 'google', 'facebook', 'apple'],
+    default: 'email',
+    required: true
+  },
   
   ministries: [{
     type: String
@@ -133,5 +141,6 @@ userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ isBanned: 1 });
+userSchema.index({ authProvider: 1 });
 
 module.exports = mongoose.model('User', userSchema);

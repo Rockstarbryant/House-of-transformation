@@ -12,12 +12,14 @@ const {
 const { protect } = require('../middleware/supabaseAuth');
 const { optionalAuth } = require('../middleware/supabaseAuth');
 const { requirePermission } = require('../middleware/requirePermission');
+const { idempotencyMiddleware } = require('../middleware/idempotencyMiddleware');
 
 const router = express.Router();
 
 // PUBLIC ROUTES
 router.post('/', optionalAuth, createContribution);
-router.post('/mpesa/initiate', optionalAuth, initiateMpesaContributionPayment);
+router.post('/mpesa/initiate', optionalAuth, idempotencyMiddleware, initiateMpesaContributionPayment);
+
 
 // ADMIN ROUTES
 router.get('/', protect, requirePermission('view:payments:all', 'manage:donations'), getAllContributions);

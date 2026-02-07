@@ -206,6 +206,90 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
+
+/**
+ * POST /api/auth/oauth-sync
+ * Sync OAuth user with MongoDB (create if doesn't exist)
+ * This is called by frontend after successful OAuth sign-in
+ */
+router.post('/oauth-sync', async (req, res) => {
+  try {
+    const { supabase_uid, email, name, provider } = req.body;
+
+    console.log('[AUTH-OAUTH-SYNC] Request for:', email, 'Provider:', provider);
+
+    // Validate input
+    if (!supabase_uid || !email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Supabase UID and email required' 
+      });
+    }
+
+    // Check if user already exists
+    let user = await User.findOne({ supabase_uid });
+
+    if (!user) {
+      console.log('[AUTH-OAUTH-SYNC] Creating new user for OAuth sign-in');
+
+      // Get the 'member' role
+      const memberRole = await Role.findOne({ name: 'member' });
+      
+      if (!memberRole) {
+        console.error('[AUTH-OAUTH-SYNC] Member role not found');
+        return res.status(500).json({ 
+          success: false, 
+          message: 'System error: Default role not configured' 
+        });
+      }
+
+      // Create new user
+      user = await User.create({
+        supabase_uid,
+        name: name || email.split('@')[0],
+        email,
+        role: memberRole._id,
+        isActive: true,
+        authProvider: provider || 'google'
+      });
+
+      console.log('[AUTH-OAUTH-SYNC] New user created:', user._id);
+      await auditService.logAuth('oauth-signup', req, user, true);
+    } else {
+      console.log('[AUTH-OAUTH-SYNC] Existing user found:', user._id);
+      await auditService.logAuth('oauth-login', req, user, true);
+    }
+
+    // Populate role for response
+    const populatedUser = await User.findById(user._id).populate('role');
+
+    res.json({
+      success: true,
+      user: {
+        id: populatedUser._id,
+        supabase_uid: populatedUser.supabase_uid,
+        name: populatedUser.name,
+        email: populatedUser.email,
+        role: {
+          id: populatedUser.role._id,
+          name: populatedUser.role.name,
+          permissions: populatedUser.role.permissions || []
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('[AUTH-OAUTH-SYNC] Error:', error);
+    await auditService.logError(req, error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
+
+
 /**
  * POST /api/auth/refresh
  * Refresh JWT token using refresh token
@@ -249,6 +333,7 @@ router.post('/refresh', async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 
 /**
  * POST /api/auth/forgot-password

@@ -11,7 +11,7 @@ const transactionAuditLogSchema = new mongoose.Schema({
 
   transactionType: {
     type: String,
-    enum: ['payment_initiated', 'payment_success', 'payment_failed', 'pledge_created', 'pledge_updated', 'contribution_recorded', 'contribution_verified', 'contribution'],
+    enum: ['payment_initiated', 'payment_success', 'payment_failed', 'pledge_created', 'pledge_updated', 'contribution_recorded', 'contribution_verified', 'contribution', 'mpesa_stk_push'],
     required: true
   },
 

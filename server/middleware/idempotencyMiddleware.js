@@ -1,4 +1,4 @@
-// server/middleware/idempotencyMiddleware.js
+// server/middleware/idempotencyMiddleware.js - ✅ CORRECTED VERSION
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 
@@ -81,20 +81,31 @@ exports.idempotencyMiddleware = async (req, res, next) => {
     res.send = function(data) {
       responseBody = data;
       
-      // Save idempotency key with response (async, don't block)
+      // ✅ CRITICAL FIX: Save idempotency key with response (async, don't block)
+      // Don't use .catch() - use proper async/await or .then()
       if (res.statusCode < 500) {
-        supabase
-          .from('idempotency_keys')
-          .insert([{
-            idempotency_key: idempotencyKey,
-            user_id: req.user._id.toString(),
-            endpoint: req.path,
-            method: req.method,
-            response_status: res.statusCode,
-            response_body: JSON.stringify(data),
-            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-          }])
-          .catch(err => console.error('[IDEMPOTENCY] Failed to store response:', err));
+        // Use IIFE to handle async operation without blocking
+        (async () => {
+          try {
+            const { error: insertError } = await supabase
+              .from('idempotency_keys')
+              .insert([{
+                idempotency_key: idempotencyKey,
+                user_id: req.user._id.toString(),
+                endpoint: req.path,
+                method: req.method,
+                response_status: res.statusCode,
+                response_body: JSON.stringify(data),
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+              }]);
+            
+            if (insertError) {
+              console.error('[IDEMPOTENCY] Failed to store response:', insertError);
+            }
+          } catch (err) {
+            console.error('[IDEMPOTENCY] Failed to store response:', err);
+          }
+        })();
       }
 
       // Call original send

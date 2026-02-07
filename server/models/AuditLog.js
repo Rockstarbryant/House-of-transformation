@@ -107,7 +107,7 @@ const auditLogSchema = new mongoose.Schema({
   // Request Details
   method: {
     type: String,
-    enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     required: true
   },
   endpoint: {

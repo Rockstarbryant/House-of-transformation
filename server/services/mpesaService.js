@@ -166,6 +166,27 @@ class MpesaService {
       throw error;
     }
   }
+
+  async registerC2BUrls(validationUrl, confirmationUrl) {
+  const accessToken = await this.getAccessToken();
+  
+  const response = await axios.post(
+    `${this.baseUrl}/mpesa/c2b/v1/registerurl`,
+    {
+      ShortCode: this.shortCode,
+      ResponseType: 'Completed', // or 'Cancelled'
+      ConfirmationURL: confirmationUrl,
+      ValidationURL: validationUrl
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+  
+  return response.data;
+}
 }
 
 module.exports = MpesaService;

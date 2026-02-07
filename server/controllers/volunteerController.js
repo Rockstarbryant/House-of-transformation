@@ -178,7 +178,7 @@ exports.apply = async (req, res) => {
 
     // Create application
     const application = await Volunteer.create({
-      user: req.user.id,
+      user: req.user._id,
       fullName,
       email: email.toLowerCase(),
       phone,

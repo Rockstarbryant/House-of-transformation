@@ -119,6 +119,7 @@ app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/contributions', require('./routes/contributionRoutes'));
 app.use('/api/pledges', require('./routes/pledgeRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/mpesa', require('./routes/mpesaCallbackRoutes'));
 app.use('/api/donations/analytics', require('./routes/donationAnalyticsRoutes'));
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
@@ -166,6 +167,9 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+
+const { initializeCleanupJobs } = require('./utils/cleanupJobs');
+initializeCleanupJobs();
 
 app.listen(PORT, () => {
   console.log(`✓ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
