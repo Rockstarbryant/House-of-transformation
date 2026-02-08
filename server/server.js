@@ -62,7 +62,8 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-Requested-With', 'X-CSRF-Token', 'Accept', 'Accept-Language', 'Authorization'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  exposedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ===== STATIC FILES =====
@@ -142,6 +143,7 @@ app.use('/api/users', protect, require('./routes/userRoutes'));
 app.use('/api/roles', protect, require('./routes/roleRoutes'));
 app.use('/api/settings', protect, require('./routes/settingsRoutes'));
 app.use('/api/analytics', protect, require('./routes/analyticsRoutes'));
+//app.use('/api/analytics', protect, require('./routes/analyticsRoutes'));
 app.use('/api/audit', protect, require('./routes/auditRoutes'));
 app.use('/api/transaction-audit', protect, require('./routes/transactionAuditRoutes'));
 app.use('/api/email-notifications', protect, require('./routes/emailNotificationRoutes'));

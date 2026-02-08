@@ -22,68 +22,68 @@ const router = express.Router();
 console.log('[ANNOUNCEMENT-ROUTES] Initializing announcement routes...');
 
 // ============================================
-// SSE STREAM (Protected - All authenticated users)
-// Uses special SSE auth that accepts token from query param
+// SSE STREAM - Manual CORS handling
 // ============================================
+
+// ✅ Handle OPTIONS preflight for /stream
+router.options('/stream', (req, res) => {
+  const origin = req.headers.origin;
+  
+  console.log('[SSE-OPTIONS] Preflight request from:', origin);
+  
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  res.status(204).end();
+});
+
+// ✅ SSE GET endpoint
 router.get('/stream', protectSSE, streamAnnouncements);
 
 // ============================================
-// PUBLIC/AUTHENTICATED USER ROUTES
+// SPECIFIC ROUTES (MUST COME BEFORE /:id)
 // ============================================
 
-// Get all announcements (with filters) - All authenticated users
-router.get('/', protect, getAllAnnouncements);
-
-// Get single announcement - All authenticated users
-router.get('/:id', protect, getAnnouncementById);
-
-// Mark announcement as read - All authenticated users
-router.post('/:id/read', protect, markAsRead);
-
-// Mark all announcements as read - All authenticated users
-router.post('/read/all', protect, markAllAsRead);
-
-// Get unread count - All authenticated users
+// Get unread count
 router.get('/count/unread', protect, getUnreadCount);
 
-// Clear all notifications - All authenticated users
+// Get statistics
+router.get('/stats/overview', protect, requirePermission('manage:announcements'), getStatistics);
+
+// Mark all as read
+router.post('/read/all', protect, markAllAsRead);
+
+// Clear all
 router.post('/clear/all', protect, clearAllNotifications);
 
 // ============================================
-// PROTECTED ROUTES (Require manage:announcements permission)
+// GENERAL ROUTES
 // ============================================
 
-// Create announcement - Requires permission
-router.post(
-  '/',
-  protect,
-  requirePermission('manage:announcements'),
-  createAnnouncement
-);
+// Get all announcements
+router.get('/', protect, getAllAnnouncements);
 
-// Update announcement - Requires permission
-router.patch(
-  '/:id',
-  protect,
-  requirePermission('manage:announcements'),
-  updateAnnouncement
-);
+// Create announcement
+router.post('/', protect, requirePermission('manage:announcements'), createAnnouncement);
 
-// Delete announcement - Requires permission
-router.delete(
-  '/:id',
-  protect,
-  requirePermission('manage:announcements'),
-  deleteAnnouncement
-);
+// ============================================
+// DYNAMIC ID ROUTES (MUST BE LAST)
+// ============================================
 
-// Get statistics - Requires permission
-router.get(
-  '/stats/overview',
-  protect,
-  requirePermission('manage:announcements'),
-  getStatistics
-);
+// Get single announcement
+router.get('/:id', protect, getAnnouncementById);
+
+// Mark announcement as read
+router.post('/:id/read', protect, markAsRead);
+
+// Update announcement
+router.patch('/:id', protect, requirePermission('manage:announcements'), updateAnnouncement);
+
+// Delete announcement
+router.delete('/:id', protect, requirePermission('manage:announcements'), deleteAnnouncement);
 
 console.log('[ANNOUNCEMENT-ROUTES] Routes registered successfully');
 

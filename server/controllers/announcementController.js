@@ -36,55 +36,94 @@ const broadcastToClients = (data) => {
 exports.streamAnnouncements = async (req, res) => {
   try {
     console.log('[SSE] New SSE connection request');
+    console.log('[SSE] User:', req.user?.email || 'Unknown');
+    console.log('[SSE] Origin:', req.headers.origin);
 
-    // Set headers for SSE
+    // ✅ CRITICAL: Set CORS headers FIRST
+    const origin = req.headers.origin || 'http://localhost:3000';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Cache-Control, Connection');
+
+    // ✅ Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering for nginx
+    res.setHeader('X-Accel-Buffering', 'no');
+    
+    // ✅ Important: Set status code explicitly
+    res.status(200);
+    
+    // Send initial comment to establish connection
     res.write(': SSE stream initialized\n\n');
 
     // Add this client to the list
     addSSEClient(res);
 
     // Send initial connection message
-    res.write(`data: ${JSON.stringify({ type: 'connected', message: 'SSE connection established' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ 
+      type: 'connected', 
+      message: 'SSE connection established',
+      timestamp: Date.now()
+    })}\n\n`);
 
     // Send current unread count
     if (req.user) {
-      const unreadCount = await Announcement.countDocuments({
-        isActive: true,
-        'readBy.user': { $ne: req.user._id },
-        $or: [
-          { expiresAt: null },
-          { expiresAt: { $gt: new Date() } }
-        ]
-      });
+      try {
+        const unreadCount = await Announcement.countDocuments({
+          isActive: true,
+          'readBy.user': { $ne: req.user._id },
+          $or: [
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } }
+          ]
+        });
 
-      res.write(`data: ${JSON.stringify({ 
-        type: 'unreadCount', 
-        count: unreadCount 
-      })}\n\n`);
+        res.write(`data: ${JSON.stringify({ 
+          type: 'unreadCount', 
+          count: unreadCount 
+        })}\n\n`);
+        
+        console.log('[SSE] Sent unread count:', unreadCount);
+      } catch (countError) {
+        console.error('[SSE] Error getting unread count:', countError);
+      }
     }
 
     // Keep connection alive with heartbeat
     const heartbeat = setInterval(() => {
-      res.write(`:heartbeat\n\n`);
+      try {
+        res.write(':heartbeat\n\n');
+      } catch (err) {
+        console.error('[SSE] Heartbeat error:', err);
+        clearInterval(heartbeat);
+      }
     }, 30000); // Every 30 seconds
 
     // Clean up on client disconnect
     req.on('close', () => {
+      console.log('[SSE] Client disconnected:', req.user?.email);
       clearInterval(heartbeat);
       removeSSEClient(res);
-      console.log('[SSE] Client connection closed');
+    });
+
+    req.on('error', (err) => {
+      console.error('[SSE] Request error:', err);
+      clearInterval(heartbeat);
+      removeSSEClient(res);
     });
 
   } catch (error) {
     console.error('[SSE] Stream error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to establish SSE connection'
-    });
+    
+    // If headers not sent yet, send error response
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to establish SSE connection',
+        error: error.message
+      });
+    }
   }
 };
 

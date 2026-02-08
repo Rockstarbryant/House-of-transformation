@@ -579,18 +579,12 @@ exports.manualRegisterUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    User self-deletion
+
+// @desc    User self-deletion - UPDATED to handle OAuth users
 // @route   DELETE /api/users/me/delete-account
 // @access  Private
 exports.deleteSelfAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Password is required to delete account'
-    });
-  }
 
   const user = await User.findById(req.user._id).populate('role');
 
@@ -607,20 +601,37 @@ exports.deleteSelfAccount = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Verify password by trying to sign in with Supabase
-    const { createClient } = require('@supabase/supabase-js');
-    const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-    
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: password
-    });
+    // ✨ NEW: Check if user signed up with OAuth (Google, Facebook, etc.)
+    const isOAuthUser = user.authProvider && user.authProvider !== 'email';
 
-    if (signInError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid password'
+    // Only verify password for email/password users
+    if (!isOAuthUser) {
+      // Require password for email/password accounts
+      if (!password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password is required to delete account'
+        });
+      }
+
+      // Verify password by trying to sign in with Supabase
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+      
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: password
       });
+
+      if (signInError) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid password'
+        });
+      }
+    } else {
+      // ✨ OAuth users don't need password verification
+      console.log('[SELF-DELETE] OAuth user detected, skipping password verification');
     }
 
     // Step 1: Delete from Supabase

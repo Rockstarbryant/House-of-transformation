@@ -1,378 +1,797 @@
-// server/controllers/analyticsController.js
+// server/controllers/analyticsController.js - COMPLETE ANALYTICS BACKEND
 const User = require('../models/User');
-const Event = require('../models/Event');
 const Sermon = require('../models/Sermon');
 const Blog = require('../models/Blog');
-const Volunteer = require('../models/Volunteer');
-const Feedback = require('../models/Feedback');
+const Event = require('../models/Event');
 const Gallery = require('../models/Gallery');
+const Feedback = require('../models/Feedback');
+const Volunteer = require('../models/Volunteer');
 const Livestream = require('../models/livestreamModel');
+const Campaign = require('../models/Campaign');
+const EmailLog = require('../models/EmailLog');
+const Announcement = require('../models/Announcement');
 const AuditLog = require('../models/AuditLog');
-const asyncHandler = require('../middleware/asyncHandler');
+const BannedUser = require('../models/BannedUser');
 
-// ============================================
-// OVERVIEW DASHBOARD
-// ============================================
-
-// @desc    Get dashboard overview stats
-// @route   GET /api/analytics/overview
-// @access  Private (view:analytics permission)
-exports.getOverview = asyncHandler(async (req, res) => {
+/**
+ * Get Overview Analytics
+ * @route GET /api/analytics/overview
+ * @access Private (Admin)
+ */
+exports.getOverview = async (req, res) => {
   try {
-    console.log('[ANALYTICS-OVERVIEW] Fetching overview stats');
-
     const [
       totalUsers,
-      totalEvents,
       totalSermons,
       totalBlogs,
-      totalVolunteers,
-      totalFeedback,
+      totalEvents,
       totalGallery,
-      totalLivestreams,
-      activeUsers,
-      upcomingEvents,
-      recentSermons,
-      pendingVolunteers
+      totalFeedback,
+      totalVolunteers,
+      totalCampaigns
     ] = await Promise.all([
-      User.countDocuments(),
-      Event.countDocuments(),
+      User.countDocuments({ isActive: true, isBanned: false }),
       Sermon.countDocuments(),
       Blog.countDocuments(),
-      Volunteer.countDocuments(),
-      Feedback.countDocuments(),
+      Event.countDocuments(),
       Gallery.countDocuments(),
-      Livestream.countDocuments(),
-      User.countDocuments({ isActive: true }),
-      Event.countDocuments({ date: { $gte: new Date() } }),
-      Sermon.countDocuments({ date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }),
-      Volunteer.countDocuments({ status: 'pending' })
+      Feedback.countDocuments({ isDeleted: false }),
+      Volunteer.countDocuments(),
+      Campaign.countDocuments()
+    ]);
+
+    // Calculate total donations from campaigns
+    const campaignAggregation = await Campaign.aggregate([
+      { $group: { _id: null, total: { $sum: '$currentAmount' } } }
+    ]);
+    const totalDonations = campaignAggregation[0]?.total || 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalUsers,
+        totalSermons,
+        totalBlogs,
+        totalEvents,
+        totalGallery,
+        totalFeedback,
+        totalVolunteers,
+        totalDonations
+      }
+    });
+  } catch (error) {
+    console.error('[Analytics] Overview error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch overview analytics'
+    });
+  }
+};
+
+/**
+ * Get User Analytics
+ * @route GET /api/analytics/users
+ * @access Private (Admin)
+ */
+exports.getUserAnalytics = async (req, res) => {
+  try {
+    // Total counts
+    const [total, active, banned] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isActive: true, isBanned: false }),
+      User.countDocuments({ isBanned: true })
+    ]);
+
+    // New users this month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const newThisMonth = await User.countDocuments({
+      createdAt: { $gte: startOfMonth }
+    });
+
+    // Users by role
+    const byRole = await User.aggregate([
+      { $match: { isActive: true, isBanned: false } },
+      {
+        $lookup: {
+          from: 'roles',
+          localField: 'role',
+          foreignField: '_id',
+          as: 'roleInfo'
+        }
+      },
+      { $unwind: { path: '$roleInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { $ifNull: ['$roleInfo.name', 'member'] },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Users by gender
+    const byGender = await User.aggregate([
+      { $match: { isActive: true, isBanned: false } },
+      {
+        $group: {
+          _id: '$gender',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Users by auth provider
+    const byAuthProvider = await User.aggregate([
+      { $match: { isActive: true, isBanned: false } },
+      {
+        $group: {
+          _id: '$authProvider',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Growth trend (last 12 months)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const growthTrend = await User.aggregate([
+      { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
     res.json({
       success: true,
-      stats: {
-        users: { total: totalUsers, active: activeUsers },
-        events: { total: totalEvents, upcoming: upcomingEvents },
-        sermons: { total: totalSermons, recent: recentSermons },
-        blogs: { total: totalBlogs },
-        volunteers: { total: totalVolunteers, pending: pendingVolunteers },
-        feedback: { total: totalFeedback },
-        gallery: { total: totalGallery },
-        livestreams: { total: totalLivestreams }
+      data: {
+        total,
+        active,
+        banned,
+        newThisMonth,
+        byRole,
+        byGender,
+        byAuthProvider,
+        growthTrend
       }
     });
   } catch (error) {
-    console.error('[ANALYTICS-OVERVIEW] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch overview', error: error.message });
+    console.error('[Analytics] User analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user analytics'
+    });
   }
-});
+};
 
-// ============================================
-// USER ANALYTICS
-// ============================================
-
-// @desc    Get user analytics
-// @route   GET /api/analytics/users
-// @access  Private
-exports.getUserAnalytics = asyncHandler(async (req, res) => {
+/**
+ * Get Content Analytics
+ * @route GET /api/analytics/content
+ * @access Private (Admin)
+ */
+exports.getContentAnalytics = async (req, res) => {
   try {
-    console.log('[ANALYTICS-USERS] Fetching user analytics');
+    // ========== SERMONS ==========
+    const totalSermons = await Sermon.countDocuments();
+    
+    const sermonsByCategory = await Sermon.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
 
-    const [roleDistribution, statusDistribution, growthData] = await Promise.all([
-      User.aggregate([
-        { $lookup: { from: 'roles', localField: 'role', foreignField: '_id', as: 'roleData' } },
-        { $unwind: { path: '$roleData', preserveNullAndEmptyArrays: true } },
-        { $group: { _id: '$roleData.name', count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-      User.aggregate([
-        { $group: { _id: '$isActive', count: { $sum: 1 } } }
-      ]),
-      User.aggregate([
-        {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' }
-            },
-            count: { $sum: 1 }
+    const sermonsByType = await Sermon.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const sermonLikesViews = await Sermon.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalLikes: { $sum: '$likes' },
+          totalViews: { $sum: '$views' }
+        }
+      }
+    ]);
+
+    const sermonTrend = await Sermon.aggregate([
+      {
+        $match: {
+          date: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$date' },
+            month: { $month: '$date' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    // ========== BLOGS ==========
+    const totalBlogs = await Blog.countDocuments();
+    const approvedBlogs = await Blog.countDocuments({ approved: true });
+    const pendingBlogs = await Blog.countDocuments({ approved: false });
+
+    const blogsByCategory = await Blog.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const blogLikes = await Blog.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalLikes: { $sum: { $size: '$likes' } }
+        }
+      }
+    ]);
+
+    const blogTrend = await Blog.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    // ========== GALLERY ==========
+    const totalGallery = await Gallery.countDocuments();
+
+    const galleryByCategory = await Gallery.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const galleryLikes = await Gallery.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalLikes: { $sum: '$likes' }
+        }
+      }
+    ]);
+
+    const galleryTrend = await Gallery.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    // ========== EVENTS ==========
+    const totalEvents = await Event.countDocuments();
+    const now = new Date();
+    const upcomingEvents = await Event.countDocuments({ date: { $gte: now } });
+    const pastEvents = await Event.countDocuments({ date: { $lt: now } });
+
+    const eventRegistrations = await Event.aggregate([
+      {
+        $project: {
+          totalRegs: { $size: { $ifNull: ['$registrations', []] } },
+          memberRegs: {
+            $size: {
+              $filter: {
+                input: { $ifNull: ['$registrations', []] },
+                as: 'reg',
+                cond: { $eq: ['$$reg.isVisitor', false] }
+              }
+            }
+          },
+          visitorRegs: {
+            $size: {
+              $filter: {
+                input: { $ifNull: ['$registrations', []] },
+                as: 'reg',
+                cond: { $eq: ['$$reg.isVisitor', true] }
+              }
+            }
           }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } },
-        { $limit: 12 }
-      ])
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRegistrations: { $sum: '$totalRegs' },
+          memberRegistrations: { $sum: '$memberRegs' },
+          visitorRegistrations: { $sum: '$visitorRegs' }
+        }
+      }
+    ]);
+
+    const eventTrend = await Event.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
     res.json({
       success: true,
-      analytics: {
-        roleDistribution,
-        statusDistribution,
-        growthData
+      data: {
+        sermons: {
+          total: totalSermons,
+          byCategory: sermonsByCategory,
+          byType: sermonsByType,
+          totalLikes: sermonLikesViews[0]?.totalLikes || 0,
+          totalViews: sermonLikesViews[0]?.totalViews || 0,
+          recentTrend: sermonTrend
+        },
+        blogs: {
+          total: totalBlogs,
+          approved: approvedBlogs,
+          pending: pendingBlogs,
+          byCategory: blogsByCategory,
+          totalLikes: blogLikes[0]?.totalLikes || 0,
+          recentTrend: blogTrend
+        },
+        gallery: {
+          total: totalGallery,
+          byCategory: galleryByCategory,
+          totalLikes: galleryLikes[0]?.totalLikes || 0,
+          recentTrend: galleryTrend
+        },
+        events: {
+          total: totalEvents,
+          upcoming: upcomingEvents,
+          past: pastEvents,
+          totalRegistrations: eventRegistrations[0]?.totalRegistrations || 0,
+          memberRegistrations: eventRegistrations[0]?.memberRegistrations || 0,
+          visitorRegistrations: eventRegistrations[0]?.visitorRegistrations || 0,
+          recentTrend: eventTrend
+        }
       }
     });
   } catch (error) {
-    console.error('[ANALYTICS-USERS] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch user analytics', error: error.message });
+    console.error('[Analytics] Content analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch content analytics'
+    });
   }
-});
+};
 
-// ============================================
-// CONTENT ANALYTICS
-// ============================================
-
-// @desc    Get content analytics
-// @route   GET /api/analytics/content
-// @access  Private
-exports.getContentAnalytics = asyncHandler(async (req, res) => {
+/**
+ * Get Engagement Analytics
+ * @route GET /api/analytics/engagement
+ * @access Private (Admin)
+ */
+exports.getEngagementAnalytics = async (req, res) => {
   try {
-    console.log('[ANALYTICS-CONTENT] Fetching content analytics');
+    // ========== FEEDBACK ==========
+    const totalFeedback = await Feedback.countDocuments({ isDeleted: false });
 
-    const [
-      sermonsByCategory,
-      sermonsByMonth,
-      topSermons,
-      blogsByCategory,
-      topBlogs,
-      galleryByCategory
-    ] = await Promise.all([
-      Sermon.aggregate([
-        { $group: { _id: '$category', count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-      Sermon.aggregate([
-        {
-          $group: {
-            _id: { year: { $year: '$date' }, month: { $month: '$date' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } },
-        { $limit: 12 }
-      ]),
-      Sermon.find().sort({ views: -1, likes: -1 }).limit(10).select('title pastor views likes date'),
-      Blog.aggregate([
-        { $group: { _id: '$category', count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-      Blog.find().sort({ 'likes': -1 }).limit(10).select('title category createdAt').populate('author', 'name'),
-      Gallery.aggregate([
-        { $group: { _id: '$category', count: { $sum: 1 }, totalLikes: { $sum: '$likes' } } },
-        { $sort: { count: -1 } }
-      ])
+    const feedbackByCategory = await Feedback.aggregate([
+      { $match: { isDeleted: false } },
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
     ]);
 
-    res.json({
-      success: true,
-      analytics: {
-        sermons: { byCategory: sermonsByCategory, byMonth: sermonsByMonth, top: topSermons },
-        blogs: { byCategory: blogsByCategory, top: topBlogs },
-        gallery: { byCategory: galleryByCategory }
-      }
+    const feedbackByStatus = await Feedback.aggregate([
+      { $match: { isDeleted: false } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const anonymousFeedback = await Feedback.countDocuments({
+      isDeleted: false,
+      isAnonymous: true
     });
-  } catch (error) {
-    console.error('[ANALYTICS-CONTENT] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch content analytics', error: error.message });
-  }
-});
 
-// ============================================
-// ENGAGEMENT ANALYTICS
-// ============================================
-
-// @desc    Get engagement analytics
-// @route   GET /api/analytics/engagement
-// @access  Private
-exports.getEngagementAnalytics = asyncHandler(async (req, res) => {
-  try {
-    console.log('[ANALYTICS-ENGAGEMENT] Fetching engagement analytics');
-
-    const [
-      feedbackStats,
-      volunteerStats,
-      eventRegistrations,
-      livestreamStats
-    ] = await Promise.all([
-      Feedback.aggregate([
-        {
-          $facet: {
-            byCategory: [{ $group: { _id: '$category', count: { $sum: 1 } } }],
-            byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-            recentCount: [
-              { $match: { submittedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } },
-              { $count: 'count' }
+    // Average response time (in hours)
+    const responseTimeData = await Feedback.aggregate([
+      {
+        $match: {
+          isDeleted: false,
+          respondedAt: { $exists: true },
+          submittedAt: { $exists: true }
+        }
+      },
+      {
+        $project: {
+          responseTime: {
+            $divide: [
+              { $subtract: ['$respondedAt', '$submittedAt'] },
+              1000 * 60 * 60 // Convert to hours
             ]
           }
         }
-      ]),
-      Volunteer.aggregate([
-        {
-          $facet: {
-            byMinistry: [{ $group: { _id: '$ministry', count: { $sum: 1 } } }],
-            byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
-            thisMonth: [
-              { $match: { appliedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
-              { $count: 'count' }
-            ]
-          }
+      },
+      {
+        $group: {
+          _id: null,
+          avgResponseTime: { $avg: '$responseTime' }
         }
-      ]),
-      Event.aggregate([
-        { $unwind: '$registrations' },
-        {
-          $group: {
-            _id: {
-              year: { $year: '$registrations.registeredAt' },
-              month: { $month: '$registrations.registeredAt' }
-            },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } },
-        { $limit: 12 }
-      ]),
-      Livestream.aggregate([
-        {
-          $group: {
-            _id: '$status',
-            count: { $sum: 1 },
-            totalViews: { $sum: '$viewCount' },
-            avgViews: { $avg: '$viewCount' }
-          }
+      }
+    ]);
+
+    // ========== VOLUNTEERS ==========
+    const totalVolunteers = await Volunteer.countDocuments();
+
+    const volunteersByStatus = await Volunteer.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const volunteersByMinistry = await Volunteer.aggregate([
+      { $group: { _id: '$ministry', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const totalHours = await Volunteer.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalHours: { $sum: '$hours' }
         }
-      ])
+      }
+    ]);
+
+    // ========== LIVESTREAMS ==========
+    const totalLivestreams = await Livestream.countDocuments();
+
+    const livestreamsByStatus = await Livestream.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const livestreamStats = await Livestream.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: '$viewCount' },
+          avgDuration: { $avg: '$duration' }
+        }
+      }
     ]);
 
     res.json({
       success: true,
-      analytics: {
-        feedback: feedbackStats[0],
-        volunteers: volunteerStats[0],
-        eventRegistrations,
-        livestreams: livestreamStats
+      data: {
+        feedback: {
+          total: totalFeedback,
+          byCategory: feedbackByCategory,
+          byStatus: feedbackByStatus,
+          anonymous: anonymousFeedback,
+          avgResponseTime: Math.round(responseTimeData[0]?.avgResponseTime || 0)
+        },
+        volunteers: {
+          total: totalVolunteers,
+          byStatus: volunteersByStatus,
+          byMinistry: volunteersByMinistry,
+          totalHours: totalHours[0]?.totalHours || 0
+        },
+        livestreams: {
+          total: totalLivestreams,
+          byStatus: livestreamsByStatus,
+          totalViews: livestreamStats[0]?.totalViews || 0,
+          avgDuration: Math.round(livestreamStats[0]?.avgDuration || 0)
+        }
       }
     });
   } catch (error) {
-    console.error('[ANALYTICS-ENGAGEMENT] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch engagement analytics', error: error.message });
+    console.error('[Analytics] Engagement analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch engagement analytics'
+    });
   }
-});
+};
 
-// ============================================
-// ACTIVITY TIMELINE
-// ============================================
-
-// @desc    Get recent activity timeline
-// @route   GET /api/analytics/activity
-// @access  Private
-exports.getRecentActivity = asyncHandler(async (req, res) => {
+/**
+ * Get Financial Analytics
+ * @route GET /api/analytics/financial
+ * @access Private (Admin)
+ */
+exports.getFinancialAnalytics = async (req, res) => {
   try {
-    const { limit = 20 } = req.query;
+    // ========== CAMPAIGNS ==========
+    const totalCampaigns = await Campaign.countDocuments();
+    const activeCampaigns = await Campaign.countDocuments({ status: 'active' });
+    const completedCampaigns = await Campaign.countDocuments({ status: 'completed' });
 
-    console.log('[ANALYTICS-ACTIVITY] Fetching recent activity');
+    const campaignsByType = await Campaign.aggregate([
+      { $group: { _id: '$campaignType', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
 
-    const recentLogs = await AuditLog.find({ success: true })
+    const campaignFinancials = await Campaign.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalGoal: { $sum: '$goalAmount' },
+          totalRaised: { $sum: '$currentAmount' }
+        }
+      }
+    ]);
+
+    const completionRate = campaignFinancials[0]?.totalGoal > 0
+      ? Math.round((campaignFinancials[0]?.totalRaised / campaignFinancials[0]?.totalGoal) * 100)
+      : 0;
+
+    // ========== PLEDGES ==========
+    const Pledge = require('../models/Pledge');
+    const totalPledges = await Pledge.countDocuments();
+
+    const pledgeStats = await Pledge.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    const pledgesByStatus = await Pledge.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const fulfilledPledges = await Pledge.countDocuments({ status: 'fulfilled' });
+    const fulfillmentRate = totalPledges > 0
+      ? Math.round((fulfilledPledges / totalPledges) * 100)
+      : 0;
+
+    // ========== PAYMENTS ==========
+    const Payment = require('../models/Payment');
+    const totalPayments = await Payment.countDocuments();
+
+    const paymentStats = await Payment.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    const paymentsByMethod = await Payment.aggregate([
+      { $group: { _id: '$paymentMethod', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const successfulPayments = await Payment.countDocuments({ status: 'success' });
+    const successRate = totalPayments > 0
+      ? Math.round((successfulPayments / totalPayments) * 100)
+      : 0;
+
+    // Monthly payment trend
+    const monthlyTrend = await Payment.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: new Date(Date.now() - 12 * 30 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        campaigns: {
+          total: totalCampaigns,
+          active: activeCampaigns,
+          completed: completedCampaigns,
+          byType: campaignsByType,
+          totalGoal: campaignFinancials[0]?.totalGoal || 0,
+          totalRaised: campaignFinancials[0]?.totalRaised || 0,
+          completionRate
+        },
+        pledges: {
+          total: totalPledges,
+          totalAmount: pledgeStats[0]?.totalAmount || 0,
+          byStatus: pledgesByStatus,
+          fulfillmentRate
+        },
+        payments: {
+          total: totalPayments,
+          totalAmount: paymentStats[0]?.totalAmount || 0,
+          byMethod: paymentsByMethod,
+          successRate,
+          monthlyTrend
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[Analytics] Financial analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch financial analytics'
+    });
+  }
+};
+
+/**
+ * Get Communication Analytics
+ * @route GET /api/analytics/communication
+ * @access Private (Admin)
+ */
+exports.getCommunicationAnalytics = async (req, res) => {
+  try {
+    // ========== EMAIL LOGS ==========
+    const totalEmails = await EmailLog.countDocuments();
+
+    const emailsByType = await EmailLog.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const emailStats = await EmailLog.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalSent: { $sum: '$totalRecipients' },
+          totalSuccess: { $sum: '$successCount' }
+        }
+      }
+    ]);
+
+    const successRate = emailStats[0]?.totalSent > 0
+      ? Math.round((emailStats[0]?.totalSuccess / emailStats[0]?.totalSent) * 100)
+      : 0;
+
+    // ========== ANNOUNCEMENTS ==========
+    const totalAnnouncements = await Announcement.countDocuments();
+    const activeAnnouncements = await Announcement.countDocuments({
+      isActive: true,
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    });
+
+    const announcementsByPriority = await Announcement.aggregate([
+      { $group: { _id: '$priority', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const readRateData = await Announcement.aggregate([
+      {
+        $project: {
+          totalViews: '$statistics.totalViews',
+          totalReads: '$statistics.totalReads'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgViews: { $avg: '$totalViews' },
+          avgReads: { $avg: '$totalReads' }
+        }
+      }
+    ]);
+
+    const avgReadRate = readRateData[0]?.avgViews > 0
+      ? Math.round((readRateData[0]?.avgReads / readRateData[0]?.avgViews) * 100)
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        emails: {
+          totalSent: emailStats[0]?.totalSent || 0,
+          successRate,
+          byType: emailsByType
+        },
+        announcements: {
+          total: totalAnnouncements,
+          active: activeAnnouncements,
+          byPriority: announcementsByPriority,
+          avgReadRate
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[Analytics] Communication analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch communication analytics'
+    });
+  }
+};
+
+/**
+ * Get System Analytics
+ * @route GET /api/analytics/system
+ * @access Private (Admin)
+ */
+exports.getSystemAnalytics = async (req, res) => {
+  try {
+    // ========== AUDIT LOGS ==========
+    const auditStats = await AuditLog.getStats();
+
+    // Recent activity (last 50)
+    const recentActivity = await AuditLog.find()
       .sort({ timestamp: -1 })
-      .limit(parseInt(limit))
-      .populate('user', 'name email')
+      .limit(50)
+      .select('action userName userEmail timestamp success statusCode endpoint')
       .lean();
 
-    res.json({
-      success: true,
-      activity: recentLogs
+    // Failed login attempts
+    const failedLogins = await AuditLog.countDocuments({
+      action: 'auth.login.failed',
+      timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
     });
-  } catch (error) {
-    console.error('[ANALYTICS-ACTIVITY] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message });
-  }
-});
 
-// ============================================
-// GROWTH TRENDS
-// ============================================
-
-// @desc    Get growth trends over time
-// @route   GET /api/analytics/trends
-// @access  Private
-exports.getGrowthTrends = asyncHandler(async (req, res) => {
-  try {
-    const { period = '6months' } = req.query;
-
-    console.log('[ANALYTICS-TRENDS] Fetching growth trends for:', period);
-
-    let startDate;
-    switch (period) {
-      case '7days':
-        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30days':
-        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case '6months':
-        startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-        break;
-      case '1year':
-        startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-    }
-
-    const [userGrowth, sermonGrowth, eventGrowth, blogGrowth] = await Promise.all([
-      User.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, day: { $dayOfMonth: '$createdAt' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
-      ]),
-      Sermon.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } }
-      ]),
-      Event.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } }
-      ]),
-      Blog.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
-        {
-          $group: {
-            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } }
-      ])
-    ]);
+    // ========== BANNED USERS ==========
+    const bannedUsers = await BannedUser.countDocuments({ isActive: true });
 
     res.json({
       success: true,
-      trends: {
-        users: userGrowth,
-        sermons: sermonGrowth,
-        events: eventGrowth,
-        blogs: blogGrowth
+      data: {
+        auditLogs: {
+          totalActions: auditStats.totalActions,
+          successRate: parseFloat(auditStats.successRate),
+          topActions: auditStats.topActions,
+          failedLogins
+        },
+        bannedUsers,
+        recentActivity
       }
     });
   } catch (error) {
-    console.error('[ANALYTICS-TRENDS] Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch trends', error: error.message });
+    console.error('[Analytics] System analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch system analytics'
+    });
   }
-});
+};
