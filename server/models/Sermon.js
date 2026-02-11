@@ -101,6 +101,18 @@ const sermonSchema = new mongoose.Schema({
     ref: 'User'
   }],
   
+  // Bookmark feature
+  bookmarkedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  
+  // Track unique views by device/session
+  viewedBy: [{
+    identifier: String,  // Device fingerprint or session ID
+    viewedAt: Date
+  }],
+  
   // Pin feature
   pinned: {
     type: Boolean,

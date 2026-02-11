@@ -58,10 +58,86 @@ exports.getSermon = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Sermon not found' });
   }
   
-  sermon.views = (sermon.views || 0) + 1;
-  await sermon.save();
-  
   res.json({ success: true, sermon });
+});
+
+// @desc    Track unique view
+// @route   POST /api/sermons/:id/view
+// @access  Public
+exports.trackView = asyncHandler(async (req, res) => {
+  const { deviceId } = req.body; // Client will send a unique device identifier
+  
+  if (!deviceId) {
+    return res.status(400).json({ success: false, message: 'Device ID required' });
+  }
+
+  const sermon = await Sermon.findById(req.params.id);
+  
+  if (!sermon) {
+    return res.status(404).json({ success: false, message: 'Sermon not found' });
+  }
+
+  // Check if this device has already viewed
+  const alreadyViewed = sermon.viewedBy?.some(
+    view => view.identifier === deviceId
+  );
+
+  if (!alreadyViewed) {
+    if (!sermon.viewedBy) sermon.viewedBy = [];
+    
+    sermon.viewedBy.push({
+      identifier: deviceId,
+      viewedAt: new Date()
+    });
+    
+    sermon.views = (sermon.views || 0) + 1;
+    await sermon.save();
+    
+    console.log(`✅ New unique view tracked for sermon: ${sermon._id}`);
+  }
+
+  res.json({ 
+    success: true, 
+    views: sermon.views,
+    alreadyViewed 
+  });
+});
+
+// @desc    Toggle bookmark
+// @route   POST /api/sermons/:id/bookmark
+// @access  Private
+exports.toggleBookmark = asyncHandler(async (req, res) => {
+  const sermon = await Sermon.findById(req.params.id);
+  
+  if (!sermon) {
+    return res.status(404).json({ success: false, message: 'Sermon not found' });
+  }
+
+  if (!sermon.bookmarkedBy) {
+    sermon.bookmarkedBy = [];
+  }
+
+  const userId = req.user._id || req.user.id;
+  const alreadyBookmarked = sermon.bookmarkedBy.some(
+    id => id.toString() === userId.toString()
+  );
+
+  if (alreadyBookmarked) {
+    sermon.bookmarkedBy = sermon.bookmarkedBy.filter(
+      id => id.toString() !== userId.toString()
+    );
+  } else {
+    sermon.bookmarkedBy.push(userId);
+  }
+
+  await sermon.save();
+  console.log(`✅ Sermon ${alreadyBookmarked ? 'unbookmarked' : 'bookmarked'}: ${sermon._id}`);
+  
+  res.json({ 
+    success: true, 
+    bookmarked: !alreadyBookmarked,
+    bookmarkCount: sermon.bookmarkedBy.length
+  });
 });
 
 // @desc    Create sermon
@@ -287,4 +363,77 @@ exports.toggleLike = asyncHandler(async (req, res) => {
   console.log(`✅ Sermon ${alreadyLiked ? 'unliked' : 'liked'}:`, sermon._id);
   
   res.json({ success: true, likes: sermon.likes, liked: !alreadyLiked });
+});
+
+// @desc    Get user's bookmarked sermons
+// @route   GET /api/sermons/bookmarks/my-bookmarks
+// @access  Private
+exports.getUserBookmarks = asyncHandler(async (req, res) => {
+  const userId = req.user._id || req.user.id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+
+  // Find all sermons where user has bookmarked
+  const sermons = await Sermon.find({ bookmarkedBy: userId })
+    .sort({ updatedAt: -1 }) // Most recently bookmarked first
+    .limit(limit)
+    .skip(skip)
+    .lean();
+
+  const total = await Sermon.countDocuments({ bookmarkedBy: userId });
+
+  // Add bookmark metadata for each sermon
+  const sermonsWithMeta = sermons.map(sermon => ({
+    ...sermon,
+    bookmarkedAt: sermon.updatedAt, // You might want to add a separate bookmarkedAt field in the future
+    isBookmarked: true
+  }));
+
+  res.json({
+    success: true,
+    sermons: sermonsWithMeta,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  });
+});
+
+// @desc    Get user's liked sermons
+// @route   GET /api/sermons/likes/my-likes
+// @access  Private
+exports.getUserLikes = asyncHandler(async (req, res) => {
+  const userId = req.user._id || req.user.id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+
+  // Find all sermons where user has liked
+  const sermons = await Sermon.find({ likedBy: userId })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .skip(skip)
+    .lean();
+
+  const total = await Sermon.countDocuments({ likedBy: userId });
+
+  const sermonsWithMeta = sermons.map(sermon => ({
+    ...sermon,
+    likedAt: sermon.updatedAt,
+    isLiked: true
+  }));
+
+  res.json({
+    success: true,
+    sermons: sermonsWithMeta,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  });
 });

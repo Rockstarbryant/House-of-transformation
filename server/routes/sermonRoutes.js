@@ -7,7 +7,11 @@ const {
   createSermon,
   updateSermon,
   deleteSermon,
-  toggleLike
+  toggleLike,
+  trackView,      
+  toggleBookmark,
+  getUserBookmarks,  
+  getUserLikes         
 } = require('../controllers/sermonController');
 const { upload } = require('../config/cloudinaryConfig');
 
@@ -50,7 +54,16 @@ router.delete(
   deleteSermon
 );
 
+// ===== USER BOOKMARKS & LIKES (Authenticated users only) =====
+router.get('/bookmarks/my-bookmarks', protect, getUserBookmarks);
+router.get('/likes/my-likes', protect, getUserLikes);
+
 // ===== LIKE ROUTE (Authenticated users only) =====
 router.post('/:id/like', protect, toggleLike);
+// Track unique view (public)
+router.post('/:id/view', trackView);
+
+// Bookmark sermon (authenticated users only)
+router.post('/:id/bookmark', protect, toggleBookmark);
 
 module.exports = router;
