@@ -223,6 +223,23 @@ exports.getUserPledges = asyncHandler(async (req, res) => {
 exports.getCampaignPledges = asyncHandler(async (req, res) => {
   try {
     const { campaignId } = req.params;
+
+     const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && (
+      req.user.role?.permissions?.includes('manage:donations') ||
+      req.user.role?.permissions?.includes('view:donations')
+    );
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:donations', 'view:donations'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { status, page = 1, limit = 20 } = req.query;
 
     console.log('[PLEDGE-GET-CAMPAIGN] Fetching pledges for campaign:', campaignId);
@@ -371,6 +388,22 @@ exports.getPledge = asyncHandler(async (req, res) => {
 // ============================================
 exports.getAllPledges = asyncHandler(async (req, res) => {
   try {
+    const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && (
+      req.user.role?.permissions?.includes('manage:donations') ||
+      req.user.role?.permissions?.includes('view:donations')
+    );
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:donations', 'view:donations'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { page = 1, limit = 20 } = req.query;
     
     const pageNum = parseInt(page);
@@ -472,6 +505,19 @@ exports.updatePledge = asyncHandler(async (req, res) => {
     const updates = req.body;
 
     console.log('[PLEDGE-UPDATE] Updating pledge:', pledgeId);
+
+     const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && 
+      req.user.role?.permissions?.includes('manage:donations');
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:donations'],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
 
     // ✅ EXPANDED: Allow more fields to be updated
     const allowedUpdates = [

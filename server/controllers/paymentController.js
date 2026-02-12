@@ -954,6 +954,22 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
 
     console.log('[PAYMENT-GET-ALL] Fetching all payments');
 
+     const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && (
+      req.user.role?.permissions?.includes('manage:donations') ||
+      req.user.role?.permissions?.includes('view:donations')
+    );
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:donations', 'view:donations'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;

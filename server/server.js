@@ -139,7 +139,8 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 // ============================================
 
 // User routes (require authentication)
-app.use('/api/users', protect, require('./routes/userRoutes'));
+
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', protect, require('./routes/roleRoutes'));
 app.use('/api/settings', protect, require('./routes/settingsRoutes'));
 app.use('/api/analytics', protect, require('./routes/analyticsRoutes'));

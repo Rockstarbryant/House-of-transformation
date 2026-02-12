@@ -13,6 +13,15 @@ const Announcement = require('../models/Announcement');
 const AuditLog = require('../models/AuditLog');
 const BannedUser = require('../models/BannedUser');
 
+
+// ✅ SECURITY HELPER
+const hasAnalyticsPermission = (user) => {
+  if (!user || !user.role) return false;
+  if (user.role.name === 'admin') return true;
+  return user.role.permissions && 
+    user.role.permissions.includes('view:analytics');
+};
+
 /**
  * Get Overview Analytics
  * @route GET /api/analytics/overview
@@ -20,6 +29,16 @@ const BannedUser = require('../models/BannedUser');
  */
 exports.getOverview = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     const [
       totalUsers,
       totalSermons,
@@ -75,6 +94,16 @@ exports.getOverview = async (req, res) => {
  */
 exports.getUserAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // Total counts
     const [total, active, banned] = await Promise.all([
       User.countDocuments(),
@@ -183,6 +212,16 @@ exports.getUserAnalytics = async (req, res) => {
  */
 exports.getContentAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // ========== SERMONS ==========
     const totalSermons = await Sermon.countDocuments();
     
@@ -406,6 +445,16 @@ exports.getContentAnalytics = async (req, res) => {
  */
 exports.getEngagementAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // ========== FEEDBACK ==========
     const totalFeedback = await Feedback.countDocuments({ isDeleted: false });
 
@@ -533,6 +582,16 @@ exports.getEngagementAnalytics = async (req, res) => {
  */
 exports.getFinancialAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // ========== CAMPAIGNS ==========
     const totalCampaigns = await Campaign.countDocuments();
     const activeCampaigns = await Campaign.countDocuments({ status: 'active' });
@@ -666,6 +725,16 @@ exports.getFinancialAnalytics = async (req, res) => {
  */
 exports.getCommunicationAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // ========== EMAIL LOGS ==========
     const totalEmails = await EmailLog.countDocuments();
 
@@ -755,6 +824,16 @@ exports.getCommunicationAnalytics = async (req, res) => {
  */
 exports.getSystemAnalytics = async (req, res) => {
   try {
+    // ✅ CRITICAL: Permission check
+if (!hasAnalyticsPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:analytics'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     // ========== AUDIT LOGS ==========
     const auditStats = await AuditLog.getStats();
 

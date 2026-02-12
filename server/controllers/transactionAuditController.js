@@ -2,11 +2,33 @@
 const TransactionAuditLog = require('../models/TransactionAuditLog');
 const asyncHandler = require('../middleware/asyncHandler');
 
+// ✅ SECURITY HELPER
+const hasAuditPermission = (user) => {
+  if (!user || !user.role) return false;
+  if (user.role.name === 'admin') return true;
+  return user.role.permissions && (
+    user.role.permissions.includes('view:audit:logs') ||
+    user.role.permissions.includes('manage:donations')
+  );
+};
+
 // ============================================
 // GET ALL AUDIT LOGS (Admin/Finance Team)
 // ============================================
 exports.getAllAuditLogs = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
+
     const { 
       page = 1, 
       limit = 50, 
@@ -99,6 +121,18 @@ exports.getAllAuditLogs = asyncHandler(async (req, res) => {
 // ============================================
 exports.getAuditLog = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
+
     const { id } = req.params;
 
     console.log('[AUDIT-LOG] Fetching log:', id);
@@ -132,6 +166,18 @@ exports.getAuditLog = asyncHandler(async (req, res) => {
 // ============================================
 exports.getAuditLogsByTransaction = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
+
     const { transactionId } = req.params;
 
     console.log('[AUDIT-LOGS] Fetching logs for transaction:', transactionId);
@@ -161,6 +207,18 @@ exports.getAuditLogsByTransaction = asyncHandler(async (req, res) => {
 // ============================================
 exports.getAuditLogsByUser = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
+
     const { userId } = req.params;
     const { page = 1, limit = 20 } = req.query;
 
@@ -206,6 +264,17 @@ exports.getAuditLogsByUser = asyncHandler(async (req, res) => {
 // ============================================
 exports.exportAuditLogs = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
     const { 
       transactionType, 
       status, 
@@ -282,6 +351,18 @@ exports.exportAuditLogs = asyncHandler(async (req, res) => {
 // ============================================
 exports.getAuditStats = asyncHandler(async (req, res) => {
   try {
+
+    // ✅ CRITICAL: Permission check
+if (!hasAuditPermission(req.user)) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:audit:logs', 'manage:donations'],
+    userPermissions: req.user?.role?.permissions || [],
+    userRole: req.user?.role?.name || 'none'
+  });
+}
+
     console.log('[AUDIT-STATS] Fetching statistics');
 
     const stats = await TransactionAuditLog.aggregate([

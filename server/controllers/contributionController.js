@@ -446,11 +446,29 @@ exports.initiateMpesaContributionPayment = asyncHandler(async (req, res) => {
   }
 });
 
+
 // ============================================
 // GET ALL CONTRIBUTIONS
 // ============================================
 exports.getAllContributions = asyncHandler(async (req, res) => {
   try {
+    // ✅ CRITICAL: Add permission check
+    const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && (
+      req.user.role?.permissions?.includes('manage:donations') ||
+      req.user.role?.permissions?.includes('view:donations')
+    );
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:donations', 'view:donations'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { status, paymentMethod, campaignId, page = 1, limit = 100 } = req.query;
 
     let query = supabase.from('contributions').select('*', { count: 'exact' });
@@ -494,6 +512,20 @@ exports.getAllContributions = asyncHandler(async (req, res) => {
 exports.verifyContribution = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
+
+     // ✅ CRITICAL: Add permission check
+    const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && 
+      req.user.role?.permissions?.includes('manage:donations');
+
+    if (!isAdmin && !hasManageDonations) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only admins can verify contributions',
+        requiredPermissions: ['manage:donations'],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
 
     const { data: existing, error: fetchError } = await supabase
       .from('contributions')

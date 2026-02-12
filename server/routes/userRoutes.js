@@ -18,37 +18,72 @@ const {
   getUserStats
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/supabaseAuth');
+const { requirePermission } = require('../middleware/requirePermission');
 
 const router = express.Router();
 
-// ============================================
-// PUBLIC ROUTES
-// ============================================
-router.get('/stats', getUserStats);
-router.get('/', getAllUsersWithPagination);
-router.get('/search', searchUsers);
-router.get('/role/:role', getUsersByRole);
-router.post('/check-ban', checkBanStatus); // Check if email/IP is banned
-router.get('/:id', getUserById);
+console.log('[USER-ROUTES] Initializing user routes...');
 
 // ============================================
-// PROTECTED ROUTES (Authenticated Users)
+// PUBLIC ROUTES (NO AUTHENTICATION REQUIRED)
 // ============================================
-router.use(protect); // All routes below require authentication
 
-// User's own profile
+// Check if email/IP is banned (needed for signup/login validation)
+router.post('/check-ban', checkBanStatus);
+
+// ============================================
+// PROTECTED ROUTES - Apply authentication to all routes below
+// ============================================
+router.use(protect); // ALL routes below require authentication
+
+// ============================================
+// USER'S OWN PROFILE (any authenticated user)
+// ============================================
+
+// Get own profile
 router.get('/me/profile', getMyProfile);
-router.put('/:id', updateUser); // Users can update own profile, admin can update any
-router.delete('/me/delete-account', deleteSelfAccount); // User self-deletion
+
+// Delete own account
+router.delete('/me/delete-account', deleteSelfAccount);
+
+// Update profile (controller checks if user owns profile or is admin)
+router.put('/:id', updateUser);
 
 // ============================================
-// ADMIN ROUTES
+// ROUTES REQUIRING manage:users PERMISSION
 // ============================================
+
+// Get user statistics
+router.get('/stats', requirePermission('manage:users'), getUserStats);
+
+// Search users
+router.get('/search', requirePermission('manage:users'), searchUsers);
+
+// Get users by role
+router.get('/role/:role', requirePermission('manage:users'), getUsersByRole);
+
+// Get all users with pagination (MAIN USER LIST)
+router.get('/', requirePermission('manage:users'), getAllUsersWithPagination);
+
+// Get single user by ID
+router.get('/:id', requirePermission('manage:users'), getUserById);
+
+// ============================================
+// ADMIN-ONLY ROUTES
+// ============================================
+
+// Bulk operations
 router.post('/bulk/role-update', authorize('admin'), bulkUpdateRoles);
 router.post('/notifications/send', authorize('admin'), sendBulkNotification);
-router.post('/manual-register', authorize('admin'), manualRegisterUser); // NEW: Manual registration
+
+// User management
+router.post('/manual-register', authorize('admin'), manualRegisterUser);
 router.put('/:id/role', authorize('admin'), updateUserRole);
-router.delete('/:id', authorize('admin'), deleteUser); // Hard delete
-router.post('/:id/ban', authorize('admin'), banUser); // NEW: Ban user
+
+// Deletion and banning
+router.delete('/:id', authorize('admin'), deleteUser);
+router.post('/:id/ban', authorize('admin'), banUser);
+
+console.log('[USER-ROUTES] ✅ Routes registered with proper security middleware');
 
 module.exports = router;

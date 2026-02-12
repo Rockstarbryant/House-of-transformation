@@ -20,47 +20,54 @@ const router = express.Router();
 console.log('[ROLE-ROUTES] Initializing role routes...');
 
 // ============================================
-// PUBLIC ROUTES (read-only)
+// ALL ROUTES REQUIRE AUTHENTICATION
+// ============================================
+router.use(protect); // Apply authentication to ALL routes
+
+// ============================================
+// ROUTES REQUIRING manage:roles PERMISSION
+// (Controllers also verify permissions as defense-in-depth)
 // ============================================
 
 // Get all available permissions (for UI dropdowns)
+// Controllers verify manage:roles permission
 router.get('/permissions/list', getAvailablePermissions);
 
 // Get all roles
+// Controllers verify manage:roles permission
 router.get('/', getAllRoles);
 
 // Get single role by ID
+// Controllers verify manage:roles permission
 router.get('/:id', getRoleById);
 
+// Get user with their role + permissions
+// Controllers verify manage:roles OR manage:users permission
+router.get('/user/:userId', getUserWithRole);
+
 // Get all users with specific role
+// Controllers verify manage:roles OR manage:users permission
 router.get('/:roleId/users', getUsersByRoleId);
 
 // ============================================
-// PROTECTED ROUTES (authenticated users)
-// ============================================
-
-// Get user with their role + permissions
-router.get('/user/:userId', protect, getUserWithRole);
-
-// ============================================
-// ADMIN ROUTES (require admin role)
+// ADMIN-ONLY ROUTES
 // ============================================
 
 // Create new role (admin only)
-router.post('/', protect, requireAdmin, createRole);
+router.post('/', requireAdmin, createRole);
 
 // Update role - add/remove permissions (admin only)
-router.patch('/:id', protect, requireAdmin, updateRole);
+router.patch('/:id', requireAdmin, updateRole);
 
 // Delete role (admin only, cannot delete system roles)
-router.delete('/:id', protect, requireAdmin, deleteRole);
+router.delete('/:id', requireAdmin, deleteRole);
 
 // Assign role to single user (admin only)
-router.patch('/assign-user', protect, requireAdmin, assignRoleToUser);
+router.patch('/assign-user', requireAdmin, assignRoleToUser);
 
 // Bulk assign role to multiple users (admin only)
-router.post('/bulk-assign', protect, requireAdmin, bulkAssignRole);
+router.post('/bulk-assign', requireAdmin, bulkAssignRole);
 
-console.log('[ROLE-ROUTES] Routes registered: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id, PATCH /assign-user, POST /bulk-assign, GET /:roleId/users, GET /user/:userId');
+console.log('[ROLE-ROUTES] ✅ Routes registered with proper security middleware');
 
 module.exports = router;

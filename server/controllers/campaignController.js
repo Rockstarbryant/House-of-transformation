@@ -127,19 +127,28 @@ exports.getAllCampaigns = asyncHandler(async (req, res) => {
 
     console.log('[CAMPAIGN-GET-ALL] Fetching campaigns');
 
+    // ✅ SECURITY FIX: Proper permission check
+    const isAdmin = req.user && req.user.role?.name === 'admin';
+    const hasManageDonations = req.user && (
+      req.user.role?.permissions?.includes('manage:donations') ||
+      req.user.role?.permissions?.includes('view:donations')
+    );
+    
     const query = {};
 
-    // Apply filters
-    if (status) query.status = status;
-    if (type) query.campaignType = type;
-    if (isFeatured === 'true') query.isFeatured = true;
-    if (visibility) query.visibility = visibility;
-
-    // Public users can only see active/public campaigns
-    if (!req.user || !req.user.role?.name === 'admin') {
+    // ✅ Non-privileged users can ONLY see active, public campaigns
+    if (!isAdmin && !hasManageDonations) {
       query.status = 'active';
       query.visibility = 'public';
+    } else {
+      // ✅ Admin/managers can filter by status and visibility
+      if (status) query.status = status;
+      if (visibility) query.visibility = visibility;
     }
+
+    // Apply other filters (all users)
+    if (type) query.campaignType = type;
+    if (isFeatured === 'true') query.isFeatured = true;
 
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 10;
@@ -194,8 +203,17 @@ exports.getCampaign = asyncHandler(async (req, res) => {
     }
 
     // Check visibility for non-admin users
-    if (campaign.status === 'draft') {
-      if (!req.user || (req.user.role?.name !== 'admin' && req.user._id.toString() !== campaign.createdBy._id.toString())) {
+    // ✅ SECURITY FIX: Proper permission checks for viewing campaigns
+      const isAdmin = req.user && req.user.role?.name === 'admin';
+      const hasManageDonations = req.user && (
+        req.user.role?.permissions?.includes('manage:donations') ||
+        req.user.role?.permissions?.includes('view:donations')
+      );
+      const isCreator = req.user && req.user._id.toString() === campaign.createdBy._id.toString();
+
+      // Draft campaigns - only admin, managers, or creator
+      if (campaign.status === 'draft') {
+        if (!isAdmin && !hasManageDonations && !isCreator) {
         return res.status(404).json({
           success: false,
           message: 'Campaign not found'
@@ -369,6 +387,8 @@ exports.activateCampaign = asyncHandler(async (req, res) => {
 exports.getCampaignAnalytics = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
+
+    
 
     console.log('[CAMPAIGN-ANALYTICS] Fetching analytics for:', id);
 

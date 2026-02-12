@@ -76,6 +76,20 @@ exports.submitFeedback = async (req, res) => {
 // @access  Private - requires granular read permissions
 exports.getAllFeedback = async (req, res) => {
   try {
+    // ✅ Permission check
+const hasPermission = req.user && (
+  req.user.role?.name === 'admin' ||
+  req.user.role?.permissions?.includes('view:feedback') ||
+  req.user.role?.permissions?.includes('manage:feedback')
+);
+
+if (!hasPermission) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:feedback', 'manage:feedback']
+  });
+}
     const { category, status, anonymous, startDate, endDate } = req.query;
     
     // Filter to include docs with isDeleted: false OR missing isDeleted field
@@ -740,6 +754,20 @@ exports.deleteFeedback = async (req, res) => {
 // @access  Private - requires view:feedback:stats permission
 exports.getStats = async (req, res) => {
   try {
+    // ✅ Permission check
+const hasPermission = req.user && (
+  req.user.role?.name === 'admin' ||
+  req.user.role?.permissions?.includes('view:feedback') ||
+  req.user.role?.permissions?.includes('manage:feedback')
+);
+
+if (!hasPermission) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions',
+    requiredPermissions: ['view:feedback', 'manage:feedback']
+  });
+}
     console.log('[STATS] Fetching feedback statistics...');
     
     // Filter: exclude soft deleted OR include docs where isDeleted is not true

@@ -16,6 +16,19 @@ const asyncHandler = require('../middleware/asyncHandler');
 // @access  Private/Admin
 exports.getUsers = asyncHandler(async (req, res) => {
   try {
+    // ✅ Permission check
+const hasPermission = req.user && (
+  req.user.role?.name === 'admin' ||
+  req.user.role?.permissions?.includes('manage:emails') ||
+  req.user.role?.permissions?.includes('send:emails')
+);
+
+if (!hasPermission) {
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Insufficient permissions'
+  });
+}
     console.log('[EMAIL-NOTIFICATION] Fetching users for email selection');
 
     const users = await User.find()

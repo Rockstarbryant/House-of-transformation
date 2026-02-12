@@ -1,11 +1,46 @@
 const Role = require('../models/Role');
 const User = require('../models/User');
 
+// ===== SECURITY HELPER FUNCTIONS =====
+
+/**
+ * Check if user has manage:roles permission
+ * Defense in depth - verify even if middleware already checked
+ */
+const hasManageRolesPermission = (user) => {
+  if (!user || !user.role) return false;
+  
+  // Admin bypass
+  if (user.role.name === 'admin') return true;
+  
+  // Check permission
+  return user.role.permissions && 
+         user.role.permissions.includes('manage:roles');
+};
+
+/**
+ * Check if user is admin
+ */
+const isAdmin = (user) => {
+  return user?.role?.name === 'admin';
+};
+
 // ============================================
 // GET ALL AVAILABLE PERMISSIONS (for UI)
 // ============================================
 exports.getAvailablePermissions = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only authenticated users with manage:roles should see permission list
+    if (!req.user || !hasManageRolesPermission(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:roles'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     // Get enum values directly from schema (correct path for array type)
     const permissionsPath = Role.schema.path('permissions');
     const permissionsEnum = permissionsPath.caster 
@@ -81,6 +116,17 @@ exports.getAvailablePermissions = async (req, res) => {
 // ============================================
 exports.getAllRoles = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only users with manage:roles permission can see all roles
+    if (!req.user || !hasManageRolesPermission(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:roles'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     console.log('[ROLE-GET-ALL] Fetching all roles');
 
     const roles = await Role.find().sort({ createdAt: -1 });
@@ -105,6 +151,17 @@ exports.getAllRoles = async (req, res) => {
 // ============================================
 exports.getRoleById = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only users with manage:roles permission can see role details
+    if (!req.user || !hasManageRolesPermission(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:roles'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { id } = req.params;
     console.log('[ROLE-GET] Fetching role:', id);
 
@@ -136,6 +193,15 @@ exports.getRoleById = async (req, res) => {
 // ============================================
 exports.createRole = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only admins can create roles
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin role required',
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { name, description, permissions } = req.body;
 
     console.log('[ROLE-CREATE] Creating role:', name);
@@ -221,6 +287,15 @@ exports.createRole = async (req, res) => {
 // ============================================
 exports.updateRole = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only admins can update roles
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin role required',
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { id } = req.params;
     const { description, permissions } = req.body;
 
@@ -235,15 +310,7 @@ exports.updateRole = async (req, res) => {
         message: 'Role not found'
       });
     }
-/*
-    // Prevent modification of system roles' permissions
-    if (role.isSystemRole && permissions) {
-      return res.status(403).json({
-        success: false,
-        message: 'Cannot modify system role permissions'
-      });
-    }
-*/
+
     // Get valid permissions from schema enum (correct path for array type)
     const permissionsPath = Role.schema.path('permissions');
     const validPermissions = permissionsPath.caster 
@@ -313,6 +380,15 @@ exports.updateRole = async (req, res) => {
 // ============================================
 exports.deleteRole = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only admins can delete roles
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin role required',
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { id } = req.params;
 
     console.log('[ROLE-DELETE] Deleting role:', id);
@@ -366,6 +442,15 @@ exports.deleteRole = async (req, res) => {
 // ============================================
 exports.assignRoleToUser = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only admins can assign roles
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin role required',
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { userId, roleId } = req.body;
 
     console.log('[ROLE-ASSIGN] Assigning role', roleId, 'to user', userId);
@@ -420,6 +505,22 @@ exports.assignRoleToUser = async (req, res) => {
 // ============================================
 exports.getUserWithRole = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only users with manage:roles or manage:users can see user role details
+    const hasPermission = req.user && (
+      hasManageRolesPermission(req.user) || 
+      (req.user.role?.permissions && req.user.role.permissions.includes('manage:users'))
+    );
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:roles', 'manage:users'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { userId } = req.params;
 
     const user = await User.findById(userId).populate('role');
@@ -450,6 +551,22 @@ exports.getUserWithRole = async (req, res) => {
 // ============================================
 exports.getUsersByRoleId = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only users with manage:roles or manage:users can see users by role
+    const hasPermission = req.user && (
+      hasManageRolesPermission(req.user) || 
+      (req.user.role?.permissions && req.user.role.permissions.includes('manage:users'))
+    );
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['manage:roles', 'manage:users'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { roleId } = req.params;
 
     const users = await User.find({ role: roleId }).populate('role');
@@ -474,9 +591,18 @@ exports.getUsersByRoleId = async (req, res) => {
 // ============================================
 exports.bulkAssignRole = async (req, res) => {
   try {
+    // ✅ CRITICAL: Only admins can bulk assign roles
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin role required',
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
     const { userIds, roleId } = req.body;
 
-    console.log('[ROLE-BULK-ASSIGN] Assigning role', roleId, 'to', userIds.length, 'users');
+    console.log('[ROLE-BULK-ASSIGN] Assigning role', roleId, 'to', userIds?.length, 'users');
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
