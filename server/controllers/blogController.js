@@ -296,3 +296,36 @@ exports.getPendingBlogs = asyncHandler(async (req, res) => {
     blogs
   });
 });
+
+
+
+// SEO ADDITION START
+// @desc    Get single blog by slug (SEO-friendly)
+// @route   GET /api/blog/slug/:slug
+// @access  Public
+exports.getBlogBySlug = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+
+  console.log('[BLOG-SLUG] Fetching blog by slug:', slug);
+
+  const blog = await Blog.findOne({ 
+    slug: slug.toLowerCase().trim(), 
+    approved: true 
+  })
+    .populate('author', 'name username role')
+    .populate('comments.user', 'name username');
+
+  if (!blog) {
+    return res.status(404).json({ 
+      success: false, 
+      message: 'Blog not found' 
+    });
+  }
+
+  console.log('[BLOG-SLUG] Found blog:', blog.title);
+
+  res.json({
+    success: true,
+    blog
+  });
+});

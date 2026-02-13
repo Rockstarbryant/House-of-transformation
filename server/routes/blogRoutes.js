@@ -5,6 +5,7 @@ const {
   getBlogs,
   getBlogsByCategory,
   getBlog,
+  getBlogBySlug,
   createBlog,
   updateBlog,
   deleteBlog,
@@ -15,8 +16,13 @@ const {
 const router = express.Router();
 
 // ===== PUBLIC ROUTES =====
+//router.get('/', getBlogs);
+//router.get('/category/:category', getBlogsByCategory);
+//router.get('/:id', getBlog);
+
 router.get('/', getBlogs);
 router.get('/category/:category', getBlogsByCategory);
+router.get('/slug/:slug', getBlogBySlug); // SEO ADDITION: Must come before /:id
 router.get('/:id', getBlog);
 
 // ===== PROTECTED ROUTES (Auth + manage:blog permission) =====
