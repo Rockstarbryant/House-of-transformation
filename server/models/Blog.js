@@ -45,6 +45,16 @@ const blogSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: 'User'
   },
+  // ✅ VIEW TRACKING ADDITION START
+  views: {
+    type: Number,
+    default: 0
+  },
+  viewedBy: [{
+    identifier: String,  // Device fingerprint or session ID
+    viewedAt: Date
+  }],
+  // ✅ VIEW TRACKING ADDITION END
   likes: [{
     type: mongoose.Schema.ObjectId,
     ref: 'User'
@@ -69,6 +79,11 @@ const blogSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Index for better query performance
+blogSchema.index({ slug: 1 });
+blogSchema.index({ category: 1, approved: 1 });
+blogSchema.index({ createdAt: -1 });
 
 // SEO ADDITION START: Auto-generate slug from title
 blogSchema.pre('save', async function(next) {

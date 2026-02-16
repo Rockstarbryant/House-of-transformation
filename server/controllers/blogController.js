@@ -99,6 +99,56 @@ exports.getBlog = asyncHandler(async (req, res) => {
   });
 });
 
+// ✅ VIEW TRACKING ADDITION START
+// @desc    Track unique view
+// @route   POST /api/blog/:id/view
+// @access  Public
+exports.trackView = asyncHandler(async (req, res) => {
+  const { deviceId } = req.body;
+  
+  if (!deviceId) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Device ID required' 
+    });
+  }
+
+  const blog = await Blog.findById(req.params.id);
+  
+  if (!blog) {
+    return res.status(404).json({ 
+      success: false, 
+      message: 'Blog not found' 
+    });
+  }
+
+  // Check if this device has already viewed
+  const alreadyViewed = blog.viewedBy?.some(
+    view => view.identifier === deviceId
+  );
+
+  if (!alreadyViewed) {
+    if (!blog.viewedBy) blog.viewedBy = [];
+    
+    blog.viewedBy.push({
+      identifier: deviceId,
+      viewedAt: new Date()
+    });
+    
+    blog.views = (blog.views || 0) + 1;
+    await blog.save();
+    
+    console.log(`✅ New unique view tracked for blog: ${blog._id}`);
+  }
+
+  res.json({ 
+    success: true, 
+    views: blog.views,
+    alreadyViewed 
+  });
+});
+// ✅ VIEW TRACKING ADDITION END
+
 // @desc    Create blog
 // @route   POST /api/blog
 // @access  Private (requires manage:blog permission)
@@ -165,7 +215,9 @@ exports.createBlog = asyncHandler(async (req, res) => {
       image,
       author: userId,
       authorRole: req.user.role.name || req.user.role,
-      approved: req.user.role.name === 'admin' ? true : false
+      approved: req.user.role.name === 'admin' ? true : false,
+      views: 0, // ✅ Initialize views
+      viewedBy: [] // ✅ Initialize viewedBy
     });
 
     console.log('✅ Blog created with ID:', blog._id);
@@ -297,9 +349,6 @@ exports.getPendingBlogs = asyncHandler(async (req, res) => {
   });
 });
 
-
-
-// SEO ADDITION START
 // @desc    Get single blog by slug (SEO-friendly)
 // @route   GET /api/blog/slug/:slug
 // @access  Public

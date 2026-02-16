@@ -10,20 +10,20 @@ const {
   updateBlog,
   deleteBlog,
   approveBlog,
-  getPendingBlogs
+  getPendingBlogs,
+  trackView // ✅ VIEW TRACKING ADDITION
 } = require('../controllers/blogController');
 
 const router = express.Router();
 
 // ===== PUBLIC ROUTES =====
-//router.get('/', getBlogs);
-//router.get('/category/:category', getBlogsByCategory);
-//router.get('/:id', getBlog);
-
 router.get('/', getBlogs);
 router.get('/category/:category', getBlogsByCategory);
 router.get('/slug/:slug', getBlogBySlug); // SEO ADDITION: Must come before /:id
 router.get('/:id', getBlog);
+
+// ✅ VIEW TRACKING ADDITION: Track unique view (public)
+router.post('/:id/view', trackView);
 
 // ===== PROTECTED ROUTES (Auth + manage:blog permission) =====
 router.post('/', protect, requirePermission('manage:blog'), createBlog);
