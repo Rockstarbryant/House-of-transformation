@@ -136,15 +136,7 @@ exports.getAllCampaigns = asyncHandler(async (req, res) => {
     
     const query = {};
 
-    // ✅ Non-privileged users can ONLY see active, public campaigns
-    if (!isAdmin && !hasManageDonations) {
-      query.status = 'active';
-      query.visibility = 'public';
-    } else {
-      // ✅ Admin/managers can filter by status and visibility
-      if (status) query.status = status;
-      if (visibility) query.visibility = visibility;
-    }
+    
 
     // Apply other filters (all users)
     if (type) query.campaignType = type;

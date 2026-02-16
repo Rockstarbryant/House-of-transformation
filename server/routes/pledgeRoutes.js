@@ -6,7 +6,9 @@ const {
   getPledge,
   updatePledge,
   cancelPledge,
-   getAllPledges 
+  getAllPledges,
+  deletePledge,
+  uncancelPledge   
 } = require('../controllers/pledgeController');
 
 const { protect } = require('../middleware/supabaseAuth');
@@ -45,5 +47,11 @@ router.get('/campaign/:campaignId', protect, requirePermission('view:pledges:all
 
 // Update pledge (requires edit:pledges)
 router.put('/:pledgeId', protect, requirePermission('edit:pledges', 'manage:donations'), updatePledge);
+
+// Uncancel pledge (restore cancelled pledge) - Admin only
+router.patch('/:pledgeId/uncancel', protect, requirePermission('edit:pledges', 'manage:donations'), uncancelPledge);
+
+// Delete pledge (cancelled pledges only) - Admin only
+router.delete('/:pledgeId', protect, requirePermission('delete:pledges', 'manage:donations'), deletePledge);
 
 module.exports = router;

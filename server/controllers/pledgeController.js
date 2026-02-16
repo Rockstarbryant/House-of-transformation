@@ -668,3 +668,154 @@ exports.cancelPledge = asyncHandler(async (req, res) => {
     });
   }
 });
+
+// ============================================
+// DELETE PLEDGE (Admin only - cancelled pledges)
+// ============================================
+exports.deletePledge = asyncHandler(async (req, res) => {
+  try {
+    const { pledgeId } = req.params;
+
+    console.log('[PLEDGE-DELETE] Deleting pledge:', pledgeId);
+
+    // Get pledge to check status
+    const { data: pledge, error: fetchError } = await supabase
+      .from('pledges')
+      .select('*')
+      .eq('id', pledgeId)
+      .single();
+
+    if (fetchError || !pledge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pledge not found'
+      });
+    }
+
+    // Can only delete cancelled pledges
+    if (pledge.status !== 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only cancelled pledges can be deleted. Please cancel the pledge first.'
+      });
+    }
+
+    // Delete the pledge
+    const { error } = await supabase
+      .from('pledges')
+      .delete()
+      .eq('id', pledgeId);
+
+    if (error) {
+      console.error('[PLEDGE-DELETE] Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete pledge',
+        error: error.message
+      });
+    }
+
+    console.log('[PLEDGE-DELETE] Pledge deleted successfully:', pledgeId);
+
+    res.json({
+      success: true,
+      message: 'Pledge deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('[PLEDGE-DELETE] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete pledge',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// UNCANCEL PLEDGE (Restore cancelled pledge)
+// ============================================
+exports.uncancelPledge = asyncHandler(async (req, res) => {
+  try {
+    const { pledgeId } = req.params;
+
+    console.log('[PLEDGE-UNCANCEL] Restoring pledge:', pledgeId);
+
+    // Get pledge to check status
+    const { data: pledge, error: fetchError } = await supabase
+      .from('pledges')
+      .select('*')
+      .eq('id', pledgeId)
+      .single();
+
+    if (fetchError || !pledge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pledge not found'
+      });
+    }
+
+    // Can only uncancel cancelled pledges
+    if (pledge.status !== 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only cancelled pledges can be restored',
+        currentStatus: pledge.status
+      });
+    }
+
+    // ✅ FIX: Calculate remaining_amount first
+    const remainingAmount = pledge.pledged_amount - pledge.paid_amount;
+
+    // Determine new status based on payment progress
+    let newStatus = 'pending';
+    if (pledge.paid_amount >= pledge.pledged_amount) {
+      newStatus = 'completed';
+    } else if (pledge.paid_amount > 0) {
+      newStatus = 'partial';
+    }
+
+    console.log('[PLEDGE-UNCANCEL] Changing status from cancelled to:', newStatus);
+    console.log('[PLEDGE-UNCANCEL] Payment info:', {
+      pledged: pledge.pledged_amount,
+      paid: pledge.paid_amount,
+      remaining: remainingAmount
+    });
+
+    // Update status - DO NOT update remaining_amount as it's a GENERATED COLUMN
+    const { data, error } = await supabase
+      .from('pledges')
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', pledgeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[PLEDGE-UNCANCEL] Supabase error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to restore pledge',
+        error: error.message
+      });
+    }
+
+    console.log('[PLEDGE-UNCANCEL] Pledge restored successfully:', pledgeId);
+
+    res.json({
+      success: true,
+      message: `Pledge restored successfully to ${newStatus} status`,
+      pledge: data
+    });
+
+  } catch (error) {
+    console.error('[PLEDGE-UNCANCEL] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to restore pledge',
+      error: error.message
+    });
+  }
+});
