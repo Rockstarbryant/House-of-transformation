@@ -282,6 +282,21 @@ exports.updateSermon = asyncHandler(async (req, res) => {
   }
 
 
+  // ✅ Strip fields that should NEVER be updated via this endpoint
+  const forbiddenFields = ['likedBy', 'bookmarkedBy', 'viewedBy', 'views', 'likes', 'comments', '_id', '__v'];
+  forbiddenFields.forEach(field => delete updateData[field]);
+
+  // ✅ Also strip empty-string array values that come from FormData serialization
+  Object.keys(updateData).forEach(key => {
+    if (Array.isArray(updateData[key]) && updateData[key].every(v => v === '' || v === 'undefined')) {
+      delete updateData[key];
+    }
+    // Handle stringified empty arrays like "[ '' ]"
+    if (typeof updateData[key] === 'string' && updateData[key].trim() === "[ '' ]") {
+      delete updateData[key];
+    }
+  });
+
   const updatedSermon = await Sermon.findByIdAndUpdate(
     req.params.id,
     updateData,

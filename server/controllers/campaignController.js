@@ -139,6 +139,7 @@ exports.getAllCampaigns = asyncHandler(async (req, res) => {
     
 
     // Apply other filters (all users)
+    if (status) query.status = status;
     if (type) query.campaignType = type;
     if (isFeatured === 'true') query.isFeatured = true;
 
