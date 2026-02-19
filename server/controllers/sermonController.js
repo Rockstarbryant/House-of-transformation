@@ -106,38 +106,31 @@ exports.trackView = asyncHandler(async (req, res) => {
 // @desc    Toggle bookmark
 // @route   POST /api/sermons/:id/bookmark
 // @access  Private
+// REPLACE toggleBookmark in sermonController.js
 exports.toggleBookmark = asyncHandler(async (req, res) => {
   const sermon = await Sermon.findById(req.params.id);
-  
-  if (!sermon) {
-    return res.status(404).json({ success: false, message: 'Sermon not found' });
-  }
-
-  if (!sermon.bookmarkedBy) {
-    sermon.bookmarkedBy = [];
-  }
+  if (!sermon) return res.status(404).json({ success: false, message: 'Sermon not found' });
 
   const userId = req.user._id || req.user.id;
-  const alreadyBookmarked = sermon.bookmarkedBy.some(
-    id => id.toString() === userId.toString()
+
+  // ✅ Normalize old flat ObjectId entries to new shape
+  sermon.bookmarkedBy = sermon.bookmarkedBy.map(entry =>
+    entry.user ? entry : { user: entry, bookmarkedAt: new Date() }
   );
 
+  const existingIndex = sermon.bookmarkedBy.findIndex(
+    b => b.user.toString() === userId.toString()
+  );
+  const alreadyBookmarked = existingIndex !== -1;
+
   if (alreadyBookmarked) {
-    sermon.bookmarkedBy = sermon.bookmarkedBy.filter(
-      id => id.toString() !== userId.toString()
-    );
+    sermon.bookmarkedBy.splice(existingIndex, 1);
   } else {
-    sermon.bookmarkedBy.push(userId);
+    sermon.bookmarkedBy.push({ user: userId, bookmarkedAt: new Date() });
   }
 
   await sermon.save();
-  console.log(`✅ Sermon ${alreadyBookmarked ? 'unbookmarked' : 'bookmarked'}: ${sermon._id}`);
-  
-  res.json({ 
-    success: true, 
-    bookmarked: !alreadyBookmarked,
-    bookmarkCount: sermon.bookmarkedBy.length
-  });
+  res.json({ success: true, bookmarked: !alreadyBookmarked, bookmarkCount: sermon.bookmarkedBy.length });
 });
 
 // @desc    Create sermon
@@ -354,101 +347,84 @@ exports.deleteSermon = asyncHandler(async (req, res) => {
 // @access  Private
 exports.toggleLike = asyncHandler(async (req, res) => {
   const sermon = await Sermon.findById(req.params.id);
-  
-  if (!sermon) {
-    return res.status(404).json({ success: false, message: 'Sermon not found' });
-  }
-
-  if (!sermon.likedBy) {
-    sermon.likedBy = [];
-  }
+  if (!sermon) return res.status(404).json({ success: false, message: 'Sermon not found' });
 
   const userId = req.user._id || req.user.id;
-  const alreadyLiked = sermon.likedBy.some(id => id.toString() === userId.toString());
+
+  // ✅ Normalize old flat ObjectId entries to new shape
+  sermon.likedBy = sermon.likedBy.map(entry =>
+    entry.user ? entry : { user: entry, likedAt: new Date() }
+  );
+
+  const existingIndex = sermon.likedBy.findIndex(
+    l => l.user.toString() === userId.toString()
+  );
+  const alreadyLiked = existingIndex !== -1;
 
   if (alreadyLiked) {
-    sermon.likedBy = sermon.likedBy.filter(id => id.toString() !== userId.toString());
+    sermon.likedBy.splice(existingIndex, 1);
     sermon.likes = Math.max(0, (sermon.likes || 0) - 1);
   } else {
-    sermon.likedBy.push(userId);
+    sermon.likedBy.push({ user: userId, likedAt: new Date() });
     sermon.likes = (sermon.likes || 0) + 1;
   }
 
   await sermon.save();
-  console.log(`✅ Sermon ${alreadyLiked ? 'unliked' : 'liked'}:`, sermon._id);
-  
   res.json({ success: true, likes: sermon.likes, liked: !alreadyLiked });
 });
 
 // @desc    Get user's bookmarked sermons
 // @route   GET /api/sermons/bookmarks/my-bookmarks
 // @access  Private
+// REPLACE getUserBookmarks
 exports.getUserBookmarks = asyncHandler(async (req, res) => {
   const userId = req.user._id || req.user.id;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 12;
   const skip = (page - 1) * limit;
 
-  // Find all sermons where user has bookmarked
-  const sermons = await Sermon.find({ bookmarkedBy: userId })
-    .sort({ updatedAt: -1 }) // Most recently bookmarked first
+  const sermons = await Sermon.find({ 'bookmarkedBy.user': userId })
+    .sort({ updatedAt: -1 })
     .limit(limit)
     .skip(skip)
     .lean();
 
-  const total = await Sermon.countDocuments({ bookmarkedBy: userId });
+  const total = await Sermon.countDocuments({ 'bookmarkedBy.user': userId });
 
-  // Add bookmark metadata for each sermon
-  const sermonsWithMeta = sermons.map(sermon => ({
-    ...sermon,
-    bookmarkedAt: sermon.updatedAt, // You might want to add a separate bookmarkedAt field in the future
-    isBookmarked: true
-  }));
-
-  res.json({
-    success: true,
-    sermons: sermonsWithMeta,
-    pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit)
-    }
+  const sermonsWithMeta = sermons.map(sermon => {
+    const bookmark = sermon.bookmarkedBy.find(
+      b => b.user.toString() === userId.toString()
+    );
+    return { ...sermon, bookmarkedAt: bookmark?.bookmarkedAt || null, isBookmarked: true };
   });
+
+  res.json({ success: true, sermons: sermonsWithMeta, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 });
 
 // @desc    Get user's liked sermons
 // @route   GET /api/sermons/likes/my-likes
 // @access  Private
+// REPLACE getUserLikes
 exports.getUserLikes = asyncHandler(async (req, res) => {
   const userId = req.user._id || req.user.id;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 12;
   const skip = (page - 1) * limit;
 
-  // Find all sermons where user has liked
-  const sermons = await Sermon.find({ likedBy: userId })
+  const sermons = await Sermon.find({ 'likedBy.user': userId })
     .sort({ updatedAt: -1 })
     .limit(limit)
     .skip(skip)
     .lean();
 
-  const total = await Sermon.countDocuments({ likedBy: userId });
+  const total = await Sermon.countDocuments({ 'likedBy.user': userId });
 
-  const sermonsWithMeta = sermons.map(sermon => ({
-    ...sermon,
-    likedAt: sermon.updatedAt,
-    isLiked: true
-  }));
-
-  res.json({
-    success: true,
-    sermons: sermonsWithMeta,
-    pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit)
-    }
+  const sermonsWithMeta = sermons.map(sermon => {
+    const like = sermon.likedBy.find(
+      l => l.user.toString() === userId.toString()
+    );
+    return { ...sermon, likedAt: like?.likedAt || null, isLiked: true };
   });
+
+  res.json({ success: true, sermons: sermonsWithMeta, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 });

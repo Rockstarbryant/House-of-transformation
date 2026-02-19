@@ -96,16 +96,29 @@ const sermonSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  likedBy: [{
+  // REPLACE the likedBy field
+likedBy: [{
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }],
-  
-  // Bookmark feature
-  bookmarkedBy: [{
+  },
+  likedAt: {
+    type: Date,
+    default: Date.now
+  }
+}],
+
+// REPLACE the bookmarkedBy field
+bookmarkedBy: [{
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }],
+  },
+  bookmarkedAt: {
+    type: Date,
+    default: Date.now
+  }
+}],
   
   // Track unique views by device/session
   viewedBy: [{

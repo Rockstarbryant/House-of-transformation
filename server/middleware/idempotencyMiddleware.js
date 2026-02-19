@@ -37,7 +37,15 @@ exports.idempotencyMiddleware = async (req, res, next) => {
     }
 
     // Store key in request for later use
-    req.idempotencyKey = idempotencyKey;
+  //  req.idempotencyKey = idempotencyKey;
+  //  req.userId = req.user._id;
+  req.idempotencyKey = idempotencyKey;
+
+    // ✅ If no authenticated user, skip DB idempotency check and proceed
+    if (!req.user) {
+      return next();
+    }
+
     req.userId = req.user._id;
 
     // Check if this request was already processed

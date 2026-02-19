@@ -13,6 +13,14 @@ const Announcement = require('../models/Announcement');
 const AuditLog = require('../models/AuditLog');
 const BannedUser = require('../models/BannedUser');
 
+const { createClient } = require('@supabase/supabase-js');
+const config = require('../config/env');
+
+const supabase = createClient(
+  config.SUPABASE_URL,
+  config.SUPABASE_SERVICE_KEY
+);
+
 
 // ✅ SECURITY HELPER
 const hasAnalyticsPermission = (user) => {
@@ -393,6 +401,114 @@ if (!hasAnalyticsPermission(req.user)) {
       { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
+    // Add inside getContentAnalytics, before the res.json()
+
+// ========== TOP PERFORMING SERMONS ==========
+const topSermonsByViews = await Sermon.find()
+  .sort({ views: -1 })
+  .limit(10)
+  .select('title pastor category type views likes date thumbnail')
+  .lean();
+
+const topSermonsByLikes = await Sermon.find()
+  .sort({ likes: -1 })
+  .limit(10)
+  .select('title pastor category type views likes date thumbnail')
+  .lean();
+
+// ========== TOP GALLERY PHOTOS ==========
+const topGalleryByLikes = await Gallery.find()
+  .sort({ likes: -1 })
+  .limit(15)
+  .select('title category likes imageUrl caption createdAt')
+  .lean();
+
+// ========== TOP EVENTS BY REGISTRATIONS ==========
+const topEventsByRegistrations = await Event.aggregate([
+  {
+    $project: {
+      title: 1,
+      date: 1,
+      location: 1,
+      totalRegistrations: { $size: { $ifNull: ['$registrations', []] } },
+      memberRegistrations: {
+        $size: {
+          $filter: {
+            input: { $ifNull: ['$registrations', []] },
+            as: 'reg',
+            cond: { $eq: ['$$reg.isVisitor', false] }
+          }
+        }
+      },
+      visitorRegistrations: {
+        $size: {
+          $filter: {
+            input: { $ifNull: ['$registrations', []] },
+            as: 'reg',
+            cond: { $eq: ['$$reg.isVisitor', true] }
+          }
+        }
+      },
+      capacity: 1
+    }
+  },
+  { $sort: { totalRegistrations: -1 } },
+  { $limit: 10 }
+]);
+
+// ========== SERMON TREND BY PERIOD ==========
+const periods = {
+  week: new Date(now - 7 * 24 * 60 * 60 * 1000),
+  month: new Date(now - 30 * 24 * 60 * 60 * 1000),
+  year: new Date(now - 365 * 24 * 60 * 60 * 1000)
+};
+
+const topSermonsByViewsWeek = await Sermon.find({ date: { $gte: periods.week } })
+  .sort({ views: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+const topSermonsByViewsMonth = await Sermon.find({ date: { $gte: periods.month } })
+  .sort({ views: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+const topSermonsByViewsYear = await Sermon.find({ date: { $gte: periods.year } })
+  .sort({ views: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+const topSermonsByLikesWeek = await Sermon.find({ date: { $gte: periods.week } })
+  .sort({ likes: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+const topSermonsByLikesMonth = await Sermon.find({ date: { $gte: periods.month } })
+  .sort({ likes: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+const topSermonsByLikesYear = await Sermon.find({ date: { $gte: periods.year } })
+  .sort({ likes: -1 }).limit(10)
+  .select('title pastor category views likes date').lean();
+
+// ========== BLOG ENGAGEMENT ==========
+const topBlogsByLikes = await Blog.find({ approved: true })
+  .sort({ 'likes': -1 })
+  .limit(10)
+  .select('title author category likes views createdAt')
+  .lean();
+
+// Category performance
+const sermonCategoryPerformance = await Sermon.aggregate([
+  {
+    $group: {
+      _id: '$category',
+      totalViews: { $sum: '$views' },
+      totalLikes: { $sum: '$likes' },
+      count: { $sum: 1 },
+      avgViews: { $avg: '$views' },
+      avgLikes: { $avg: '$likes' }
+    }
+  },
+  { $sort: { totalViews: -1 } }
+]);
+
     res.json({
       success: true,
       data: {
@@ -402,7 +518,17 @@ if (!hasAnalyticsPermission(req.user)) {
           byType: sermonsByType,
           totalLikes: sermonLikesViews[0]?.totalLikes || 0,
           totalViews: sermonLikesViews[0]?.totalViews || 0,
-          recentTrend: sermonTrend
+          recentTrend: sermonTrend,
+          topByViews: topSermonsByViews,
+          topByLikes: topSermonsByLikes,
+          topByViewsWeek: topSermonsByViewsWeek,
+          topByViewsMonth: topSermonsByViewsMonth,
+          topByViewsYear: topSermonsByViewsYear,
+          topByLikesWeek: topSermonsByLikesWeek,
+          topByLikesMonth: topSermonsByLikesMonth,
+          topByLikesYear: topSermonsByLikesYear,
+          categoryPerformance: sermonCategoryPerformance
+
         },
         blogs: {
           total: totalBlogs,
@@ -410,13 +536,15 @@ if (!hasAnalyticsPermission(req.user)) {
           pending: pendingBlogs,
           byCategory: blogsByCategory,
           totalLikes: blogLikes[0]?.totalLikes || 0,
-          recentTrend: blogTrend
+          recentTrend: blogTrend,
+           topByLikes: topBlogsByLikes
         },
         gallery: {
           total: totalGallery,
           byCategory: galleryByCategory,
           totalLikes: galleryLikes[0]?.totalLikes || 0,
-          recentTrend: galleryTrend
+          recentTrend: galleryTrend,
+          topByLikes: topGalleryByLikes
         },
         events: {
           total: totalEvents,
@@ -425,7 +553,8 @@ if (!hasAnalyticsPermission(req.user)) {
           totalRegistrations: eventRegistrations[0]?.totalRegistrations || 0,
           memberRegistrations: eventRegistrations[0]?.memberRegistrations || 0,
           visitorRegistrations: eventRegistrations[0]?.visitorRegistrations || 0,
-          recentTrend: eventTrend
+          recentTrend: eventTrend,
+          topByRegistrations: topEventsByRegistrations
         }
       }
     });
@@ -582,17 +711,17 @@ if (!hasAnalyticsPermission(req.user)) {
  */
 exports.getFinancialAnalytics = async (req, res) => {
   try {
-    // ✅ CRITICAL: Permission check
-if (!hasAnalyticsPermission(req.user)) {
-  return res.status(403).json({
-    success: false,
-    message: 'Access denied: Insufficient permissions',
-    requiredPermissions: ['view:analytics'],
-    userPermissions: req.user?.role?.permissions || [],
-    userRole: req.user?.role?.name || 'none'
-  });
-}
-    // ========== CAMPAIGNS ==========
+    if (!hasAnalyticsPermission(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        requiredPermissions: ['view:analytics'],
+        userPermissions: req.user?.role?.permissions || [],
+        userRole: req.user?.role?.name || 'none'
+      });
+    }
+
+    // ========== CAMPAIGNS (MongoDB) ==========
     const totalCampaigns = await Campaign.countDocuments();
     const activeCampaigns = await Campaign.countDocuments({ status: 'active' });
     const completedCampaigns = await Campaign.countDocuments({ status: 'completed' });
@@ -616,71 +745,78 @@ if (!hasAnalyticsPermission(req.user)) {
       ? Math.round((campaignFinancials[0]?.totalRaised / campaignFinancials[0]?.totalGoal) * 100)
       : 0;
 
-    // ========== PLEDGES ==========
-    const Pledge = require('../models/Pledge');
-    const totalPledges = await Pledge.countDocuments();
+    // ========== PLEDGES (Supabase) ==========
+    const { count: totalPledges } = await supabase
+      .from('pledges')
+      .select('*', { count: 'exact', head: true });
 
-    const pledgeStats = await Pledge.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$amount' }
-        }
-      }
-    ]);
+    const { data: pledgeAmountData } = await supabase
+      .from('pledges')
+      .select('pledged_amount, status');
 
-    const pledgesByStatus = await Pledge.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
+    const totalPledgeAmount = pledgeAmountData?.reduce((sum, p) => sum + (p.pledged_amount || 0), 0) || 0;
 
-    const fulfilledPledges = await Pledge.countDocuments({ status: 'fulfilled' });
+    // Group by status
+    const pledgeStatusMap = {};
+    pledgeAmountData?.forEach(p => {
+      pledgeStatusMap[p.status] = (pledgeStatusMap[p.status] || 0) + 1;
+    });
+    const pledgesByStatus = Object.entries(pledgeStatusMap).map(([_id, count]) => ({ _id, count }));
+
+    const fulfilledPledges = pledgeStatusMap['fulfilled'] || pledgeStatusMap['completed'] || 0;
     const fulfillmentRate = totalPledges > 0
       ? Math.round((fulfilledPledges / totalPledges) * 100)
       : 0;
 
-    // ========== PAYMENTS ==========
-    const Payment = require('../models/Payment');
-    const totalPayments = await Payment.countDocuments();
+    // ========== PAYMENTS (Supabase) ==========
+    const { count: totalPayments } = await supabase
+      .from('payments')
+      .select('*', { count: 'exact', head: true });
 
-    const paymentStats = await Payment.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$amount' }
-        }
-      }
-    ]);
+    const { data: paymentData } = await supabase
+      .from('payments')
+      .select('amount, payment_method, status, created_at');
 
-    const paymentsByMethod = await Payment.aggregate([
-      { $group: { _id: '$paymentMethod', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
+    const totalPaymentAmount = paymentData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-    const successfulPayments = await Payment.countDocuments({ status: 'success' });
+    // Group by payment method
+    const methodMap = {};
+    paymentData?.forEach(p => {
+      methodMap[p.payment_method] = (methodMap[p.payment_method] || 0) + 1;
+    });
+    const paymentsByMethod = Object.entries(methodMap).map(([_id, count]) => ({ _id, count }));
+
+    const successfulPayments = paymentData?.filter(p => p.status === 'success').length || 0;
     const successRate = totalPayments > 0
       ? Math.round((successfulPayments / totalPayments) * 100)
       : 0;
 
-    // Monthly payment trend
-    const monthlyTrend = await Payment.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: new Date(Date.now() - 12 * 30 * 24 * 60 * 60 * 1000) }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]);
+    // Monthly payment trend (last 12 months)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const { data: trendData } = await supabase
+      .from('payments')
+      .select('amount, created_at')
+      .gte('created_at', twelveMonthsAgo.toISOString());
+
+    const trendMap = {};
+    trendData?.forEach(p => {
+      const date = new Date(p.created_at);
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      if (!trendMap[key]) {
+        trendMap[key] = { 
+          _id: { year: date.getFullYear(), month: date.getMonth() + 1 }, 
+          count: 0, 
+          totalAmount: 0 
+        };
+      }
+      trendMap[key].count += 1;
+      trendMap[key].totalAmount += p.amount || 0;
+    });
+
+    const monthlyTrend = Object.values(trendMap)
+      .sort((a, b) => a._id.year - b._id.year || a._id.month - b._id.month);
 
     res.json({
       success: true,
@@ -695,14 +831,14 @@ if (!hasAnalyticsPermission(req.user)) {
           completionRate
         },
         pledges: {
-          total: totalPledges,
-          totalAmount: pledgeStats[0]?.totalAmount || 0,
+          total: totalPledges || 0,
+          totalAmount: totalPledgeAmount,
           byStatus: pledgesByStatus,
           fulfillmentRate
         },
         payments: {
-          total: totalPayments,
-          totalAmount: paymentStats[0]?.totalAmount || 0,
+          total: totalPayments || 0,
+          totalAmount: totalPaymentAmount,
           byMethod: paymentsByMethod,
           successRate,
           monthlyTrend
