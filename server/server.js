@@ -125,6 +125,7 @@ app.use('/api/donations/analytics', require('./routes/donationAnalyticsRoutes'))
 app.use('/api/livestreams', require('./routes/livestreamRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 app.use('/api/volunteers', require('./routes/volunteerRoutes'));
+app.use('/api/notices', require('./routes/noticeRoutes'));
 
 // ============================================
 // ✅ CRITICAL FIX: Announcements route uses its own auth
