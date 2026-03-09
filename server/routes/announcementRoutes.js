@@ -10,7 +10,9 @@ const {
   getUnreadCount,
   clearAllNotifications,
   getStatistics,
-  streamAnnouncements
+  streamAnnouncements,
+  resendNotifications,       
+  getNotificationStats,      
 } = require('../controllers/announcementController');
 
 const { protect } = require('../middleware/supabaseAuth');
@@ -68,6 +70,12 @@ router.get('/', protect, getAllAnnouncements);
 
 // Create announcement
 router.post('/', protect, requirePermission('manage:announcements'), createAnnouncement);
+
+// Notification stats (admin)
+router.get('/:id/notification-stats', protect, requirePermission('manage:announcements'), getNotificationStats);
+
+// Resend notifications (admin)
+router.post('/:id/resend', protect, requirePermission('manage:announcements'), resendNotifications);
 
 // ============================================
 // DYNAMIC ID ROUTES (MUST BE LAST)

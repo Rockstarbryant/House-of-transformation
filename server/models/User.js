@@ -28,6 +28,16 @@ const userSchema = new mongoose.Schema({
     type: String,
     sparse: true
   },
+  notifications: {
+  email: {
+    type:    Boolean,
+    default: false,
+  },
+  sms: {
+    type:    Boolean,
+    default: false,
+  },
+},
   location: String,
   bio: String,
   avatar: {

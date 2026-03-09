@@ -382,38 +382,49 @@ exports.getUserStats = asyncHandler(async (req, res) => {
 // @route   PUT /api/users/:id
 // @access  Private (own profile or admin)
 exports.updateUser = asyncHandler(async (req, res) => {
-  const { name, email, phone, bio, location, avatar, gender } = req.body;
-   
+  const { name, email, phone, bio, location, avatar, gender, notifications } = req.body;
+
   // Check if user is updating their own profile or is admin
   const isOwnProfile = req.user._id.toString() === req.params.id;
-  const isAdminUser = isAdmin(req.user);
+  const isAdminUser  = isAdmin(req.user);
 
   if (!isOwnProfile && !isAdminUser) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Not authorized to update this profile' 
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to update this profile'
     });
   }
 
-  // Build update object
+  // Build update object — whitelist every accepted field
   const updateData = {};
-  if (name) updateData.name = name;
-  if (phone !== undefined) updateData.phone = phone;
-  if (bio !== undefined) updateData.bio = bio;
+  if (name)                updateData.name     = name;
+  if (phone  !== undefined) updateData.phone   = phone;
+  if (bio    !== undefined) updateData.bio     = bio;
   if (location !== undefined) updateData.location = location;
-  if (avatar !== undefined) updateData.avatar = avatar;
+  if (avatar !== undefined) updateData.avatar  = avatar;
   if (gender && ['male', 'female'].includes(gender)) updateData.gender = gender;
-  
+
   // Only admin can change email
   if (email && isAdminUser) updateData.email = email;
+
+  // ── Notification preferences (user controls their own; admin can set for anyone) ──
+  if (notifications !== undefined && typeof notifications === 'object') {
+    // Build a partial update so we never accidentally wipe a sub-field
+    if (typeof notifications.email === 'boolean') {
+      updateData['notifications.email'] = notifications.email;
+    }
+    if (typeof notifications.sms === 'boolean') {
+      updateData['notifications.sms'] = notifications.sms;
+    }
+  }
 
   const user = await User.findByIdAndUpdate(
     req.params.id,
     updateData,
     { new: true, runValidators: true }
   )
-  .select('-password')
-  .populate('role', 'name permissions');
+    .select('-password')
+    .populate('role', 'name permissions');
 
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found' });

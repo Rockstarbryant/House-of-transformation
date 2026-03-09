@@ -87,7 +87,7 @@ Key responsibilities:
 │  │ Public     │  │ Mixed Auth   │  │ Protected │ │
 │  │ Routes     │  │ Routes       │  │ Routes    │ │
 │  │ (no JWT)   │  │ (optionalAuth│  │ (protect  │ │
-│  │            │  │  or protectSSE│  │  required)│ │
+│  │            │  │or protectSSE)│  │  required)│ │
 │  └────────────┘  └──────────────┘  └───────────┘ │
 │          ↓                                        │
 │  requirePermission (per-route enforcement)        │
