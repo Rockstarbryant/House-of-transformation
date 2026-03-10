@@ -1,6 +1,6 @@
 // server/workers/communicationWorker.js
 const { Worker } = require('bullmq');
-const redis      = require('../config/redis');
+const { getRedisConnection } = require('../config/redis');
 
 let worker;
 
@@ -10,23 +10,14 @@ const startCommunicationWorker = () => {
   }
 
   worker = new Worker(
-    'communications',
-    async (job) => {
-      const { communicationId } = job.data;
-      console.log(`[CommunicationWorker] ▶ Processing job "${job.name}" | id: ${job.id} | comm: ${communicationId}`);
-
-      // Lazy-require to avoid circular dependency at startup
-      const communicationService = require('../services/communicationService');
-      await communicationService.processCommunication(communicationId);
-
-      console.log(`[CommunicationWorker] ✅ Job completed: ${job.id}`);
-    },
-    {
-      connection:  redis,
-      concurrency: 2,
-      limiter:     { max: 10, duration: 60_000 },
-    }
-  );
+  'communications',
+  async (job) => { ... },
+  {
+    connection:  getRedisConnection(), // ← was: redis
+    concurrency: 2,
+    limiter:     { max: 10, duration: 60_000 },
+  }
+);
 
   worker.on('failed', async (job, err) => {
     console.error(

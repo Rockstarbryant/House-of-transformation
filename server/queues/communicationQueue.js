@@ -1,6 +1,6 @@
 // server/queues/communicationQueue.js
 const { Queue } = require('bullmq');
-const redis    = require('../config/redis');
+const { getRedisConnection } = require('../config/redis');
 
 const QUEUE_NAME = 'communications';
 let _queue;
@@ -8,7 +8,7 @@ let _queue;
 const getQueue = () => {
   if (!_queue) {
     _queue = new Queue(QUEUE_NAME, {
-      connection: redis,
+      connection: getRedisConnection(), // ← was: redis
       defaultJobOptions: {
         attempts:         3,
         backoff:          { type: 'exponential', delay: 5_000 },
