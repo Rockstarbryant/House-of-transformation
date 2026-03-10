@@ -5,8 +5,8 @@ const cors    = require('cors');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const connectDB      = require('./config/database');
-const errorHandler   = require('./middleware/errorHandler');
+const connectDB    = require('./config/database');
+const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
 
 const config = require('./config/env');
@@ -17,6 +17,7 @@ console.log('   SUPABASE_SERVICE_KEY:',config.SUPABASE_SERVICE_KEY ? '✓ Loaded
 console.log('   MONGODB_URI:',         config.MONGODB_URI          ? '✓ Loaded' : '✗ MISSING');
 console.log('   REDIS_URL:',           process.env.REDIS_URL        ? '✓ Loaded' : '⚠ Using default localhost');
 console.log('   BREVO_API_KEY:',       process.env.BREVO_API_KEY    ? '✓ Loaded' : '⚠ Email/SMS notifications disabled');
+console.log('   AT_API_KEY:',          process.env.AT_API_KEY       ? '✓ Loaded' : '⚠ SMS notifications disabled');
 console.log('   NODE_ENV:',            process.env.NODE_ENV || 'development');
 console.log('');
 
@@ -27,33 +28,45 @@ require('./config/cloudinaryConfig');
 
 connectDB();
 
-// ── Start notification worker ────────────────────────────────────────────
-// Only initialise if Redis and Brevo are configured.
-// The worker silently skips jobs if Brevo key is missing.
-let stopWorker = async () => {};
+// ── Start workers ─────────────────────────────────────────────────────────────
+// Only initialise if Redis is configured.
+let stopNotificationWorker = async () => {};
+let stopCommunicationWorker = async () => {};
 
 if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
+  // Existing announcement notification worker
   try {
-    const { startNotificationWorker, stopNotificationWorker } = require('./workers/notificationWorker');
+    const { startNotificationWorker, stopNotificationWorker: _stop1 } = require('./workers/notificationWorker');
     startNotificationWorker();
-    stopWorker = stopNotificationWorker;
+    stopNotificationWorker = _stop1;
     console.log('✓ Notification worker started');
   } catch (err) {
     console.error('⚠  Notification worker failed to start:', err.message);
     console.error('   Announcements will still work — email/SMS notifications will not be sent');
   }
+
+  // New communication worker
+  try {
+    const { startCommunicationWorker, stopCommunicationWorker: _stop2 } = require('./workers/communicationWorker');
+    startCommunicationWorker();
+    stopCommunicationWorker = _stop2;
+    console.log('✓ Communication worker started');
+  } catch (err) {
+    console.error('⚠  Communication worker failed to start:', err.message);
+    console.error('   Communications will still be queued — they will process once worker recovers');
+  }
 }
 
 const app = express();
 
-// ── Trust proxy ───────────────────────────────────────────────────────────
+// ── Trust proxy ───────────────────────────────────────────────────────────────
 app.set('trust proxy', 1);
 
-// ── Body parser ───────────────────────────────────────────────────────────
+// ── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── CORS ──────────────────────────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins =
   process.env.NODE_ENV === 'development'
     ? [
@@ -82,34 +95,35 @@ app.use(
   })
 );
 
-// ── Static files ──────────────────────────────────────────────────────────
+// ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static('uploads'));
 
-// ── Audit middleware ──────────────────────────────────────────────────────
+// ── Audit middleware ──────────────────────────────────────────────────────────
 app.use('/api', auditMiddleware);
 
-// ── Health & info ─────────────────────────────────────────────────────────
+// ── Health & info ─────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
     message:  'Welcome to House of Transformation API',
-    version:  '2.0.0',
-    features: ['SSE', 'Email Notifications (Brevo)', 'SMS Notifications (Brevo)', 'BullMQ Job Queue'],
+    version:  '2.1.0',
+    features: ['SSE', 'Email (Brevo)', 'SMS (Africa\'s Talking)', 'BullMQ Job Queue', 'Communication Broadcasts'],
   });
 });
 
 app.get('/api/health', (req, res) => {
   res.json({
-    success:    true,
-    message:    'Server is running',
-    queue:      process.env.REDIS_URL ? 'connected' : 'redis not configured',
-    brevo:      process.env.BREVO_API_KEY ? 'configured' : 'not configured',
+    success:        true,
+    message:        'Server is running',
+    queue:          process.env.REDIS_URL ? 'connected' : 'redis not configured',
+    brevo:          process.env.BREVO_API_KEY ? 'configured' : 'not configured',
+    africasTalking: process.env.AT_API_KEY   ? 'configured' : 'not configured',
   });
 });
 
-// ── Rate limiter ──────────────────────────────────────────────────────────
+// ── Rate limiter ──────────────────────────────────────────────────────────────
 app.use('/api/', apiLimiter);
 
-// ── Routes (same mount order as original) ────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',            require('./routes/authRoutes'));
 app.use('/api/settings/public', require('./routes/settingsRoutes'));
 
@@ -139,18 +153,23 @@ app.use('/api/settings',            protect, require('./routes/settingsRoutes'))
 app.use('/api/analytics',           protect, require('./routes/analyticsRoutes'));
 app.use('/api/audit',               protect, require('./routes/auditRoutes'));
 app.use('/api/transaction-audit',   protect, require('./routes/transactionAuditRoutes'));
+
+// Legacy email notifications (kept for backward compat)
 app.use('/api/email-notifications', protect, require('./routes/emailNotificationRoutes'));
 app.use('/api/email',               protect, require('./routes/emailTestRoutes'));
 
-// ── 404 ───────────────────────────────────────────────────────────────────
+// ✅ NEW: Communications system
+app.use('/api/communications',      protect, require('./routes/communicationRoutes'));
+
+// ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found', path: req.path, method: req.method });
 });
 
-// ── Global error handler ──────────────────────────────────────────────────
+// ── Global error handler ──────────────────────────────────────────────────────
 app.use(errorHandler);
 
-// ── Start server ──────────────────────────────────────────────────────────
+// ── Start server ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
 const { initializeCleanupJobs } = require('./utils/cleanupJobs');
@@ -162,19 +181,25 @@ const server = app.listen(PORT, () => {
   console.log(`✓ Rate limiting: 1000 req / 15 min`);
 });
 
-// ── Graceful shutdown ─────────────────────────────────────────────────────
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
 const gracefulShutdown = async (signal) => {
   console.log(`\n[Server] ${signal} received — shutting down gracefully`);
 
   server.close(async () => {
     console.log('[Server] HTTP server closed');
-    await stopWorker();
-    const { closeQueue } = require('./queues/notificationQueue');
-    await closeQueue();
+
+    await stopNotificationWorker();
+    await stopCommunicationWorker();
+
+    const { closeQueue: closeNotifQueue }  = require('./queues/notificationQueue');
+    const { closeQueue: closeCommQueue }   = require('./queues/communicationQueue');
+
+    await closeNotifQueue();
+    await closeCommQueue();
+
     process.exit(0);
   });
 
-  // Force kill after 10 seconds
   setTimeout(() => {
     console.error('[Server] Forced shutdown after timeout');
     process.exit(1);

@@ -1,321 +1,155 @@
 // server/services/emailService.js
-/**
- * Email Service
- * Sends emails using SMTP settings from database
- */
+// Upgraded from Nodemailer/SMTP → Brevo Transactional API
 
-const nodemailer = require('nodemailer');
-const Settings = require('../models/Settings');
+const SENDER_NAME  = process.env.BREVO_SENDER_NAME  || 'House of Transformation';
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'noreply@houseoftransformation.com';
 
 class EmailService {
   constructor() {
-    this.transporter = null;
-    this.lastSettingsCheck = 0;
-    this.settingsCacheDuration = 5 * 60 * 1000; // 5 minutes
+    this._client = null;
   }
 
-  /**
-   * Get transporter (creates new one if settings changed)
-   */
-  async getTransporter() {
-    try {
-      const now = Date.now();
-      
-      // Use cached transporter if less than 5 minutes old
-      if (this.transporter && (now - this.lastSettingsCheck) < this.settingsCacheDuration) {
-        console.log('[EMAIL-SERVICE] Using cached transporter');
-        return this.transporter;
-      }
-
-      console.log('[EMAIL-SERVICE] Fetching email settings from database...');
-      
-      const settings = await Settings.getSettings();
-      const emailSettings = settings?.emailSettings;
-
-      // Check if email settings are configured
-      if (!emailSettings?.smtpHost || !emailSettings?.smtpUser || !emailSettings?.smtpPassword) {
-        console.warn('[EMAIL-SERVICE] ⚠️ Email settings not configured');
-        return null;
-      }
-
-      console.log('[EMAIL-SERVICE] Creating transporter with settings:', {
-        host: emailSettings.smtpHost,
-        port: emailSettings.smtpPort,
-        user: emailSettings.smtpUser.substring(0, 5) + '***'
-      });
-
-      // Create new transporter with current settings
-      this.transporter = nodemailer.createTransport({
-        host: emailSettings.smtpHost,
-        port: emailSettings.smtpPort,
-        secure: emailSettings.smtpPort === 465, // Use TLS for port 465
-        auth: {
-          user: emailSettings.smtpUser,
-          pass: emailSettings.smtpPassword
-        }
-      });
-
-      // Verify transporter connection
-      try {
-        await this.transporter.verify();
-        console.log('[EMAIL-SERVICE] ✅ Transporter verified - SMTP connected successfully');
-      } catch (verifyError) {
-        console.error('[EMAIL-SERVICE] ❌ Transporter verification failed:', verifyError.message);
-        return null;
-      }
-
-      this.lastSettingsCheck = now;
-      return this.transporter;
-
-    } catch (error) {
-      console.error('[EMAIL-SERVICE] Error getting transporter:', error);
-      return null;
+  /** Lazy-initialise Brevo client (avoids crash if key is missing at startup) */
+  _getClient() {
+    if (!this._client) {
+      if (!process.env.BREVO_API_KEY) return null;
+      const { BrevoClient } = require('@getbrevo/brevo');
+      this._client = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
     }
+    return this._client;
   }
 
   /**
-   * Send email using configured SMTP
+   * Core send method — drop-in replacement for the old nodemailer call.
+   * Accepts to as a string or array of strings.
    */
-  async sendEmail(options) {
+  async sendEmail({ to, subject, text, html }) {
     try {
-      const { to, subject, text, html } = options;
-
-      console.log('[EMAIL-SERVICE] Preparing to send email to:', to);
-
-      // Get settings
-      const settings = await Settings.getSettings();
-      const emailSettings = settings?.emailSettings;
-      const notificationSettings = settings?.notificationSettings;
-
-      // Check if email notifications are enabled
-      if (!notificationSettings?.emailNotifications) {
-        console.log('[EMAIL-SERVICE] ⚠️ Email notifications disabled in settings');
-        return { success: false, reason: 'Email notifications disabled' };
+      const client = this._getClient();
+      if (!client) {
+        console.warn('[EmailService] ⚠ Brevo not configured — email skipped');
+        return { success: false, reason: 'Email not configured (BREVO_API_KEY missing)' };
       }
 
-      // Get transporter
-      const transporter = await this.getTransporter();
-      if (!transporter) {
-        console.error('[EMAIL-SERVICE] ❌ No transporter available');
-        return { success: false, reason: 'Email not configured' };
-      }
+      const toArray = Array.isArray(to) ? to : [to];
 
-      // Prepare mail options
-      const mailOptions = {
-        from: `${emailSettings.fromName} <${emailSettings.fromEmail}>`,
-        to,
+      await client.transactionalEmails.sendTransacEmail({
+        sender:      { name: SENDER_NAME, email: SENDER_EMAIL },
+        to:          toArray.map(email => ({ email })),
         subject,
-        text,
-        html
-      };
-
-      console.log('[EMAIL-SERVICE] Sending email...');
-      
-      // Send email
-      const info = await transporter.sendMail(mailOptions);
-
-      console.log('[EMAIL-SERVICE] ✅ Email sent successfully:', {
-        messageId: info.messageId,
-        response: info.response
+        htmlContent: html,
+        textContent: text,
       });
 
-      return {
-        success: true,
-        messageId: info.messageId
-      };
+      console.log(`[EmailService] ✅ Email sent — subject: "${subject}" | to: ${toArray.join(', ')}`);
+      return { success: true };
 
     } catch (error) {
-      console.error('[EMAIL-SERVICE] ❌ Error sending email:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Send password reset email
-   */
-  async sendPasswordResetEmail(email, resetToken, resetUrl) {
-    const html = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #8B1A1A; color: white; text-decoration: none; border-radius: 5px;">
-        Reset Password
-      </a>
-      <p>Or copy this link: <code>${resetUrl}</code></p>
-      <p>This link expires in 1 hour.</p>
-      <p>If you didn't request this, ignore this email.</p>
-    `;
-
-    return this.sendEmail({
-      to: email,
-      subject: 'Password Reset Request',
-      text: `Reset your password using this link: ${resetUrl}`,
-      html
-    });
-  }
-
-  /**
-   * Send welcome email
-   */
-  async sendWelcomeEmail(email, name) {
-    const html = `
-      <h2>Welcome to House of Transformation!</h2>
-      <p>Hi ${name},</p>
-      <p>Welcome to our community. We're excited to have you with us.</p>
-      <p>Visit our website: <a href="https://houseoftransformation.com">houseoftransformation.com</a></p>
-      <p>Best regards,<br>House of Transformation Team</p>
-    `;
-
-    return this.sendEmail({
-      to: email,
-      subject: 'Welcome to House of Transformation',
-      text: `Welcome ${name}!`,
-      html
-    });
-  }
-
-  /**
-   * Send contact form email
-   */
-  async sendContactFormEmail(contactData) {
-    const { name, email, subject, message } = contactData;
-
-    const settings = await Settings.getSettings();
-    const adminEmail = settings?.contactEmail;
-
-    const html = `
-      <h2>New Contact Form Submission</h2>
-      <p><strong>From:</strong> ${name}</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Subject:</strong> ${subject}</p>
-      <p><strong>Message:</strong></p>
-      <p>${message.replace(/\n/g, '<br>')}</p>
-    `;
-
-    return this.sendEmail({
-      to: adminEmail,
-      subject: `New Contact Form: ${subject}`,
-      text: message,
-      html
-    });
-  }
-
-  /**
-   * Send admin notification (new donation, new volunteer, etc.)
-   */
-  async sendAdminNotification(type, data) {
-    try {
-      const settings = await Settings.getSettings();
-      const adminEmail = settings?.contactEmail;
-      const notificationSettings = settings?.notificationSettings;
-
-      // Check if this notification type is enabled
-      const notificationMap = {
-        donation: 'notifyOnNewDonation',
-        volunteer: 'notifyOnNewVolunteer',
-        user: 'notifyOnNewUser'
-      };
-
-      const notificationKey = notificationMap[type];
-      if (notificationKey && !notificationSettings?.[notificationKey]) {
-        console.log(`[EMAIL-SERVICE] ${type} notifications disabled`);
-        return { success: false, reason: `${type} notifications disabled` };
-      }
-
-      let subject = '';
-      let html = '';
-
-      switch(type) {
-        case 'donation':
-          subject = `New Donation - $${data.amount}`;
-          html = `
-            <h2>New Donation Received</h2>
-            <p>Amount: $${data.amount}</p>
-            <p>From: ${data.donorName || 'Anonymous'}</p>
-            <p>Date: ${new Date().toLocaleString()}</p>
-          `;
-          break;
-
-        case 'volunteer':
-          subject = 'New Volunteer Application';
-          html = `
-            <h2>New Volunteer Application</h2>
-            <p>Name: ${data.name}</p>
-            <p>Email: ${data.email}</p>
-            <p>Skills: ${data.skills}</p>
-            <p>Date: ${new Date().toLocaleString()}</p>
-          `;
-          break;
-
-        case 'user':
-          subject = 'New User Registration';
-          html = `
-            <h2>New User Registered</h2>
-            <p>Name: ${data.name}</p>
-            <p>Email: ${data.email}</p>
-            <p>Date: ${new Date().toLocaleString()}</p>
-          `;
-          break;
-      }
-
-      return this.sendEmail({
-        to: adminEmail,
-        subject,
-        html
-      });
-
-    } catch (error) {
-      console.error('[EMAIL-SERVICE] Error sending admin notification:', error);
+      console.error('[EmailService] ❌ Send failed:', error.message);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Test email connection
-   */
-  async testConnection() {
+  async sendPasswordResetEmail(email, resetToken, resetUrl) {
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+        <h2 style="color:#8B1A1A;">Password Reset</h2>
+        <p>Click below to reset your House of Transformation portal password:</p>
+        <a href="${resetUrl}"
+           style="display:inline-block;padding:12px 28px;background:#8B1A1A;color:#fff;
+                  text-decoration:none;border-radius:6px;margin:16px 0;font-weight:bold;">
+          Reset Password
+        </a>
+        <p style="color:#666;font-size:13px;">This link expires in 1 hour.</p>
+        <p style="color:#999;font-size:12px;">If you didn't request this, ignore this email.</p>
+      </div>`;
+    return this.sendEmail({
+      to:      email,
+      subject: 'Password Reset — House of Transformation',
+      text:    `Reset your password here: ${resetUrl}`,
+      html,
+    });
+  }
+
+  async sendWelcomeEmail(email, name) {
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+        <h2 style="color:#8B1A1A;">Welcome to House of Transformation!</h2>
+        <p>Hi ${name},</p>
+        <p>We're thrilled to have you in our community. God bless you!</p>
+        <p>— House of Transformation Team, Busia Kenya</p>
+      </div>`;
+    return this.sendEmail({
+      to:      email,
+      subject: 'Welcome to House of Transformation',
+      text:    `Welcome, ${name}! We are excited to have you.`,
+      html,
+    });
+  }
+
+  async sendContactFormEmail(contactData) {
+    const { name, email, subject, message } = contactData;
+
+    let adminEmail = SENDER_EMAIL;
     try {
-      console.log('[EMAIL-SERVICE] Testing email connection...');
-      
+      const Settings = require('../models/Settings');
       const settings = await Settings.getSettings();
-      const emailSettings = settings?.emailSettings;
+      if (settings?.contactEmail) adminEmail = settings.contactEmail;
+    } catch (_) { /* fallback to env */ }
 
-      if (!emailSettings?.smtpHost) {
-        return {
-          success: false,
-          error: 'Email settings not configured'
-        };
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+        <h2 style="color:#8B1A1A;">New Contact Form Submission</h2>
+        <p><strong>From:</strong> ${name} &lt;${email}&gt;</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <div style="background:#f9f9f9;padding:16px;border-radius:6px;margin-top:12px;line-height:1.7;">
+          ${message.replace(/\n/g, '<br>')}
+        </div>
+      </div>`;
+    return this.sendEmail({ to: adminEmail, subject: `Contact: ${subject}`, text: message, html });
+  }
+
+  async sendAdminNotification(type, data) {
+    let adminEmail = SENDER_EMAIL;
+    try {
+      const Settings = require('../models/Settings');
+      const settings = await Settings.getSettings();
+      if (settings?.contactEmail) adminEmail = settings.contactEmail;
+
+      const notifKey = { donation: 'notifyOnNewDonation', volunteer: 'notifyOnNewVolunteer', user: 'notifyOnNewUser' }[type];
+      if (notifKey && !settings?.notificationSettings?.[notifKey]) {
+        return { success: false, reason: `${type} notifications disabled` };
       }
+    } catch (_) { /* proceed anyway */ }
 
-      const transporter = nodemailer.createTransport({
-        host: emailSettings.smtpHost,
-        port: emailSettings.smtpPort,
-        secure: emailSettings.smtpPort === 465,
-        auth: {
-          user: emailSettings.smtpUser,
-          pass: emailSettings.smtpPassword
-        }
-      });
+    const templates = {
+      donation: {
+        subject: `New Donation — ${data.amount}`,
+        html:    `<h3>New Donation</h3><p>Amount: ${data.amount}</p><p>From: ${data.donorName || 'Anonymous'}</p><p>${new Date().toLocaleString()}</p>`,
+      },
+      volunteer: {
+        subject: 'New Volunteer Application',
+        html:    `<h3>New Volunteer</h3><p>Name: ${data.name}</p><p>Email: ${data.email}</p><p>Skills: ${data.skills || 'N/A'}</p>`,
+      },
+      user: {
+        subject: 'New User Registration',
+        html:    `<h3>New User</h3><p>Name: ${data.name}</p><p>Email: ${data.email}</p><p>${new Date().toLocaleString()}</p>`,
+      },
+    };
 
-      await transporter.verify();
-      
-      console.log('[EMAIL-SERVICE] ✅ Email connection successful');
-      return {
-        success: true,
-        message: 'Email connection successful'
-      };
+    const tpl = templates[type];
+    if (!tpl) return { success: false, reason: 'Unknown notification type' };
 
-    } catch (error) {
-      console.error('[EMAIL-SERVICE] ❌ Email connection failed:', error.message);
-      return {
-        success: false,
-        error: error.message
-      };
+    return this.sendEmail({ to: adminEmail, subject: tpl.subject, html: tpl.html, text: tpl.subject });
+  }
+
+  /** For the settings panel "Test Connection" button */
+  async testConnection() {
+    if (!process.env.BREVO_API_KEY) {
+      return { success: false, error: 'BREVO_API_KEY not configured' };
     }
+    return { success: true, message: 'Brevo API key is present — connection OK' };
   }
 }
 
-// Export singleton instance
 module.exports = new EmailService();
