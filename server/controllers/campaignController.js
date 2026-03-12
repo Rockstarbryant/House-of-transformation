@@ -239,84 +239,88 @@ exports.getCampaign = asyncHandler(async (req, res) => {
 
 // ============================================
 // UPDATE CAMPAIGN (Admin only)
+// ✅ Now triggers thank-you when status → completed
 // ============================================
 exports.updateCampaign = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
-
+    const { id }    = req.params;
+    const updates   = req.body;
+ 
     console.log('[CAMPAIGN-UPDATE] Updating campaign:', id);
-
+ 
     const campaign = await Campaign.findById(id);
-
+ 
     if (!campaign) {
-      return res.status(404).json({
-        success: false,
-        message: 'Campaign not found'
-      });
+      return res.status(404).json({ success: false, message: 'Campaign not found' });
     }
-
-    // Validate dates if provided
+ 
+    // ✅ Capture status BEFORE any changes
+    const previousStatus = campaign.status;
+ 
     if (updates.startDate && updates.endDate) {
       if (new Date(updates.startDate) >= new Date(updates.endDate)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Start date must be before end date'
-        });
+        return res.status(400).json({ success: false, message: 'Start date must be before end date' });
       }
     }
-
-    // Update allowed fields
-    const allowedFields = ['title', 'description', 'goalAmount', 'campaignType', 'startDate', 'endDate', 'status', 'visibility', 'allowPledges', 'isFeatured', 'imageUrl', 'impactStatement', 'milestones'];
-    
+ 
+    const allowedFields = [
+      'title', 'description', 'goalAmount', 'campaignType',
+      'startDate', 'endDate', 'status', 'visibility',
+      'allowPledges', 'isFeatured', 'imageUrl', 'impactStatement', 'milestones'
+    ];
+ 
     allowedFields.forEach(field => {
-      if (updates[field] !== undefined) {
-        campaign[field] = updates[field];
-      }
+      if (updates[field] !== undefined) campaign[field] = updates[field];
     });
-
+ 
     await campaign.save();
-
-    // ✅ SYNC TO SUPABASE
+ 
+    // ✅ Sync to Supabase
     if (campaign.supabaseId) {
       const supabaseUpdates = {};
-      if (updates.title !== undefined) supabaseUpdates.title = updates.title;
-      if (updates.description !== undefined) supabaseUpdates.description = updates.description;
-      if (updates.goalAmount !== undefined) supabaseUpdates.goal_amount = updates.goalAmount;
-      if (updates.campaignType !== undefined) supabaseUpdates.campaign_type = updates.campaignType;
-      if (updates.startDate !== undefined) supabaseUpdates.start_date = updates.startDate;
-      if (updates.endDate !== undefined) supabaseUpdates.end_date = updates.endDate;
-      if (updates.status !== undefined) supabaseUpdates.status = updates.status;
-      if (updates.visibility !== undefined) supabaseUpdates.visibility = updates.visibility;
-      if (updates.allowPledges !== undefined) supabaseUpdates.allow_pledges = updates.allowPledges;
-      if (updates.isFeatured !== undefined) supabaseUpdates.is_featured = updates.isFeatured;
-      if (updates.imageUrl !== undefined) supabaseUpdates.image_url = updates.imageUrl;
-
+      if (updates.title !== undefined)         supabaseUpdates.title          = updates.title;
+      if (updates.description !== undefined)   supabaseUpdates.description    = updates.description;
+      if (updates.goalAmount !== undefined)    supabaseUpdates.goal_amount    = updates.goalAmount;
+      if (updates.campaignType !== undefined)  supabaseUpdates.campaign_type  = updates.campaignType;
+      if (updates.startDate !== undefined)     supabaseUpdates.start_date     = updates.startDate;
+      if (updates.endDate !== undefined)       supabaseUpdates.end_date       = updates.endDate;
+      if (updates.status !== undefined)        supabaseUpdates.status         = updates.status;
+      if (updates.visibility !== undefined)    supabaseUpdates.visibility     = updates.visibility;
+      if (updates.allowPledges !== undefined)  supabaseUpdates.allow_pledges  = updates.allowPledges;
+      if (updates.isFeatured !== undefined)    supabaseUpdates.is_featured    = updates.isFeatured;
+      if (updates.imageUrl !== undefined)      supabaseUpdates.image_url      = updates.imageUrl;
+ 
       const { error: supabaseError } = await supabase
         .from('campaigns')
         .update(supabaseUpdates)
         .eq('id', campaign.supabaseId);
-
+ 
       if (supabaseError) {
         console.error('[CAMPAIGN-UPDATE] Supabase sync error:', supabaseError);
       }
     }
-
+ 
+    // ✅ Fire thank-you if status just changed to completed
+    if (updates.status === 'completed' && previousStatus !== 'completed') {
+      console.log('[CAMPAIGN-UPDATE] Status → completed, queuing thank-you messages');
+      try {
+        const { queueCampaignThankYou } = require('../services/campaignThankYouService');
+        // Non-blocking — don't await so the HTTP response isn't delayed
+        queueCampaignThankYou(campaign).catch(err =>
+          console.error('[CAMPAIGN-UPDATE] Thank-you failed:', err.message)
+        );
+      } catch (err) {
+        console.error('[CAMPAIGN-UPDATE] Thank-you require failed:', err.message);
+      }
+    }
+ 
     console.log('[CAMPAIGN-UPDATE] Campaign updated:', campaign._id);
-
-    res.json({
-      success: true,
-      message: 'Campaign updated successfully',
-      campaign
-    });
-
+ 
+    res.json({ success: true, message: 'Campaign updated successfully', campaign });
+ 
   } catch (error) {
     console.error('[CAMPAIGN-UPDATE] Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update campaign',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to update campaign', error: error.message });
   }
 });
 
@@ -471,45 +475,47 @@ exports.getCampaignAnalytics = asyncHandler(async (req, res) => {
 });
 
 // NEW FUNCTION - Add to campaignController.js
+// ============================================
+// UPDATE OVERDUE CAMPAIGNS
+// ✅ Now triggers thank-you for each campaign that transitions
+// ============================================
 exports.updateOverdueCampaigns = asyncHandler(async (req, res) => {
   try {
     const now = new Date();
-    
-    // Find all active campaigns past their end date
+ 
     const overdueCampaigns = await Campaign.find({
-      status: 'active',
+      status:  'active',
       endDate: { $lt: now }
     });
-
+ 
     console.log(`[CAMPAIGNS] Found ${overdueCampaigns.length} overdue campaigns`);
-
+ 
     for (const campaign of overdueCampaigns) {
-      // Mark as completed
       campaign.status = 'completed';
       await campaign.save();
-
-      // Sync to Supabase
+ 
       if (campaign.supabaseId) {
-        await supabase
-          .from('campaigns')
-          .update({ status: 'completed' })
-          .eq('id', campaign.supabaseId);
+        await supabase.from('campaigns').update({ status: 'completed' }).eq('id', campaign.supabaseId);
       }
-
+ 
+      // ✅ Fire thank-you non-blocking
+      try {
+        const { queueCampaignThankYou } = require('../services/campaignThankYouService');
+        queueCampaignThankYou(campaign).catch(err =>
+          console.error('[CAMPAIGNS] Thank-you failed for', campaign._id.toString(), ':', err.message)
+        );
+      } catch (err) {
+        console.error('[CAMPAIGNS] Thank-you require failed:', err.message);
+      }
+ 
       console.log(`[CAMPAIGNS] Marked campaign ${campaign._id} as completed`);
     }
-
-    res.json({
-      success: true,
-      message: `Updated ${overdueCampaigns.length} campaigns`,
-      count: overdueCampaigns.length
-    });
+ 
+    res.json({ success: true, message: `Updated ${overdueCampaigns.length} campaigns`, count: overdueCampaigns.length });
+ 
   } catch (error) {
     console.error('[CAMPAIGNS] Update overdue error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update overdue campaigns'
-    });
+    res.status(500).json({ success: false, message: 'Failed to update overdue campaigns' });
   }
 });
 
@@ -519,51 +525,42 @@ exports.updateOverdueCampaigns = asyncHandler(async (req, res) => {
 exports.completeCampaign = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-
     console.log('[CAMPAIGN-COMPLETE] Completing campaign:', id);
-
+ 
     const campaign = await Campaign.findById(id);
-
+ 
     if (!campaign) {
-      return res.status(404).json({
-        success: false,
-        message: 'Campaign not found'
-      });
+      return res.status(404).json({ success: false, message: 'Campaign not found' });
     }
-
+ 
     if (campaign.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only active campaigns can be completed'
-      });
+      return res.status(400).json({ success: false, message: 'Only active campaigns can be completed' });
     }
-
+ 
     campaign.status = 'completed';
     await campaign.save();
-
-    // ✅ SYNC TO SUPABASE
+ 
+    // ✅ Sync to Supabase first so thank-you service sees the right status
     if (campaign.supabaseId) {
-      await supabase
-        .from('campaigns')
-        .update({ status: 'completed' })
-        .eq('id', campaign.supabaseId);
+      await supabase.from('campaigns').update({ status: 'completed' }).eq('id', campaign.supabaseId);
     }
-
+ 
+    // ✅ Queue thank-you messages (non-blocking)
+    try {
+      const { queueCampaignThankYou } = require('../services/campaignThankYouService');
+      queueCampaignThankYou(campaign).catch(err =>
+        console.error('[CAMPAIGN-COMPLETE] Thank-you failed:', err.message)
+      );
+    } catch (err) {
+      console.error('[CAMPAIGN-COMPLETE] Thank-you require failed:', err.message);
+    }
+ 
     console.log('[CAMPAIGN-COMPLETE] Campaign completed:', campaign._id);
-
-    res.json({
-      success: true,
-      message: 'Campaign completed successfully',
-      campaign
-    });
-
+    res.json({ success: true, message: 'Campaign completed successfully', campaign });
+ 
   } catch (error) {
     console.error('[CAMPAIGN-COMPLETE] Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to complete campaign',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to complete campaign', error: error.message });
   }
 });
 

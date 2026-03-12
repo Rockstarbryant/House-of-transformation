@@ -22,7 +22,7 @@ console.log('   NODE_ENV:',            process.env.NODE_ENV || 'development');
 console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
-const { protect }     = require('./middleware/supabaseAuth');
+const { protect } = require('./middleware/supabaseAuth');
 
 require('./config/cloudinaryConfig');
 
@@ -30,10 +30,12 @@ connectDB();
 
 // ── Start workers ─────────────────────────────────────────────────────────────
 // Only initialise if Redis is configured.
-let stopNotificationWorker = async () => {};
+let stopNotificationWorker  = async () => {};
 let stopCommunicationWorker = async () => {};
+let stopPledgeReminderWorker = async () => {};  // ✅ NEW
 
 if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
+
   // Existing announcement notification worker
   try {
     const { startNotificationWorker, stopNotificationWorker: _stop1 } = require('./workers/notificationWorker');
@@ -45,7 +47,7 @@ if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
     console.error('   Announcements will still work — email/SMS notifications will not be sent');
   }
 
-  // New communication worker
+  // Communication broadcast worker
   try {
     const { startCommunicationWorker, stopCommunicationWorker: _stop2 } = require('./workers/communicationWorker');
     startCommunicationWorker();
@@ -54,6 +56,19 @@ if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
   } catch (err) {
     console.error('⚠  Communication worker failed to start:', err.message);
     console.error('   Communications will still be queued — they will process once worker recovers');
+  }
+
+  // ✅ NEW: Pledge reminder worker + daily cron scheduler
+  try {
+    const { startPledgeReminderWorker, stopPledgeReminderWorker: _stop3 } = require('./workers/pledgeReminderWorker');
+    const { startPledgeReminderScheduler } = require('./jobs/pledgeReminderScheduler');
+    startPledgeReminderWorker();
+    startPledgeReminderScheduler();
+    stopPledgeReminderWorker = _stop3;
+    console.log('✓ Pledge reminder worker and scheduler started (daily 08:00 EAT)');
+  } catch (err) {
+    console.error('⚠  Pledge reminder worker failed to start:', err.message);
+    console.error('   Pledges still work — reminder notifications will not be sent automatically');
   }
 }
 
@@ -105,8 +120,16 @@ app.use('/api', auditMiddleware);
 app.get('/', (req, res) => {
   res.json({
     message:  'Welcome to House of Transformation API',
-    version:  '2.1.0',
-    features: ['SSE', 'Email (Brevo)', 'SMS (Africa\'s Talking)', 'BullMQ Job Queue', 'Communication Broadcasts'],
+    version:  '2.2.0',  // ✅ bumped
+    features: [
+      'SSE',
+      'Email (Brevo)',
+      'SMS (Africa\'s Talking)',
+      'BullMQ Job Queue',
+      'Communication Broadcasts',
+      'Pledge Reminders',       // ✅ NEW
+      'Campaign Thank-You Messages', // ✅ NEW
+    ],
   });
 });
 
@@ -158,7 +181,7 @@ app.use('/api/transaction-audit',   protect, require('./routes/transactionAuditR
 app.use('/api/email-notifications', protect, require('./routes/emailNotificationRoutes'));
 app.use('/api/email',               protect, require('./routes/emailTestRoutes'));
 
-// ✅ NEW: Communications system
+// Communication broadcasts
 app.use('/api/communications',      protect, require('./routes/communicationRoutes'));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
@@ -188,14 +211,19 @@ const gracefulShutdown = async (signal) => {
   server.close(async () => {
     console.log('[Server] HTTP server closed');
 
+    // Stop all workers
     await stopNotificationWorker();
     await stopCommunicationWorker();
+    await stopPledgeReminderWorker();   // ✅ NEW
 
-    const { closeQueue: closeNotifQueue }  = require('./queues/notificationQueue');
-    const { closeQueue: closeCommQueue }   = require('./queues/communicationQueue');
+    // Close all queues
+    const { closeQueue: closeNotifQueue }         = require('./queues/notificationQueue');
+    const { closeQueue: closeCommQueue }           = require('./queues/communicationQueue');
+    const { closeQueue: closePledgeReminderQueue } = require('./queues/pledgeReminderQueue'); // ✅ NEW
 
     await closeNotifQueue();
     await closeCommQueue();
+    await closePledgeReminderQueue();  // ✅ NEW
 
     process.exit(0);
   });

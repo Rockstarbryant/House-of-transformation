@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
 const asyncHandler = require('../middleware/asyncHandler');
 const Campaign = require('../models/Campaign');
+const { calcNextReminderAt } = require('../services/pledgeReminderService');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -82,7 +83,16 @@ exports.createPledge = asyncHandler(async (req, res) => {
         installment_plan: installmentPlan || 'lump-sum',
         due_date: campaign.endDate,
         next_payment_due: new Date(),
-        notes: notes || null
+        notes: notes || null,
+        reminder_enabled: req.body.reminderEnabled !== false,
+        reminder_channels: req.body.reminderChannels || ['email'],
+        reminder_frequency: req.body.reminderFrequency || 'weekly',
+        reminder_custom_days: req.body.reminderCustomDays || 7,
+        reminder_max_count: Math.min(parseInt(req.body.reminderMaxCount) || 3, 10),
+        reminder_next_at: calcNextReminderAt(
+                                req.body.reminderFrequency || 'weekly',
+                                req.body.reminderCustomDays || 7
+                              ),
       }])
       .select()
       .single();
@@ -817,5 +827,32 @@ exports.uncancelPledge = asyncHandler(async (req, res) => {
       message: 'Failed to restore pledge',
       error: error.message
     });
+  }
+});
+
+// ============================================
+// ADMIN: SEND REMINDERS TO ALL PENDING PLEDGES
+// ============================================
+exports.sendPledgeReminders = asyncHandler(async (req, res) => {
+  const isAdmin = req.user && req.user.role?.name === 'admin';
+  const hasManage = req.user && req.user.role?.permissions?.includes('manage:donations');
+
+  if (!isAdmin && !hasManage) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
+
+  try {
+    const { addAdminBlastRun } = require('../queues/pledgeReminderQueue');
+    const job = await addAdminBlastRun();
+    console.log('[PledgeController] Admin reminder blast queued:', job.id);
+
+    res.json({
+      success: true,
+      message: 'Reminder blast queued. All members with pending/partial pledges will be notified.',
+      jobId: job.id
+    });
+  } catch (err) {
+    console.error('[PledgeController] Reminder blast error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to queue reminders', error: err.message });
   }
 });

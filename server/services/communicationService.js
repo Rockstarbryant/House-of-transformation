@@ -254,4 +254,4 @@ const processCommunication = async (communicationId) => {
   }
 };
 
-module.exports = { processCommunication };
+module.exports = { processCommunication, sendEmailBatches, sendSmsBatches, buildHtml };

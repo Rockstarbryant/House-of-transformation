@@ -8,7 +8,8 @@ const {
   cancelPledge,
   getAllPledges,
   deletePledge,
-  uncancelPledge   
+  uncancelPledge,
+  sendPledgeReminders   
 } = require('../controllers/pledgeController');
 
 const { protect } = require('../middleware/supabaseAuth');
@@ -43,7 +44,7 @@ router.patch('/:pledgeId/cancel', protect, cancelPledge);
 // Get campaign pledges (requires view:pledges:all)
 router.get('/campaign/:campaignId', protect, requirePermission('view:pledges:all', 'manage:donations'), getCampaignPledges);
 
-
+router.post('/send-reminders', protect, requirePermission('manage:donations'), sendPledgeReminders);
 
 // Update pledge (requires edit:pledges)
 router.put('/:pledgeId', protect, requirePermission('edit:pledges', 'manage:donations'), updatePledge);

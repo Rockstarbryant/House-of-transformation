@@ -181,8 +181,6 @@ donationSettings: {
   enablePledgeReminders: { type: Boolean, default: true }
 },
 
-// ... rest of existing settings ...
-
   // Social Media Links
   socialMedia: {
     facebook: { type: String, default: '' },
@@ -192,6 +190,46 @@ donationSettings: {
     linkedin: { type: String, default: '' },
     whatsapp: { type: String, default: '' }
   },
+
+    // Church identity extras
+  churchMotto: { type: String, default: '' },
+  foundedYear: { type: Number, default: 2000 },
+ 
+  // Dedicated contact lines (shown in member portal Connect tab)
+  prayerLine:        { type: String, default: '' }, // e.g. +254 7XX XXX XXX
+  counselingContact: { type: String, default: '' },
+  newMembersContact: { type: String, default: '' },
+ 
+  // Service Schedule
+  serviceTimes: [
+    {
+      name:        { type: String, default: '' }, // e.g. "Sunday Morning Service"
+      day:         { type: String, default: '' }, // e.g. "Sunday"
+      time:        { type: String, default: '' }, // e.g. "9:00 AM – 12:00 PM"
+      venue:       { type: String, default: '' }, // e.g. "Main Sanctuary"
+      description: { type: String, default: '' },
+      isActive:    { type: Boolean, default: true },
+    },
+  ],
+ 
+  // Leadership / Staff directory
+  leadership: [
+    {
+      name:         { type: String, required: true },
+      title:        { type: String, default: '' }, // "Senior Pastor", "Youth Leader"
+      ministry:     { type: String, default: '' }, // "Main Ministry", "Youth", "Worship"
+      phone:        { type: String, default: '' },
+      whatsapp:     { type: String, default: '' },
+      email:        { type: String, default: '' },
+      facebook:     { type: String, default: '' },
+      instagram:    { type: String, default: '' },
+      twitter:      { type: String, default: '' },
+      bio:          { type: String, default: '' },
+      avatar:       { type: String, default: '' },  // Cloudinary URL
+      isVisible:    { type: Boolean, default: true },
+      displayOrder: { type: Number, default: 0 },
+    },
+  ],
 
   // Livestream Settings
   livestreamSettings: {

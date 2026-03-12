@@ -81,7 +81,18 @@ exports.sendCommunication = asyncHandler(async (req, res) => {
   }
 
   // ── Create record ───────────────────────────────────────────────────────
-  const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
+  const scheduledDate = scheduledFor ? new Date(scheduledFor) : null;
+  const now           = new Date();
+  const isScheduled   = scheduledDate && scheduledDate > now;
+  const delayMs       = isScheduled ? scheduledDate.getTime() - now.getTime() : 0;
+
+  // Add a guard — reject if scheduled time is in the past
+  if (scheduledFor && !isScheduled) {
+    return res.status(400).json({
+      success: false,
+      message: 'Scheduled time must be in the future. Please check your timezone — times are converted from your local browser time to UTC automatically.',
+    });
+  }
   const comm = await Communication.create({
     subject:       subject?.trim() || 'Message from House of Transformation',
     message:       message.trim(),
@@ -98,11 +109,14 @@ exports.sendCommunication = asyncHandler(async (req, res) => {
   // ── Queue job ───────────────────────────────────────────────────────────
   let job;
   if (isScheduled) {
-    const delayMs = new Date(scheduledFor).getTime() - Date.now();
-    job = await scheduleJob(comm._id.toString(), delayMs);
-  } else {
-    job = await addCommunicationJob(comm._id.toString());
-  }
+  job = await scheduleJob(comm._id.toString(), delayMs);
+  console.log(
+    '[CommunicationController] Scheduled for: ' + scheduledDate.toISOString() +
+    ' | delay: ' + Math.round(delayMs / 1000 / 60) + ' minutes'
+  );
+} else {
+  job = await addCommunicationJob(comm._id.toString());
+}
 
   comm.jobId = job.id;
   await comm.save();

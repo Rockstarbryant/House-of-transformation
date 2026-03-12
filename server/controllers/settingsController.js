@@ -119,6 +119,131 @@ exports.updateGeneralSettings = asyncHandler(async (req, res) => {
   }
 });
 
+ 
+// @desc    Get church info for authenticated members (Connect tab)
+// @route   GET /api/settings/church-info
+// @access  Private (any authenticated user)
+exports.getChurchInfo = asyncHandler(async (req, res) => {
+  try {
+    const settings = await Settings.getSettings();
+ 
+    res.json({
+      success: true,
+      churchInfo: {
+        // Identity
+        siteName:      settings.siteName,
+        siteTagline:   settings.siteTagline,
+        churchMotto:   settings.churchMotto,
+        foundedYear:   settings.foundedYear,
+ 
+        // Contact
+        contactEmail:      settings.contactEmail,
+        contactPhone:      settings.contactPhone,
+        contactAddress:    settings.contactAddress,
+        prayerLine:        settings.prayerLine,
+        counselingContact: settings.counselingContact,
+        newMembersContact: settings.newMembersContact,
+ 
+        // Social media
+        socialMedia: settings.socialMedia,
+ 
+        // Service times (active only)
+        serviceTimes: (settings.serviceTimes || []).filter(s => s.isActive),
+ 
+        // Leadership (visible only)
+        leadership: (settings.leadership || [])
+          .filter(l => l.isVisible)
+          .sort((a, b) => a.displayOrder - b.displayOrder),
+      },
+    });
+  } catch (error) {
+    console.error('[SETTINGS-CHURCH-INFO] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch church info', error: error.message });
+  }
+});
+ 
+// @desc    Update church identity + extra contact fields (admin only)
+// @route   PATCH /api/settings/church-info
+// @access  Private/Admin
+exports.updateChurchInfo = asyncHandler(async (req, res) => {
+  try {
+    const {
+      churchMotto, foundedYear,
+      prayerLine, counselingContact, newMembersContact,
+    } = req.body;
+ 
+    const settings = await Settings.getSettings();
+ 
+    if (churchMotto      !== undefined) settings.churchMotto      = churchMotto;
+    if (foundedYear      !== undefined) settings.foundedYear      = foundedYear;
+    if (prayerLine       !== undefined) settings.prayerLine       = prayerLine;
+    if (counselingContact!== undefined) settings.counselingContact= counselingContact;
+    if (newMembersContact!== undefined) settings.newMembersContact= newMembersContact;
+ 
+    settings.lastUpdatedBy = req.user.id;
+    await settings.save();
+ 
+    res.json({ success: true, message: 'Church info updated successfully', settings });
+  } catch (error) {
+    console.error('[SETTINGS-CHURCH-INFO-UPDATE] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update church info', error: error.message });
+  }
+});
+ 
+// @desc    Replace entire leadership array (admin only)
+// @route   PATCH /api/settings/leadership
+// @access  Private/Admin
+exports.updateLeadership = asyncHandler(async (req, res) => {
+  try {
+    const { leadership } = req.body;
+ 
+    if (!Array.isArray(leadership)) {
+      return res.status(400).json({ success: false, message: 'leadership must be an array' });
+    }
+ 
+    const settings = await Settings.getSettings();
+    settings.leadership = leadership;
+    settings.lastUpdatedBy = req.user.id;
+    await settings.save();
+ 
+    res.json({
+      success: true,
+      message: 'Leadership updated successfully',
+      leadership: settings.leadership,
+    });
+  } catch (error) {
+    console.error('[SETTINGS-LEADERSHIP-UPDATE] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update leadership', error: error.message });
+  }
+});
+ 
+// @desc    Replace entire serviceTimes array (admin only)
+// @route   PATCH /api/settings/service-times
+// @access  Private/Admin
+exports.updateServiceTimes = asyncHandler(async (req, res) => {
+  try {
+    const { serviceTimes } = req.body;
+ 
+    if (!Array.isArray(serviceTimes)) {
+      return res.status(400).json({ success: false, message: 'serviceTimes must be an array' });
+    }
+ 
+    const settings = await Settings.getSettings();
+    settings.serviceTimes = serviceTimes;
+    settings.lastUpdatedBy = req.user.id;
+    await settings.save();
+ 
+    res.json({
+      success: true,
+      message: 'Service times updated successfully',
+      serviceTimes: settings.serviceTimes,
+    });
+  } catch (error) {
+    console.error('[SETTINGS-SERVICE-TIMES-UPDATE] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update service times', error: error.message });
+  }
+});
+
 // @desc    Update email settings
 // @route   PATCH /api/settings/email
 // @access  Private/Admin
