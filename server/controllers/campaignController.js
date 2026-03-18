@@ -40,11 +40,23 @@ exports.createCampaign = asyncHandler(async (req, res) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    let initialStatus = 'draft';
-    if (start <= now && end > now) {
-      initialStatus = 'active';
-    } else if (end <= now) {
-      initialStatus = 'completed';
+    // ✅ FIX — day-level comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to start of today
+
+    const startDay = new Date(startDate);
+    startDay.setHours(0, 0, 0, 0);
+
+    const endDay = new Date(endDate);
+    endDay.setHours(0, 0, 0, 0);
+
+    let initialStatus;
+    if (endDay <= today) {
+      initialStatus = 'completed';   // end date is in the past
+    } else if (startDay <= today) {
+      initialStatus = 'active';      // starts today or started in the past
+    } else {
+      initialStatus = 'draft';       // starts in the future
     }
 
     // Create in MongoDB first
