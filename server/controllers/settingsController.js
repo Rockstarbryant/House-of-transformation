@@ -47,6 +47,9 @@ exports.getPublicSettings = asyncHandler(async (req, res) => {
       contactEmail: settings.contactEmail,
       contactPhone: settings.contactPhone,
       contactAddress: settings.contactAddress,
+      churchPaymentMethods: settings.churchPaymentMethods,
+      titheCard: settings.titheCard,
+      offeringCard: settings.offeringCard,
       socialMedia: settings.socialMedia,
       features: settings.features,
       maintenanceMode: {
@@ -116,6 +119,50 @@ exports.updateGeneralSettings = asyncHandler(async (req, res) => {
       message: 'Failed to update general settings',
       error: error.message
     });
+  }
+});
+
+// @desc    Update public-facing payment display config
+// @route   PATCH /api/settings/payment-methods
+// @access  Private/Admin
+exports.updatePaymentMethods = asyncHandler(async (req, res) => {
+  try {
+    const { churchPaymentMethods, titheCard, offeringCard } = req.body;
+
+    const settings = await Settings.getSettings();
+
+    if (churchPaymentMethods !== undefined) {
+      // Merge each sub-method so a partial update doesn't wipe sibling fields
+      const pm = settings.churchPaymentMethods || {};
+      ['paybill', 'till', 'bank', 'pochiLaBiashara', 'paypal'].forEach(key => {
+        if (churchPaymentMethods[key] !== undefined) {
+          pm[key] = { ...(pm[key] || {}), ...churchPaymentMethods[key] };
+        }
+      });
+      settings.churchPaymentMethods = pm;
+    }
+
+    if (titheCard !== undefined) {
+      settings.titheCard = { ...(settings.titheCard || {}), ...titheCard };
+    }
+
+    if (offeringCard !== undefined) {
+      settings.offeringCard = { ...(settings.offeringCard || {}), ...offeringCard };
+    }
+
+    settings.lastUpdatedBy = req.user._id;
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Payment display settings updated successfully',
+      churchPaymentMethods: settings.churchPaymentMethods,
+      titheCard:            settings.titheCard,
+      offeringCard:         settings.offeringCard,
+    });
+  } catch (error) {
+    console.error('[SETTINGS-PAYMENT-METHODS] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update payment methods', error: error.message });
   }
 });
 

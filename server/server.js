@@ -148,7 +148,8 @@ app.use('/api/', apiLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',            require('./routes/authRoutes'));
-app.use('/api/settings/public', require('./routes/settingsRoutes'));
+app.use('/api/settings',        require('./routes/settingsRoutes'));
+//app.use('/api/settings/public', require('./routes/settingsRoutes'));
 
 // Public content routes
 app.use('/api/sermons',            require('./routes/sermonRoutes'));
@@ -172,7 +173,7 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 // Protected routes
 app.use('/api/users',               require('./routes/userRoutes'));
 app.use('/api/roles',               protect, require('./routes/roleRoutes'));
-app.use('/api/settings',            protect, require('./routes/settingsRoutes'));
+//app.use('/api/settings',            protect, require('./routes/settingsRoutes'));
 app.use('/api/analytics',           protect, require('./routes/analyticsRoutes'));
 app.use('/api/audit',               protect, require('./routes/auditRoutes'));
 app.use('/api/transaction-audit',   protect, require('./routes/transactionAuditRoutes'));

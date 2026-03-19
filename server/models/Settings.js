@@ -181,6 +181,64 @@ donationSettings: {
   enablePledgeReminders: { type: Boolean, default: true }
 },
 
+
+// ── Public-facing payment display config ──────────────────────────────────────
+// These control what donors SEE on the donate page (paybill, till, bank etc.)
+// They are SEPARATE from M-Pesa API credentials used for STK Push.
+churchPaymentMethods: {
+  paybill: {
+    enabled:            { type: Boolean, default: false },
+    label:              { type: String,  default: 'M-Pesa Paybill' },
+    number:             { type: String,  default: '' },
+    titheAccountRef:    { type: String,  default: 'TITHE' },
+    offeringAccountRef: { type: String,  default: 'OFFERING' },
+    campaignAccountRef: { type: String,  default: 'CAMPAIGN' },
+  },
+  till: {
+    enabled: { type: Boolean, default: false },
+    label:   { type: String,  default: 'M-Pesa Till Number' },
+    number:  { type: String,  default: '' },
+  },
+  bank: {
+    enabled:       { type: Boolean, default: false },
+    label:         { type: String,  default: 'Bank Transfer' },
+    bankName:      { type: String,  default: '' },
+    accountNumber: { type: String,  default: '' },
+    accountName:   { type: String,  default: '' },
+    branchName:    { type: String,  default: '' },
+  },
+  pochiLaBiashara: {
+    enabled: { type: Boolean, default: false },
+    label:   { type: String,  default: 'Pochi la Biashara' },
+    number:  { type: String,  default: '' },
+    name:    { type: String,  default: '' },
+  },
+  paypal: {
+    enabled: { type: Boolean, default: false },
+    label:   { type: String,  default: 'PayPal' },
+    email:   { type: String,  default: '' },
+    link:    { type: String,  default: '' },
+  },
+},
+
+// Per-card display toggles for the Donate page
+titheCard: {
+  enabled:             { type: Boolean, default: true },
+  showPaybill:         { type: Boolean, default: true },
+  showTill:            { type: Boolean, default: true },
+  showBank:            { type: Boolean, default: true },
+  showPochiLaBiashara: { type: Boolean, default: false },
+  showPaypal:          { type: Boolean, default: false },
+},
+offeringCard: {
+  enabled:             { type: Boolean, default: true },
+  showPaybill:         { type: Boolean, default: true },
+  showTill:            { type: Boolean, default: true },
+  showBank:            { type: Boolean, default: true },
+  showPochiLaBiashara: { type: Boolean, default: false },
+  showPaypal:          { type: Boolean, default: false },
+},
+
   // Social Media Links
   socialMedia: {
     facebook: { type: String, default: '' },

@@ -7,6 +7,7 @@ const {
   updateEmailSettings,
   updateNotificationSettings,
   updateSecuritySettings,
+  updatePaymentMethods,
   updatePaymentSettings,
   updateSocialMedia,
   updateMaintenanceMode,
@@ -72,6 +73,7 @@ router.patch('/mpesa',            protect, requireAdmin, updateMpesaSettings);
 router.post('/mpesa/test',        protect, requireAdmin, testMpesaConnection);
 router.post('/mpesa/simulate',    protect, requireAdmin, simulateMpesaStkPush);
 router.patch('/payment',          protect, requireAdmin, updatePaymentGateway);
+router.patch('/payment-methods', protect, requireAdmin, updatePaymentMethods);
 
 // Donations
 router.get('/donations',          protect, requireAdmin, getDonationSettings);
