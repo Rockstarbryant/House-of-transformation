@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/env');
+const Sentry = require('../config/sentry');
 
 // Initialize Supabase with ANON_KEY for verification
 const supabase = createClient(
@@ -9,8 +10,10 @@ const supabase = createClient(
 
 /**
  * ✅ PROTECTED ROUTE - Verify Supabase JWT
- * Verifies token and attaches Supabase user + MongoDB profile to req.user
- * Usage: router.get('/protected', protect, controller)
+ * Verifies token and attaches Supabase user + MongoDB profile to req.user.
+ * Also calls Sentry.setUser() so every subsequent error in the same request
+ * is tagged with the authenticated user's ID, email, and role — making it
+ * trivial to search "all errors for user X" in the Sentry dashboard.
  */
 exports.protect = async (req, res, next) => {
   let token;
@@ -22,6 +25,7 @@ exports.protect = async (req, res, next) => {
 
   // No token provided
   if (!token) {
+    Sentry.setUser(null);
     return res.status(401).json({ 
       success: false,
       message: 'Not authorized to access this route' 
@@ -36,6 +40,7 @@ exports.protect = async (req, res, next) => {
 
     if (error || !data.user) {
       console.error('[AUTH-MIDDLEWARE] Token verification failed:', error);
+      Sentry.setUser(null);
       return res.status(401).json({ 
         success: false,
         message: 'Invalid or expired token' 
@@ -51,23 +56,34 @@ exports.protect = async (req, res, next) => {
 
     if (!mongoUser) {
       console.error('[AUTH-MIDDLEWARE] MongoDB profile not found for:', supabaseUser.id);
+      Sentry.setUser(null);
       return res.status(401).json({ 
         success: false,
         message: 'User profile not found' 
       });
     }
 
-    // Attach to request - POPULATE ROLE
-      const userWithRole = await User.findById(mongoUser._id).populate('role');
-      req.user = userWithRole.toObject();
-      req.user.supabase_uid = supabaseUser.id;
-      req.user.email = supabaseUser.email;
+    // Attach to request — populate role
+    const userWithRole = await User.findById(mongoUser._id).populate('role');
+    req.user = userWithRole.toObject();
+    req.user.supabase_uid = supabaseUser.id;
+    req.user.email = supabaseUser.email;
+
+    // Tag this request's Sentry scope with the authenticated user.
+    // Any error thrown after this point will include user context in Sentry.
+    Sentry.setUser({
+      id:    req.user._id.toString(),
+      email: req.user.email,
+      role:  req.user.role?.name,
+    });
 
     console.log('[AUTH-MIDDLEWARE] User authenticated:', req.user.email);
     next();
 
   } catch (error) {
     console.error('[AUTH-MIDDLEWARE] Token verification error:', error);
+    // Clear user context from Sentry so the error isn't attributed to a stale user
+    Sentry.setUser(null);
     return res.status(401).json({ 
       success: false,
       message: 'Token verification failed' 
@@ -77,8 +93,8 @@ exports.protect = async (req, res, next) => {
 
 /**
  * ✅ OPTIONAL AUTH - Attach user if token exists
- * Doesn't fail if no token - continues with req.user = null
- * Usage: router.get('/public', optionalAuth, controller)
+ * Doesn't fail if no token — continues with req.user = null.
+ * Sets Sentry user context when a valid token is present.
  */
 exports.optionalAuth = async (req, res, next) => {
   try {
@@ -88,9 +104,10 @@ exports.optionalAuth = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // If no token, continue as guest
+    // No token — continue as guest, clear any stale Sentry user context
     if (!token) {
       req.user = null;
+      Sentry.setUser(null);
       return next();
     }
 
@@ -99,6 +116,7 @@ exports.optionalAuth = async (req, res, next) => {
 
     if (!data.user) {
       req.user = null;
+      Sentry.setUser(null);
       return next();
     }
 
@@ -109,14 +127,21 @@ exports.optionalAuth = async (req, res, next) => {
     if (mongoUser) {
       req.user = mongoUser.toObject();
       req.user.supabase_uid = data.user.id;
+      // Set Sentry user context for optional-auth routes too
+      Sentry.setUser({
+        id:    req.user._id.toString(),
+        email: data.user.email,
+      });
     } else {
       req.user = null;
+      Sentry.setUser(null);
     }
 
     next();
 
   } catch (error) {
     console.error('[AUTH-MIDDLEWARE] Optional auth error:', error);
+    Sentry.setUser(null);
     req.user = null;
     next();
   }
@@ -124,7 +149,7 @@ exports.optionalAuth = async (req, res, next) => {
 
 /**
  * ✅ ROLE-BASED AUTHORIZATION
- * Must be used AFTER protect middleware
+ * Must be used AFTER protect middleware.
  * Usage: router.post('/admin', protect, authorize('admin'), controller)
  */
 exports.authorize = (...roleNames) => {
@@ -137,10 +162,7 @@ exports.authorize = (...roleNames) => {
         });
       }
 
-      // Check if roleNames includes the string 'admin' or other legacy names
-      // If so, do simple string check on user object
       if (roleNames.includes('admin') || roleNames.includes('pastor') || roleNames.includes('bishop')) {
-        // NEW: Populate role and check role.name
         const User = require('../models/User');
         const fullUser = await User.findById(req.user._id).populate('role');
         
@@ -152,7 +174,6 @@ exports.authorize = (...roleNames) => {
           });
         }
 
-        // Check if user's role name matches any of the required role names
         if (!roleNames.includes(fullUser.role.name)) {
           return res.status(403).json({ 
             success: false,
@@ -162,11 +183,9 @@ exports.authorize = (...roleNames) => {
           });
         }
 
-        // Attach populated role to request
         req.user = fullUser.toObject();
         next();
       } else {
-        // If checking permissions instead, pass to requirePermission
         next();
       }
     } catch (error) {

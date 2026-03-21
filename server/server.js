@@ -1,42 +1,50 @@
-const express = require('express');
-const path    = require('path');
-const dotenv  = require('dotenv');
-const cors    = require('cors');
-
+// ── Load env vars FIRST — everything below depends on them ───────────────────
+const path   = require('path');
+const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+// ── Sentry SECOND — must patch express/http/mongo before they are required ───
+// expressIntegration() in sentry.js auto-instruments routes — do NOT manually
+// add expressRequestHandler() / expressTracingHandler() anywhere in this file.
+require('./config/sentry');
+const Sentry = require('@sentry/node');
+
+const express = require('express');
+const cors    = require('cors');
+
 const connectDB    = require('./config/database');
-const errorHandler = require('./middleware/errorHandler');
-const { apiLimiter, authLimiter, signupLimiter } = require('./middleware/rateLimiter');
+const { errorHandler } = require('./middleware/errorHandler');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 const config = require('./config/env');
 console.log('\n🔍 Supabase Configuration Check:');
-console.log('   SUPABASE_URL:',        config.SUPABASE_URL        ? '✓ Loaded' : '✗ MISSING');
-console.log('   SUPABASE_ANON_KEY:',   config.SUPABASE_ANON_KEY   ? '✓ Loaded' : '✗ MISSING');
-console.log('   SUPABASE_SERVICE_KEY:',config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '✗ MISSING');
-console.log('   MONGODB_URI:',         config.MONGODB_URI          ? '✓ Loaded' : '✗ MISSING');
-console.log('   REDIS_URL:',           process.env.REDIS_URL        ? '✓ Loaded' : '⚠ Using default localhost');
-console.log('   BREVO_API_KEY:',       process.env.BREVO_API_KEY    ? '✓ Loaded' : '⚠ Email/SMS notifications disabled');
-console.log('   AT_API_KEY:',          process.env.AT_API_KEY       ? '✓ Loaded' : '⚠ SMS notifications disabled');
-console.log('   NODE_ENV:',            process.env.NODE_ENV || 'development');
+console.log('   SUPABASE_URL:',         config.SUPABASE_URL        ? '✓ Loaded' : '✗ MISSING');
+console.log('   SUPABASE_ANON_KEY:',    config.SUPABASE_ANON_KEY   ? '✓ Loaded' : '✗ MISSING');
+console.log('   SUPABASE_SERVICE_KEY:', config.SUPABASE_SERVICE_KEY ? '✓ Loaded' : '✗ MISSING');
+console.log('   MONGODB_URI:',          config.MONGODB_URI          ? '✓ Loaded' : '✗ MISSING');
+console.log('   REDIS_URL:',            process.env.REDIS_URL        ? '✓ Loaded' : '⚠ Using default localhost');
+console.log('   BREVO_API_KEY:',        process.env.BREVO_API_KEY    ? '✓ Loaded' : '⚠ Email/SMS notifications disabled');
+console.log('   AT_API_KEY:',           process.env.AT_API_KEY       ? '✓ Loaded' : '⚠ SMS notifications disabled');
+console.log('   SENTRY_DSN:',           process.env.SENTRY_DSN       ? '✓ Loaded' : '⚠ Error tracking disabled');
+console.log('   STATUS_USER:',          process.env.STATUS_USER      ? '✓ Loaded' : '⚠ Using default (admin)');
+console.log('   NODE_ENV:',             process.env.NODE_ENV || 'development');
 console.log('');
 
 const auditMiddleware = require('./middleware/auditMiddleware');
-const { protect } = require('./middleware/supabaseAuth');
+const { protect }     = require('./middleware/supabaseAuth');
+const requestLogger   = require('./middleware/requestLogger');
 
 require('./config/cloudinaryConfig');
 
 connectDB();
 
 // ── Start workers ─────────────────────────────────────────────────────────────
-// Only initialise if Redis is configured.
-let stopNotificationWorker  = async () => {};
-let stopCommunicationWorker = async () => {};
-let stopPledgeReminderWorker = async () => {};  // ✅ NEW
+let stopNotificationWorker   = async () => {};
+let stopCommunicationWorker  = async () => {};
+let stopPledgeReminderWorker = async () => {};
 
 if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
 
-  // Existing announcement notification worker
   try {
     const { startNotificationWorker, stopNotificationWorker: _stop1 } = require('./workers/notificationWorker');
     startNotificationWorker();
@@ -47,7 +55,6 @@ if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
     console.error('   Announcements will still work — email/SMS notifications will not be sent');
   }
 
-  // Communication broadcast worker
   try {
     const { startCommunicationWorker, stopCommunicationWorker: _stop2 } = require('./workers/communicationWorker');
     startCommunicationWorker();
@@ -58,7 +65,6 @@ if (process.env.REDIS_URL || process.env.NODE_ENV === 'development') {
     console.error('   Communications will still be queued — they will process once worker recovers');
   }
 
-  // ✅ NEW: Pledge reminder worker + daily cron scheduler
   try {
     const { startPledgeReminderWorker, stopPledgeReminderWorker: _stop3 } = require('./workers/pledgeReminderWorker');
     const { startPledgeReminderScheduler } = require('./jobs/pledgeReminderScheduler');
@@ -77,7 +83,7 @@ const app = express();
 // ── Trust proxy ───────────────────────────────────────────────────────────────
 app.set('trust proxy', 1);
 
-// ── Body parser ───────────────────────────────────────────────────────────────
+// ── Body parsers ──────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -110,6 +116,9 @@ app.use(
   })
 );
 
+// ── HTTP request logger (Morgan → Winston → MongoDB) ─────────────────────────
+app.use(requestLogger);
+
 // ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static('uploads'));
 
@@ -120,15 +129,15 @@ app.use('/api', auditMiddleware);
 app.get('/', (req, res) => {
   res.json({
     message:  'Welcome to House of Transformation API',
-    version:  '2.2.0',  // ✅ bumped
+    version:  '2.2.0',
     features: [
       'SSE',
       'Email (Brevo)',
       'SMS (Africa\'s Talking)',
       'BullMQ Job Queue',
       'Communication Broadcasts',
-      'Pledge Reminders',       // ✅ NEW
-      'Campaign Thank-You Messages', // ✅ NEW
+      'Pledge Reminders',
+      'Campaign Thank-You Messages',
     ],
   });
 });
@@ -137,9 +146,10 @@ app.get('/api/health', (req, res) => {
   res.json({
     success:        true,
     message:        'Server is running',
-    queue:          process.env.REDIS_URL ? 'connected' : 'redis not configured',
+    queue:          process.env.REDIS_URL     ? 'connected'  : 'redis not configured',
     brevo:          process.env.BREVO_API_KEY ? 'configured' : 'not configured',
-    africasTalking: process.env.AT_API_KEY   ? 'configured' : 'not configured',
+    africasTalking: process.env.AT_API_KEY    ? 'configured' : 'not configured',
+    sentry:         process.env.SENTRY_DSN    ? 'configured' : 'not configured',
   });
 });
 
@@ -147,25 +157,24 @@ app.get('/api/health', (req, res) => {
 app.use('/api/', apiLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/auth',            require('./routes/authRoutes'));
-app.use('/api/settings',        require('./routes/settingsRoutes'));
-//app.use('/api/settings/public', require('./routes/settingsRoutes'));
+app.use('/api/auth',             require('./routes/authRoutes'));
+app.use('/api/settings',         require('./routes/settingsRoutes'));
 
 // Public content routes
-app.use('/api/sermons',            require('./routes/sermonRoutes'));
-app.use('/api/blog',               require('./routes/blogRoutes'));
-app.use('/api/events',             require('./routes/eventRoutes'));
-app.use('/api/gallery',            require('./routes/galleryRoutes'));
-app.use('/api/campaigns',          require('./routes/campaignRoutes'));
-app.use('/api/contributions',      require('./routes/contributionRoutes'));
-app.use('/api/pledges',            require('./routes/pledgeRoutes'));
-app.use('/api/payments',           require('./routes/paymentRoutes'));
-app.use('/api/mpesa',              require('./routes/mpesaCallbackRoutes'));
-app.use('/api/donations/analytics',require('./routes/donationAnalyticsRoutes'));
-app.use('/api/livestreams',        require('./routes/livestreamRoutes'));
-app.use('/api/feedback',           require('./routes/feedbackRoutes'));
-app.use('/api/volunteers',         require('./routes/volunteerRoutes'));
-app.use('/api/notices',            require('./routes/noticeRoutes'));
+app.use('/api/sermons',             require('./routes/sermonRoutes'));
+app.use('/api/blog',                require('./routes/blogRoutes'));
+app.use('/api/events',              require('./routes/eventRoutes'));
+app.use('/api/gallery',             require('./routes/galleryRoutes'));
+app.use('/api/campaigns',           require('./routes/campaignRoutes'));
+app.use('/api/contributions',       require('./routes/contributionRoutes'));
+app.use('/api/pledges',             require('./routes/pledgeRoutes'));
+app.use('/api/payments',            require('./routes/paymentRoutes'));
+app.use('/api/mpesa',               require('./routes/mpesaCallbackRoutes'));
+app.use('/api/donations/analytics', require('./routes/donationAnalyticsRoutes'));
+app.use('/api/livestreams',         require('./routes/livestreamRoutes'));
+app.use('/api/feedback',            require('./routes/feedbackRoutes'));
+app.use('/api/volunteers',          require('./routes/volunteerRoutes'));
+app.use('/api/notices',             require('./routes/noticeRoutes'));
 
 // Announcements (mixed auth — SSE uses protectSSE, rest use protect)
 app.use('/api/announcements', require('./routes/announcementRoutes'));
@@ -173,7 +182,6 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 // Protected routes
 app.use('/api/users',               require('./routes/userRoutes'));
 app.use('/api/roles',               protect, require('./routes/roleRoutes'));
-//app.use('/api/settings',            protect, require('./routes/settingsRoutes'));
 app.use('/api/analytics',           protect, require('./routes/analyticsRoutes'));
 app.use('/api/audit',               protect, require('./routes/auditRoutes'));
 app.use('/api/transaction-audit',   protect, require('./routes/transactionAuditRoutes'));
@@ -190,7 +198,14 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found', path: req.path, method: req.method });
 });
 
-// ── Global error handler ──────────────────────────────────────────────────────
+// ── Error handlers ────────────────────────────────────────────────────────────
+// Sentry v10 correct API: setupExpressErrorHandler(app) — called after routes,
+// before your own error handler. Captures unhandled errors and attaches
+// res.sentry (event ID) before errorHandler runs.
+// Safe no-op if SENTRY_DSN is not set (sentry.js skips init in that case).
+Sentry.setupExpressErrorHandler(app);
+
+// Winston → MongoDB error logging + JSON response
 app.use(errorHandler);
 
 // ── Start server ──────────────────────────────────────────────────────────────
@@ -203,6 +218,9 @@ const server = app.listen(PORT, () => {
   console.log(`\n✓ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`✓ CORS origins: ${allowedOrigins.join(', ')}`);
   console.log(`✓ Rate limiting: 1000 req / 15 min`);
+  if (process.env.SENTRY_DSN) {
+    console.log(`✓ Sentry error tracking: active`);
+  }
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
@@ -212,19 +230,17 @@ const gracefulShutdown = async (signal) => {
   server.close(async () => {
     console.log('[Server] HTTP server closed');
 
-    // Stop all workers
     await stopNotificationWorker();
     await stopCommunicationWorker();
-    await stopPledgeReminderWorker();   // ✅ NEW
+    await stopPledgeReminderWorker();
 
-    // Close all queues
     const { closeQueue: closeNotifQueue }         = require('./queues/notificationQueue');
     const { closeQueue: closeCommQueue }           = require('./queues/communicationQueue');
-    const { closeQueue: closePledgeReminderQueue } = require('./queues/pledgeReminderQueue'); // ✅ NEW
+    const { closeQueue: closePledgeReminderQueue } = require('./queues/pledgeReminderQueue');
 
     await closeNotifQueue();
     await closeCommQueue();
-    await closePledgeReminderQueue();  // ✅ NEW
+    await closePledgeReminderQueue();
 
     process.exit(0);
   });
