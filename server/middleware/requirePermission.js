@@ -56,7 +56,7 @@ exports.requirePermission = (...requiredPermissions) => {
       console.log('[PERMISSION] User permissions:', userPermissions);
       console.log('[PERMISSION] Required permissions:', requiredPermissions);
 
-      // BROAD PERMISSION EXPANSION
+      // ── BROAD PERMISSION EXPANSION ────────────────────────────────────────
       // If user has manage:X, they automatically have all granular X permissions
       const expandedPermissions = [...userPermissions];
       
@@ -73,44 +73,55 @@ exports.requirePermission = (...requiredPermissions) => {
       }
 
       // Donation permission expansion
-        if (userPermissions.includes('manage:donations')) {
-          expandedPermissions.push(
-            // Campaign permissions
-            'view:campaigns',
-            'create:campaigns',
-            'edit:campaigns',
-            'delete:campaigns',
-            'activate:campaigns',
-            'feature:campaigns',
-            
-            // Pledge permissions
-            'view:pledges',
-            'view:pledges:all',
-            'approve:pledges',
-            'edit:pledges',
-            
-            // Payment permissions
-            'view:payments',
-            'view:payments:all',
-            'process:payments',
-            'verify:payments',
-            
-            // Reports
-            'view:donation:reports'
-          );
-        }
+      if (userPermissions.includes('manage:donations')) {
+        expandedPermissions.push(
+          // Campaign permissions
+          'view:campaigns',
+          'create:campaigns',
+          'edit:campaigns',
+          'delete:campaigns',
+          'activate:campaigns',
+          'feature:campaigns',
+          
+          // Pledge permissions
+          'view:pledges',
+          'view:pledges:all',
+          'approve:pledges',
+          'edit:pledges',
+          
+          // Payment permissions
+          'view:payments',
+          'view:payments:all',
+          'process:payments',
+          'verify:payments',
+          
+          // Reports
+          'view:donation:reports'
+        );
+      }
 
-        
+      // Announcement permission expansion
+      if (userPermissions.includes('manage:announcements')) {
+        expandedPermissions.push(
+          'view:announcements',
+          'create:announcements',
+          'edit:announcements',
+          'delete:announcements'
+        );
+      }
 
-        // Announcement permission expansion (if needed)
-        if (userPermissions.includes('manage:announcements')) {
-          expandedPermissions.push(
-            'view:announcements',
-            'create:announcements',
-            'edit:announcements',
-            'delete:announcements'
-          );
-        }
+      // ── NEW: Members permission expansion ────────────────────────────────
+      // manage:members expands to granular member actions
+      if (userPermissions.includes('manage:members')) {
+        expandedPermissions.push(
+          'view:members',
+          'create:members',
+          'edit:members',
+          'delete:members',
+          'approve:members',
+          'reject:members',
+        );
+      }
 
       userPermissions = expandedPermissions;
       console.log('[PERMISSION] Expanded permissions:', userPermissions);

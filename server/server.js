@@ -176,6 +176,8 @@ app.use('/api/feedback',            require('./routes/feedbackRoutes'));
 app.use('/api/volunteers',          require('./routes/volunteerRoutes'));
 app.use('/api/notices',             require('./routes/noticeRoutes'));
 
+ app.use('/api/members',             require('./routes/membershipRoutes'));
+
 // Announcements (mixed auth — SSE uses protectSSE, rest use protect)
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 

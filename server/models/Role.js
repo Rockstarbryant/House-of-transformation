@@ -24,6 +24,7 @@ const roleSchema = new mongoose.Schema({
       'manage:sermons',
       'manage:gallery',
       'manage:donations',
+      'manage:members',
       'manage:users',
       'manage:roles',
       'manage:blog',
